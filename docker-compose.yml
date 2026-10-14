@@ -1,0 +1,43 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: fm-postgres
+    environment:
+      POSTGRES_DB: familymarket
+      POSTGRES_USER: familymarket
+      POSTGRES_PASSWORD: familymarket
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U familymarket -d familymarket"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  backend:
+    build: ./backend
+    container_name: fm-backend
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/familymarket
+      DB_USER: familymarket
+      DB_PASSWORD: familymarket
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me-in-production-0123456789abcdef}
+      CORS_ORIGINS: http://localhost,http://localhost:5173
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    container_name: fm-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
