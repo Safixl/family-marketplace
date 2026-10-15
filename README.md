@@ -29,7 +29,7 @@ docker compose up --build
 ```
 
 - Фронтенд: http://localhost (nginx проксирует `/api` на backend)
-- Backend API: http://localhost:8080/api
+- Backend API: https://likely-discerning-maggot.cloudpub.ru/api
 - PostgreSQL: `localhost:5432`, база `familymarket`, пользователь `familymarket`
 
 > Для доступа с других устройств в локальной сети откройте `http://<IP-машины>`.
@@ -55,7 +55,7 @@ docker compose up --build
    cd backend
    ./gradlew bootRun
    ```
-3. **Frontend** (Vite dev-сервер проксирует `/api` на `localhost:8080`):
+3. **Frontend** (Vite dev-сервер проксирует `/api` на `https://likely-discerning-maggot.cloudpub.ru`):
    ```bash
    cd frontend
    npm install

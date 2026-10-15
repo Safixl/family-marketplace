@@ -24,7 +24,7 @@ services:
       DB_USER: familymarket
       DB_PASSWORD: familymarket
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me-in-production-0123456789abcdef}
-      CORS_ORIGINS: http://localhost,http://localhost:5173
+      CORS_ORIGINS: http://localhost,http://localhost:5173,https://likely-discerning-maggot.cloudpub.ru
     ports:
       - "8080:8080"
     depends_on:
