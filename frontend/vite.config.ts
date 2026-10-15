@@ -5,6 +5,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    allowedHosts: ['.cloudpub.ru'],
     proxy: {
       '/api': {
         target: 'https://likely-discerning-maggot.cloudpub.ru',

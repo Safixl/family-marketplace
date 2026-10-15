@@ -5,7 +5,7 @@ spring:
   application:
     name: family-marketplace
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/familymarket}
+    url: ${DB_URL:jdbc:postgresql://tcp.cloudpub.ru:15401/familymarket}
     username: ${DB_USER:familymarket}
     password: ${DB_PASSWORD:familymarket}
   jpa:

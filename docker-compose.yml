@@ -20,7 +20,7 @@ services:
     build: ./backend
     container_name: fm-backend
     environment:
-      DB_URL: jdbc:postgresql://postgres:5432/familymarket
+      DB_URL: jdbc:postgresql://tcp.cloudpub.ru:15401/familymarket
       DB_USER: familymarket
       DB_PASSWORD: familymarket
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me-in-production-0123456789abcdef}
