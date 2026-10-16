@@ -8,7 +8,7 @@ export default defineConfig({
     allowedHosts: ['.cloudpub.ru'],
     proxy: {
       '/api': {
-        target: 'https://likely-discerning-maggot.cloudpub.ru',
+        target: 'http://localhost:8080',
         changeOrigin: true,
       },
     },
