@@ -33,6 +33,7 @@ public class InventoryService {
         item.setProduct(purchase.getProduct());
         item.setPurchase(purchase);
         item.setStatus("AVAILABLE");
+        item.setItemType(purchase.getStore().isWardrobe() ? "WARDROBE" : "COUPON");
         item.setCreatedAt(Instant.now());
         inventoryItemRepository.save(item);
     }

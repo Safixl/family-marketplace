@@ -1,5 +1,6 @@
 package com.familymarket.store;
 
+import com.familymarket.seasonal.SeasonalEvent;
 import com.familymarket.user.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -46,6 +47,15 @@ public class Store {
 
     @Column(name = "template_type", length = 32)
     private String templateType;
+
+    /** Магазин «Гардероб Героя»: покупки = цифровая кастомизация (Инвентарь А). */
+    @Column(nullable = false)
+    private boolean wardrobe;
+
+    /** Сезонный ивент, к которому привязан магазин (сезонный магазин). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "seasonal_event_id")
+    private SeasonalEvent seasonalEvent;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

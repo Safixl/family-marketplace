@@ -8,5 +8,6 @@ public record StoreUpsertRequest(
         @Size(max = 2000, message = "Описание слишком длинное") String description,
         @NotBlank(message = "Укажите название валюты") @Size(max = 50, message = "Название валюты слишком длинное") String currencyName,
         @Size(max = 16, message = "Иконка валюты слишком длинная") String currencyIcon,
-        Boolean active) {
+        Boolean active,
+        Boolean wardrobe) {
 }

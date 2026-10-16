@@ -25,4 +25,7 @@ public interface ReadingLogRepository extends JpaRepository<ReadingLog, Long> {
 
     @Query("select coalesce(sum(l.book.pages), 0) from ReadingLog l where l.child.id = :childId and l.status = 'APPROVED'")
     long sumPagesByChildId(@Param("childId") Long childId);
+
+    @Query("select distinct l.readAt from ReadingLog l where l.child.id = :childId and l.status = 'APPROVED'")
+    List<java.time.LocalDate> findDistinctApprovedDates(@Param("childId") Long childId);
 }

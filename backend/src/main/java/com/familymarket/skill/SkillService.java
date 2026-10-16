@@ -6,6 +6,7 @@ import com.familymarket.achievement.AchievementService;
 import com.familymarket.achievement.ChildAchievementRepository;
 import com.familymarket.child.ChildRepository;
 import com.familymarket.common.NotFoundException;
+import com.familymarket.daily.DailyLogRepository;
 import com.familymarket.dto.SkillProgressDto;
 import com.familymarket.house.HouseDayRepository;
 import com.familymarket.math.MathAttemptRepository;
@@ -43,6 +44,7 @@ public class SkillService {
     private final ReadingLogRepository readingLogRepository;
     private final MathAttemptRepository mathAttemptRepository;
     private final HouseDayRepository houseDayRepository;
+    private final DailyLogRepository dailyLogRepository;
     private final AchievementService achievementService;
 
     public SkillService(ChildRepository childRepository,
@@ -51,6 +53,7 @@ public class SkillService {
                         ReadingLogRepository readingLogRepository,
                         MathAttemptRepository mathAttemptRepository,
                         HouseDayRepository houseDayRepository,
+                        DailyLogRepository dailyLogRepository,
                         AchievementService achievementService) {
         this.childRepository = childRepository;
         this.achievementRepository = achievementRepository;
@@ -58,7 +61,13 @@ public class SkillService {
         this.readingLogRepository = readingLogRepository;
         this.mathAttemptRepository = mathAttemptRepository;
         this.houseDayRepository = houseDayRepository;
+        this.dailyLogRepository = dailyLogRepository;
         this.achievementService = achievementService;
+    }
+
+    /** Опыт из ежедневных дейликов навыка (включает бонус Full Clear). */
+    private long dailyXp(Long childId, String skill) {
+        return dailyLogRepository.sumXpByChildIdAndSkill(childId, skill);
     }
 
     @Transactional(readOnly = true)
@@ -94,9 +103,12 @@ public class SkillService {
 
             // Активностная часть (0..40)
             double activityScore = switch (meta.skill()) {
-                case "MATH" -> Math.min(40, mathCorrect * 2.0);
+                case "MATH" -> Math.min(40, mathCorrect * 2.0 + dailyXp(childId, "MATH"));
                 case "READING" -> Math.min(40, booksRead * 2.0 + pagesRead / 200.0);
                 case "HOUSE" -> Math.min(40, housePositive * 1.5);
+                case "LOGIC" -> Math.min(40, dailyXp(childId, "LOGIC"));
+                case "LANG" -> Math.min(40, dailyXp(childId, "LANG"));
+                case "SPORT" -> Math.min(40, dailyXp(childId, "SPORT"));
                 default -> 0;
             };
 

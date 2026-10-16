@@ -15,6 +15,7 @@ export interface ChildDto {
   avatarEmoji: string;
   accessKey: string;
   active: boolean;
+  age: number | null;
   createdAt: string;
 }
 
@@ -26,6 +27,7 @@ export interface StoreDto {
   currencyIcon: string;
   active: boolean;
   templateType: string | null;
+  wardrobe: boolean;
   createdAt: string;
 }
 
@@ -119,6 +121,8 @@ export interface AchievementDto {
   level: number;
   hiddenReward: boolean;
   rewardStoreId: number | null;
+  xpReward: number;
+  title: string | null;
   createdAt: string;
 }
 
@@ -346,6 +350,142 @@ export interface InventoryItemDto {
   currencyName: string;
   currencyIcon: string;
   status: InventoryStatus;
+  itemType: 'WARDROBE' | 'COUPON';
   createdAt: string;
   resolvedAt: string | null;
+}
+
+// ---------- «Дейлики»: квесты, уровень, депозиты, сезонные ивенты ----------
+
+export interface LevelDto {
+  xp: number;
+  level: number;
+  xpInLevel: number;
+  xpToNext: number;
+  ratio: number;
+  rank: string;
+  rankEmoji: string;
+}
+
+export type QuestType = 'DAILY' | 'STORY' | 'SEASONAL';
+
+export interface QuestDto {
+  id: number;
+  parentId: number;
+  childId: number | null;
+  type: QuestType;
+  title: string;
+  description: string | null;
+  icon: string;
+  rewardStoreId: number | null;
+  rewardStoreName: string | null;
+  currencyName: string | null;
+  currencyIcon: string | null;
+  rewardAmount: number;
+  xpReward: number;
+  seasonalEventId: number | null;
+  repeatable: boolean;
+  active: boolean;
+  createdAt: string;
+}
+
+export type SubmissionStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface QuestSubmissionDto {
+  id: number;
+  questId: number;
+  questTitle: string;
+  questIcon: string;
+  questType: QuestType;
+  childId: number;
+  childName: string;
+  childAvatar: string;
+  status: SubmissionStatus;
+  comment: string | null;
+  photoUrl: string | null;
+  rewardAmount: number;
+  currencyName: string | null;
+  currencyIcon: string | null;
+  xpReward: number;
+  seasonalEventId: number | null;
+  createdAt: string;
+  resolvedAt: string | null;
+}
+
+export interface SeasonalEventDto {
+  id: number;
+  name: string;
+  description: string | null;
+  tokenName: string;
+  tokenIcon: string;
+  startsAt: string;
+  endsAt: string;
+  active: boolean;
+  openNow: boolean;
+  createdAt: string;
+}
+
+export interface DepositDto {
+  id: number;
+  childId: number;
+  storeId: number;
+  storeName: string;
+  currencyName: string;
+  currencyIcon: string;
+  amount: number;
+  rate: number;
+  lastInterestAt: string;
+}
+
+export interface AvatarItemDto {
+  id: number;
+  name: string;
+  description: string | null;
+  category: 'SKIN' | 'FRAME' | 'PET' | 'BACKGROUND';
+  icon: string;
+  createdAt: string;
+}
+
+export interface ChildAvatarItemDto {
+  id: number;
+  itemId: number;
+  name: string;
+  category: 'SKIN' | 'FRAME' | 'PET' | 'BACKGROUND';
+  icon: string;
+  equipped: boolean;
+  unlockedAt: string;
+}
+
+export interface DailyTaskDto {
+  index: number;
+  type: string;
+  question: string;
+}
+
+export interface LangWordDto {
+  id: string;
+  word: string;
+  translation: string;
+  learned: boolean;
+}
+
+export interface DailySkillDto {
+  skill: string;
+  name: string;
+  icon: string;
+  currencyName: string | null;
+  currencyIcon: string | null;
+  tasks: DailyTaskDto[];
+  words: LangWordDto[];
+  minutesLogged: number;
+  stepsLogged: number;
+  pointsEarned: number;
+  pointsTarget: number;
+  fullClear: boolean;
+  completed: boolean;
+}
+
+export interface DailyStateDto {
+  day: string;
+  skills: DailySkillDto[];
 }

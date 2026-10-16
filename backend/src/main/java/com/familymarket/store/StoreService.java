@@ -48,6 +48,7 @@ public class StoreService {
         store.setCurrencyName(request.currencyName().trim());
         store.setCurrencyIcon(defaultIcon(request.currencyIcon()));
         store.setActive(request.active() == null || request.active());
+        store.setWardrobe(Boolean.TRUE.equals(request.wardrobe()));
         store.setCreatedAt(Instant.now());
         return storeRepository.save(store);
     }
@@ -63,6 +64,9 @@ public class StoreService {
         }
         if (request.active() != null) {
             store.setActive(request.active());
+        }
+        if (request.wardrobe() != null) {
+            store.setWardrobe(request.wardrobe());
         }
         return storeRepository.save(store);
     }

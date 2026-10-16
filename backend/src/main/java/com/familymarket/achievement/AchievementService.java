@@ -5,6 +5,7 @@ import com.familymarket.balance.BalanceRepository;
 import com.familymarket.child.Child;
 import com.familymarket.child.ChildRepository;
 import com.familymarket.common.NotFoundException;
+import com.familymarket.daily.DailyLogRepository;
 import com.familymarket.dto.AchievementDto;
 import com.familymarket.dto.AchievementUpsertRequest;
 import com.familymarket.dto.ChildAchievementGroupDto;
@@ -45,6 +46,7 @@ public class AchievementService {
     private final MathAttemptRepository mathAttemptRepository;
     private final HouseDayRepository houseDayRepository;
     private final PurchaseRepository purchaseRepository;
+    private final DailyLogRepository dailyLogRepository;
     private final BalanceService balanceService;
 
     public AchievementService(AchievementRepository achievementRepository,
@@ -57,6 +59,7 @@ public class AchievementService {
                               MathAttemptRepository mathAttemptRepository,
                               HouseDayRepository houseDayRepository,
                               PurchaseRepository purchaseRepository,
+                              DailyLogRepository dailyLogRepository,
                               BalanceService balanceService) {
         this.achievementRepository = achievementRepository;
         this.childRepository = childRepository;
@@ -68,6 +71,7 @@ public class AchievementService {
         this.mathAttemptRepository = mathAttemptRepository;
         this.houseDayRepository = houseDayRepository;
         this.purchaseRepository = purchaseRepository;
+        this.dailyLogRepository = dailyLogRepository;
         this.balanceService = balanceService;
     }
 
@@ -92,6 +96,8 @@ public class AchievementService {
         achievement.setSkill(normalizeSkill(request.skill()));
         achievement.setLevel(request.level() == null ? 0 : request.level());
         achievement.setHiddenReward(Boolean.TRUE.equals(request.hiddenReward()));
+        achievement.setXpReward(request.xpReward() == null ? 0 : request.xpReward());
+        achievement.setTitle(trimToNull(request.title()));
         if (request.rewardStoreId() != null) {
             achievement.setRewardStore(storeRepository.findById(request.rewardStoreId())
                     .orElseThrow(() -> new NotFoundException("Магазин не найден")));
@@ -134,6 +140,12 @@ public class AchievementService {
                     .orElseThrow(() -> new NotFoundException("Магазин не найден")));
         } else if (request.rewardStoreId() != null || request.rewardStoreId() == null && request.targetType() != null) {
             // rewardStoreId == null оставляем как есть
+        }
+        if (request.xpReward() != null) {
+            achievement.setXpReward(request.xpReward());
+        }
+        if (request.title() != null) {
+            achievement.setTitle(trimToNull(request.title()));
         }
         return achievementRepository.save(achievement);
     }
@@ -290,6 +302,13 @@ public class AchievementService {
             case "HOUSE_CLEAN_STREAK" -> streak(houseDayRepository.findCleanRoomDays(childId));
             case "HOUSE_HELP_STREAK" -> streak(houseDayRepository.findHelpDays(childId));
             case "HOME_PURCHASES" -> purchaseRepository.countPaidInHomeStores(childId);
+            case "LOGIC_TASKS" -> dailyLogRepository.sumPointsByChildIdAndSkill(childId, "LOGIC");
+            case "LANG_WORDS" -> dailyLogRepository.sumPointsByChildIdAndSkill(childId, "LANG");
+            case "SPORT_DAYS" -> dailyLogRepository.findActiveDays(childId, "SPORT").size();
+            case "READING_STREAK" -> streak(readingLogRepository.findDistinctApprovedDates(childId));
+            case "LOGIC_STREAK" -> streak(dailyLogRepository.findActiveDays(childId, "LOGIC"));
+            case "LANG_STREAK" -> streak(dailyLogRepository.findActiveDays(childId, "LANG"));
+            case "SPORT_STREAK" -> streak(dailyLogRepository.findActiveDays(childId, "SPORT"));
             default -> 0;
         };
     }
@@ -327,7 +346,9 @@ public class AchievementService {
         String normalized = targetType.trim().toUpperCase();
         return switch (normalized) {
             case "READING_BOOKS", "READING_PAGES", "MATH_TASKS", "POINTS_EARNED",
-                    "MATH_STREAK", "HOUSE_CLEAN_STREAK", "HOUSE_HELP_STREAK", "HOME_PURCHASES" -> normalized;
+                    "MATH_STREAK", "HOUSE_CLEAN_STREAK", "HOUSE_HELP_STREAK", "HOME_PURCHASES",
+                    "LOGIC_TASKS", "LANG_WORDS", "SPORT_DAYS",
+                    "READING_STREAK", "LOGIC_STREAK", "LANG_STREAK", "SPORT_STREAK" -> normalized;
             default -> "NONE";
         };
     }

@@ -21,4 +21,6 @@ public interface StoreRepository extends JpaRepository<Store, Long> {
 
     @Query("select s.parent.id from Store s where s.id = :id")
     Optional<Long> findParentIdById(@Param("id") Long id);
+
+    List<Store> findByParentIdAndSeasonalEventIdOrderByCreatedAtAsc(Long parentId, Long seasonalEventId);
 }

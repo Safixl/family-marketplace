@@ -51,4 +51,8 @@ public class Child {
     /** JSON-массив виджетов главной страницы ребёнка. */
     @Column(name = "home_widgets", length = 500)
     private String homeWidgets = "[\"balances\",\"stats\",\"achievements\",\"orders\"]";
+
+    /** Возраст ребёнка (5-16): влияет на сложность дейликов и масштаб цен. */
+    @Column
+    private Integer age;
 }

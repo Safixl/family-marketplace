@@ -30,8 +30,10 @@ CREATE TABLE IF NOT EXISTS stores (
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 
--- Тип шаблона магазина: READING / MATH / HOME / NULL (обычный магазин)
+-- Тип шаблона магазина: READING / MATH / HOME / LOGIC / LANG / SPORT / NULL (обычный магазин)
 ALTER TABLE stores ADD COLUMN IF NOT EXISTS template_type VARCHAR(32);
+-- Магазин «Гардероб Героя»: покупки попадают в Инвентарь А (цифровая кастомизация)
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS wardrobe BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE TABLE IF NOT EXISTS products (
     id              BIGSERIAL PRIMARY KEY,
@@ -235,3 +237,123 @@ CREATE INDEX IF NOT EXISTS idx_math_attempts_task     ON math_attempts (task_id)
 CREATE INDEX IF NOT EXISTS idx_math_attempts_child    ON math_attempts (child_id);
 CREATE INDEX IF NOT EXISTS idx_house_days_store       ON house_days (store_id);
 CREATE INDEX IF NOT EXISTS idx_house_days_child       ON house_days (child_id);
+
+-- ============================================================
+-- «Дейлики» — RPG-механики: квесты ГМа, сезонные ивенты,
+-- ежедневные дейлики, депозиты, кастомизация аватара, титулы
+-- ============================================================
+
+-- Возраст ребёнка (5-16): влияет на сложность дейликов и масштаб цен
+ALTER TABLE children ADD COLUMN IF NOT EXISTS age INT;
+
+-- Тип инвентаря: COUPON (купон-снадобье) / WARDROBE (цифровая кастомизация)
+ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS item_type VARCHAR(20) NOT NULL DEFAULT 'COUPON';
+
+-- Общий опыт за ачивку и титул персонажа
+ALTER TABLE achievements ADD COLUMN IF NOT EXISTS xp_reward INT NOT NULL DEFAULT 0;
+ALTER TABLE achievements ADD COLUMN IF NOT EXISTS title VARCHAR(100);
+
+-- Сезонные ивенты: ограниченное время, валюта-жетоны
+CREATE TABLE IF NOT EXISTS seasonal_events (
+    id          BIGSERIAL PRIMARY KEY,
+    parent_id   BIGINT       NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    name        VARCHAR(150) NOT NULL,
+    description VARCHAR(2000),
+    token_name  VARCHAR(50)  NOT NULL DEFAULT 'жетон',
+    token_icon  VARCHAR(16)  NOT NULL DEFAULT '🎟️',
+    starts_at   DATE         NOT NULL,
+    ends_at     DATE         NOT NULL,
+    active      BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+-- Сезонный магазин: обычный магазин, привязанный к ивенту
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS seasonal_event_id BIGINT REFERENCES seasonal_events (id) ON DELETE SET NULL;
+
+-- Квесты ГМа: DAILY (дейлик) / STORY (сюжетный) / SEASONAL (сезонный)
+CREATE TABLE IF NOT EXISTS quests (
+    id                BIGSERIAL PRIMARY KEY,
+    parent_id         BIGINT        NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    child_id          BIGINT        REFERENCES children (id) ON DELETE CASCADE,
+    type              VARCHAR(20)   NOT NULL DEFAULT 'STORY',
+    title             VARCHAR(255)  NOT NULL,
+    description       VARCHAR(2000),
+    icon              VARCHAR(64)   NOT NULL DEFAULT '📜',
+    reward_store_id   BIGINT        REFERENCES stores (id) ON DELETE SET NULL,
+    reward_amount     NUMERIC(12,2) NOT NULL DEFAULT 0,
+    xp_reward         INT           NOT NULL DEFAULT 0,
+    seasonal_event_id BIGINT        REFERENCES seasonal_events (id) ON DELETE SET NULL,
+    repeatable        BOOLEAN       NOT NULL DEFAULT FALSE,
+    active            BOOLEAN       NOT NULL DEFAULT TRUE,
+    created_at        TIMESTAMPTZ   NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_quests_parent ON quests (parent_id);
+CREATE INDEX IF NOT EXISTS idx_quests_child  ON quests (child_id);
+CREATE INDEX IF NOT EXISTS idx_quests_type   ON quests (type);
+
+-- Заявки ребёнка на выполнение квеста: PENDING / APPROVED / REJECTED
+CREATE TABLE IF NOT EXISTS quest_submissions (
+    id          BIGSERIAL PRIMARY KEY,
+    quest_id    BIGINT        NOT NULL REFERENCES quests (id) ON DELETE CASCADE,
+    child_id    BIGINT        NOT NULL REFERENCES children (id) ON DELETE CASCADE,
+    status      VARCHAR(20)   NOT NULL DEFAULT 'PENDING',
+    comment     VARCHAR(1000),
+    photo_url   VARCHAR(1000),
+    created_at  TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    resolved_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_quest_submissions_quest  ON quest_submissions (quest_id);
+CREATE INDEX IF NOT EXISTS idx_quest_submissions_child  ON quest_submissions (child_id);
+CREATE INDEX IF NOT EXISTS idx_quest_submissions_status ON quest_submissions (status);
+
+-- Депозиты «Личный инвест-фонд»: пиастры под процент (5-10% в неделю)
+CREATE TABLE IF NOT EXISTS deposits (
+    id               BIGSERIAL PRIMARY KEY,
+    child_id         BIGINT        NOT NULL REFERENCES children (id) ON DELETE CASCADE,
+    store_id         BIGINT        NOT NULL REFERENCES stores (id) ON DELETE CASCADE,
+    amount           NUMERIC(12,2) NOT NULL DEFAULT 0,
+    rate             NUMERIC(5,2)  NOT NULL DEFAULT 5,
+    last_interest_at TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    created_at       TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    CONSTRAINT uq_deposit_child_store UNIQUE (child_id, store_id)
+);
+CREATE INDEX IF NOT EXISTS idx_deposits_child ON deposits (child_id);
+
+-- Каталог предметов кастомизации аватара (Гардероб Героя)
+-- Категории: SKIN (скин) / FRAME (рамка) / PET (питомец) / BACKGROUND (фон)
+CREATE TABLE IF NOT EXISTS avatar_items (
+    id          BIGSERIAL PRIMARY KEY,
+    parent_id   BIGINT       NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    name        VARCHAR(150) NOT NULL,
+    description VARCHAR(500),
+    category    VARCHAR(32)  NOT NULL DEFAULT 'SKIN',
+    icon        VARCHAR(64)  NOT NULL DEFAULT '🎨',
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+-- Выданные ребёнку предметы кастомизации (equipped — надето сейчас)
+CREATE TABLE IF NOT EXISTS child_avatar_items (
+    id          BIGSERIAL PRIMARY KEY,
+    child_id    BIGINT      NOT NULL REFERENCES children (id) ON DELETE CASCADE,
+    item_id     BIGINT      NOT NULL REFERENCES avatar_items (id) ON DELETE CASCADE,
+    equipped    BOOLEAN     NOT NULL DEFAULT FALSE,
+    unlocked_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_child_avatar_item UNIQUE (child_id, item_id)
+);
+CREATE INDEX IF NOT EXISTS idx_child_avatar_child ON child_avatar_items (child_id);
+
+-- Журнал ежедневных дейликов (LOGIC / LANG / SPORT / MATH)
+-- full_clear = идеальное прохождение блока без ошибок (+2 XP)
+CREATE TABLE IF NOT EXISTS daily_logs (
+    id         BIGSERIAL PRIMARY KEY,
+    child_id   BIGINT        NOT NULL REFERENCES children (id) ON DELETE CASCADE,
+    skill      VARCHAR(32)   NOT NULL,
+    day        DATE          NOT NULL,
+    payload    VARCHAR(4000),
+    points     NUMERIC(12,2) NOT NULL DEFAULT 0,
+    xp         INT           NOT NULL DEFAULT 0,
+    full_clear BOOLEAN       NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    CONSTRAINT uq_daily_log UNIQUE (child_id, skill, day)
+);
+CREATE INDEX IF NOT EXISTS idx_daily_logs_child ON daily_logs (child_id);

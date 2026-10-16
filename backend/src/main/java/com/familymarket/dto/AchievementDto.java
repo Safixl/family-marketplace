@@ -8,6 +8,7 @@ import java.time.Instant;
 public record AchievementDto(Long id, String name, String description, String icon,
                              BigDecimal rewardAmount, String targetType, int targetValue,
                              String groupKey, String skill, int level, boolean hiddenReward, Long rewardStoreId,
+                             int xpReward, String title,
                              Instant createdAt) {
 
     public static AchievementDto from(Achievement achievement) {
@@ -24,6 +25,8 @@ public record AchievementDto(Long id, String name, String description, String ic
                 achievement.getLevel(),
                 achievement.isHiddenReward(),
                 achievement.getRewardStore() == null ? null : achievement.getRewardStore().getId(),
+                achievement.getXpReward(),
+                achievement.getTitle(),
                 achievement.getCreatedAt());
     }
 }

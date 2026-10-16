@@ -10,9 +10,10 @@ interface FormState {
   name: string;
   avatarEmoji: string;
   active: boolean;
+  age: string;
 }
 
-const EMPTY_FORM: FormState = { name: '', avatarEmoji: '😊', active: true };
+const EMPTY_FORM: FormState = { name: '', avatarEmoji: '😊', active: true, age: '' };
 
 export default function ChildrenTab() {
   const [children, setChildren] = useState<ChildDto[]>([]);
@@ -60,7 +61,12 @@ export default function ChildrenTab() {
 
   const openEdit = (child: ChildDto) => {
     setEditing(child);
-    setForm({ name: child.name, avatarEmoji: child.avatarEmoji, active: child.active });
+    setForm({
+      name: child.name,
+      avatarEmoji: child.avatarEmoji,
+      active: child.active,
+      age: child.age != null ? String(child.age) : '',
+    });
     setModalOpen(true);
   };
 
@@ -71,7 +77,12 @@ export default function ChildrenTab() {
     }
     setBusy(true);
     try {
-      const body = { name: form.name.trim(), avatarEmoji: form.avatarEmoji.trim() || '😊', active: form.active };
+      const body = {
+        name: form.name.trim(),
+        avatarEmoji: form.avatarEmoji.trim() || '😊',
+        active: form.active,
+        age: form.age ? Number(form.age) : null,
+      };
       if (editing) {
         await api.put(`/parent/children/${editing.id}`, body);
       } else {
@@ -183,7 +194,9 @@ export default function ChildrenTab() {
                   </div>
                   <div>
                     <div className="font-bold">{child.name}</div>
-                    <div className="text-xs text-slate-500">создан {fmtDate(child.createdAt)}</div>
+                    <div className="text-xs text-slate-500">
+                      {child.age != null ? `возраст ${child.age} лет · ` : ''}создан {fmtDate(child.createdAt)}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
@@ -329,6 +342,21 @@ export default function ChildrenTab() {
                 onChange={(e) => setForm({ ...form, avatarEmoji: e.target.value })}
                 placeholder="😊"
               />
+            </div>
+            <div>
+              <label className="label">Возраст (5–16)</label>
+              <input
+                type="number"
+                min={5}
+                max={16}
+                className="input"
+                value={form.age}
+                onChange={(e) => setForm({ ...form, age: e.target.value })}
+                placeholder="Например, 9"
+              />
+              <p className="mt-1 text-xs text-slate-400">
+                От возраста зависит сложность ежедневных дейликов (задачи, карточки слов, примеры)
+              </p>
             </div>
             <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
               <input

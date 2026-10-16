@@ -66,6 +66,14 @@ public class Achievement {
     @JoinColumn(name = "reward_store_id")
     private Store rewardStore;
 
+    /** Общий опыт, начисляемый за достижение. */
+    @Column(name = "xp_reward", nullable = false)
+    private int xpReward;
+
+    /** Титул персонажа за достижение (например, «Хранитель Порядка»). */
+    @Column(length = 100)
+    private String title;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 }

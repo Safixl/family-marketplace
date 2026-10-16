@@ -4,9 +4,13 @@ import {
   Home,
   LogOut,
   Package,
+  PiggyBank,
+  ScrollText,
   Settings,
+  Shirt,
   Swords,
   Trophy,
+  Zap,
 } from 'lucide-react';
 import { api } from '../api/client';
 import {
@@ -14,30 +18,40 @@ import {
   ChildProfileResponse,
   ChildPurchaseDto,
   ChildSettingsDto,
+  LevelDto,
   SkillId,
   SkillProgressDto,
   StoreDto,
 } from '../api/types';
 import { useAuth } from '../context/AuthContext';
 import { errMsg, fmtAmount } from '../lib/format';
-import { levelFromXp } from '../lib/rpg';
+import { levelFromXp, RpgLevel } from '../lib/rpg';
 import { skillById } from '../lib/skills';
+import AchievementPopup from './child/AchievementPopup';
 import ChildAchievementsTab from './child/ChildAchievementsTab';
+import ChildDailiesTab from './child/ChildDailiesTab';
+import ChildDepositsTab from './child/ChildDepositsTab';
 import ChildHomeTab from './child/ChildHomeTab';
 import ChildOrdersTab from './child/ChildOrdersTab';
+import ChildQuestsTab from './child/ChildQuestsTab';
 import ChildSettingsTab from './child/ChildSettingsTab';
+import ChildWardrobeTab from './child/ChildWardrobeTab';
 import ChildWishlistTab from './child/ChildWishlistTab';
 import LevelBar from './child/rpg/LevelBar';
 import SkillPage from './child/skills/SkillPage';
 import SkillsGrid from './child/skills/SkillsGrid';
 import { Spinner } from './ui';
 
-type Tab = 'home' | 'skills' | 'achievements' | 'wishlist' | 'orders' | 'settings';
+type Tab = 'home' | 'dailies' | 'quests' | 'skills' | 'achievements' | 'wardrobe' | 'deposit' | 'wishlist' | 'orders' | 'settings';
 
 const TABS: Array<{ id: Tab; label: string; icon: typeof Home }> = [
   { id: 'home', label: 'Главная', icon: Home },
+  { id: 'dailies', label: 'Дейлики', icon: Zap },
+  { id: 'quests', label: 'Квесты', icon: ScrollText },
   { id: 'skills', label: 'Навыки', icon: Swords },
   { id: 'achievements', label: 'Достижения', icon: Trophy },
+  { id: 'wardrobe', label: 'Гардероб', icon: Shirt },
+  { id: 'deposit', label: 'Банк', icon: PiggyBank },
   { id: 'wishlist', label: 'Вишлист', icon: Gift },
   { id: 'orders', label: 'Заказы', icon: Package },
   { id: 'settings', label: 'Настройки', icon: Settings },
@@ -161,7 +175,30 @@ export default function ChildDashboard() {
   };
 
   const totalXp = useMemo(() => skills.reduce((sum, s) => sum + s.xp, 0), [skills]);
-  const level = useMemo(() => levelFromXp(totalXp), [totalXp]);
+  const [serverLevel, setServerLevel] = useState<LevelDto | null>(null);
+  const localLevel = useMemo(() => levelFromXp(totalXp), [totalXp]);
+
+  // Общий уровень с бэкенда: 50% опыта навыков + опыт ачивок и квестов
+  useEffect(() => {
+    (async () => {
+      try {
+        setServerLevel(await api.get<LevelDto>('/child/level'));
+      } catch {
+        // используем локальный расчёт
+      }
+    })();
+  }, [skills.length]);
+
+  const level: RpgLevel = serverLevel
+    ? {
+        level: serverLevel.level,
+        xpInLevel: serverLevel.xpInLevel,
+        xpToNext: serverLevel.xpToNext,
+        ratio: serverLevel.ratio,
+        rank: serverLevel.rank,
+        rankEmoji: serverLevel.rankEmoji,
+      }
+    : localLevel;
 
   const storeForSkill = (skill: SkillId): StoreDto | null => {
     const template = skillById(skill).storeTemplate;
@@ -176,6 +213,8 @@ export default function ChildDashboard() {
 
   return (
     <div className="theme-body min-h-screen">
+      <AchievementPopup achievements={achievements} />
+
       {/* Шапка героя */}
       <header className="theme-header pb-20 pt-6 text-white">
         <div className="mx-auto max-w-5xl px-4 sm:px-6">
@@ -273,7 +312,15 @@ export default function ChildDashboard() {
             </div>
           ))}
 
+        {tab === 'dailies' && <ChildDailiesTab />}
+
+        {tab === 'quests' && <ChildQuestsTab />}
+
         {tab === 'achievements' && <ChildAchievementsTab />}
+
+        {tab === 'wardrobe' && <ChildWardrobeTab />}
+
+        {tab === 'deposit' && <ChildDepositsTab />}
 
         {tab === 'wishlist' && <ChildWishlistTab />}
 

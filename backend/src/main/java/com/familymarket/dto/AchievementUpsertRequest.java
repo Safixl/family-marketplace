@@ -17,5 +17,7 @@ public record AchievementUpsertRequest(
         @Size(max = 32, message = "Навык слишком длинный") String skill,
         Integer level,
         Boolean hiddenReward,
-        Long rewardStoreId) {
+        Long rewardStoreId,
+        Integer xpReward,
+        String title) {
 }

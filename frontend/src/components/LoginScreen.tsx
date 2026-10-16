@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react';
-import { Baby, KeyRound, Loader2, LogIn, ShoppingBag, Sparkles, User as UserIcon, UserPlus } from 'lucide-react';
+import { Baby, KeyRound, Loader2, LogIn, Sparkles, User as UserIcon, UserPlus, Zap } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 type Mode = 'parent' | 'child';
@@ -43,10 +43,10 @@ export default function LoginScreen() {
       <div className="w-full max-w-md">
         <div className="mb-6 text-center text-white">
           <div className="mb-3 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-white/15 backdrop-blur">
-            <ShoppingBag size={32} />
+            <Zap size={32} />
           </div>
-          <h1 className="text-3xl font-extrabold">Семейный магазин</h1>
-          <p className="mt-1 text-sm text-white/80">Магазин с внутренней валютой для детей</p>
+          <h1 className="text-3xl font-extrabold">Дейлики</h1>
+          <p className="mt-1 text-sm text-white/80">RPG-прокачка навыков и квесты от Гейм-Мастера</p>
         </div>
 
         <div className="rounded-3xl bg-white p-6 shadow-2xl">

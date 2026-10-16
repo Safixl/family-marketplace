@@ -1,18 +1,22 @@
 import { useState } from 'react';
-import { LayoutDashboard, LogOut, ShoppingCart, Store, Trophy, Users } from 'lucide-react';
+import { LayoutDashboard, LogOut, ScrollText, ShoppingCart, Sparkles, Store, Trophy, Users, Zap } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import AchievementsTab from './tabs/AchievementsTab';
 import ChildrenTab from './tabs/ChildrenTab';
 import OverviewTab from './tabs/OverviewTab';
 import PurchasesTab from './tabs/PurchasesTab';
+import QuestsTab from './tabs/QuestsTab';
+import SeasonalTab from './tabs/SeasonalTab';
 import StoresTab from './tabs/StoresTab';
 
-type TabId = 'overview' | 'children' | 'stores' | 'achievements' | 'purchases';
+type TabId = 'overview' | 'children' | 'stores' | 'achievements' | 'purchases' | 'quests' | 'seasonal';
 
 const TABS: Array<{ id: TabId; label: string; icon: typeof LayoutDashboard }> = [
   { id: 'overview', label: 'Обзор', icon: LayoutDashboard },
   { id: 'children', label: 'Дети', icon: Users },
   { id: 'stores', label: 'Магазины', icon: Store },
+  { id: 'quests', label: 'Квесты', icon: ScrollText },
+  { id: 'seasonal', label: 'Сезоны', icon: Sparkles },
   { id: 'achievements', label: 'Достижения', icon: Trophy },
   { id: 'purchases', label: 'Покупки', icon: ShoppingCart },
 ];
@@ -28,11 +32,11 @@ export default function ParentDashboard() {
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col bg-slate-900 p-4 lg:flex">
         <div className="mb-8 flex items-center gap-3 px-2">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-white">
-            <Store size={20} />
+            <Zap size={20} />
           </div>
           <div>
-            <div className="font-bold text-white">Семейный магазин</div>
-            <div className="text-xs text-slate-400">Кабинет родителя</div>
+            <div className="font-bold text-white">Дейлики</div>
+            <div className="text-xs text-slate-400">Кабинет Гейм-Мастера</div>
           </div>
         </div>
         <nav className="flex-1 space-y-1">
@@ -65,8 +69,8 @@ export default function ParentDashboard() {
       {/* Шапка (мобильный) */}
       <header className="sticky top-0 z-30 flex items-center justify-between bg-slate-900 px-4 py-3 lg:hidden">
         <div className="flex items-center gap-2 text-white">
-          <Store size={20} className="text-indigo-400" />
-          <span className="font-bold">Семейный магазин</span>
+          <Zap size={20} className="text-indigo-400" />
+          <span className="font-bold">Дейлики</span>
         </div>
         <button onClick={logout} className="rounded-xl p-2 text-slate-300 hover:bg-slate-800" title="Выйти">
           <LogOut size={20} />
@@ -81,6 +85,8 @@ export default function ParentDashboard() {
           {tab === 'stores' && <StoresTab />}
           {tab === 'achievements' && <AchievementsTab />}
           {tab === 'purchases' && <PurchasesTab />}
+          {tab === 'quests' && <QuestsTab />}
+          {tab === 'seasonal' && <SeasonalTab />}
         </div>
       </main>
 

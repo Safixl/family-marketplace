@@ -41,7 +41,7 @@ public class StoreTemplateService {
     }
 
     public List<Template> templates() {
-        return List.of(reading(), math(), home());
+        return List.of(reading(), math(), home(), logic(), lang(), sport());
     }
 
     public Template get(String slug) {
@@ -146,6 +146,45 @@ public class StoreTemplateService {
                         seed("Алиса мини", 124),
                         seed("Телевизор 43\"", 308),
                         seed("Замок на двери", 999)));
+    }
+
+    private Template logic() {
+        return new Template(
+                "logic", "Логика",
+                "Ежедневные дейлики логики: загадки, ребусы и задачи на мышление. 1 правильный ответ = 1 IQ-коин. Блок без ошибок даёт бонус XP.",
+                "IQ-коины", "🧠", "LOGIC",
+                List.of(
+                        seed("Кубик Рубика", 120),
+                        seed("Настольная игра «Эволюция»", 800),
+                        seed("Набор фокусов", 400),
+                        seed("Невидимые чернила", 150),
+                        seed("Квест в реальности", 1000)));
+    }
+
+    private Template lang() {
+        return new Template(
+                "lang", "Иностранный язык",
+                "Ежедневные дейлики языка: карточки слов. 1 выученное слово = 1 лингво-миля.",
+                "лингво-мили", "✈️", "LANG",
+                List.of(
+                        seed("Японские сладости", 200),
+                        seed("Редкая газировка", 120),
+                        seed("Мерч из сериала", 600),
+                        seed("Комикс в оригинале", 500),
+                        seed("Скин в игре на иностранном", 300)));
+    }
+
+    private Template sport() {
+        return new Template(
+                "sport", "Спорт и хобби",
+                "Ежедневные дейлики спорта и творчества: 10 минут активности = 1 очко энергии, 2000 шагов = 1 очко.",
+                "очки энергии", "⚡", "SPORT",
+                List.of(
+                        seed("Крутой мяч", 300),
+                        seed("Фитнес-браслет", 2000),
+                        seed("Маркеры Copic", 1500),
+                        seed("Билет на картинг", 1200),
+                        seed("Поход на скалодром", 800)));
     }
 
     private ProductSeed seed(String name, int price) {

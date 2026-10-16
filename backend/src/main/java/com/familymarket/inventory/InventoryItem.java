@@ -51,6 +51,10 @@ public class InventoryItem {
     @Column(nullable = false, length = 20)
     private String status = "AVAILABLE";
 
+    /** Тип инвентаря: COUPON (купон-снадобье) / WARDROBE (цифровая кастомизация). */
+    @Column(name = "item_type", nullable = false, length = 20)
+    private String itemType = "COUPON";
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

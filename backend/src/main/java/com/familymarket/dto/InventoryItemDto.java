@@ -18,6 +18,7 @@ public record InventoryItemDto(
         String currencyName,
         String currencyIcon,
         String status,
+        String itemType,
         Instant createdAt,
         Instant resolvedAt) {
 
@@ -35,6 +36,7 @@ public record InventoryItemDto(
                 item.getStore().getCurrencyName(),
                 item.getStore().getCurrencyIcon(),
                 item.getStatus(),
+                item.getItemType(),
                 item.getCreatedAt(),
                 item.getResolvedAt());
     }
