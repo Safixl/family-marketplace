@@ -24,7 +24,7 @@ app:
     secret: ${JWT_SECRET:dev-secret-change-me-in-production-0123456789abcdef}
     expiration-ms: ${JWT_EXPIRATION_MS:604800000}
   cors:
-    origins: ${CORS_ORIGINS:http://localhost:5173,https://likely-discerning-maggot.cloudpub.ru}
+    origins: ${CORS_ORIGINS:http://localhost:5173,https://*.cloudpub.ru}
 
 logging:
   level:
