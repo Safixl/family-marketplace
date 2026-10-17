@@ -4,6 +4,9 @@ server:
 spring:
   application:
     name: family-marketplace
+  config:
+    # Локальные креды БД читаются из backend/.env (файл в .gitignore, не попадает в git)
+    import: optional:file:.env[.properties]
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5433/familymarket}
     username: ${DB_USER:familymarket}
