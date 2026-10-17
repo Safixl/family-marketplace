@@ -127,16 +127,6 @@ CREATE TABLE IF NOT EXISTS inventory_items (
 CREATE INDEX IF NOT EXISTS idx_inventory_child ON inventory_items (child_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_status ON inventory_items (status);
 
--- Миграция существующих таблиц (идемпотентно)
-ALTER TABLE children ADD COLUMN IF NOT EXISTS theme VARCHAR(32) NOT NULL DEFAULT 'rainbow';
-ALTER TABLE children ADD COLUMN IF NOT EXISTS home_widgets VARCHAR(500) NOT NULL DEFAULT '["balances","stats","achievements","orders"]';
-ALTER TABLE reading_books ADD COLUMN IF NOT EXISTS child_id BIGINT REFERENCES children (id) ON DELETE CASCADE;
-ALTER TABLE reading_logs ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'APPROVED';
-ALTER TABLE math_tasks ADD COLUMN IF NOT EXISTS child_id BIGINT REFERENCES children (id) ON DELETE CASCADE;
-ALTER TABLE house_days ADD COLUMN IF NOT EXISTS room_score INT NOT NULL DEFAULT 0;
-ALTER TABLE house_days ADD COLUMN IF NOT EXISTS living_score INT NOT NULL DEFAULT 0;
-ALTER TABLE house_days ADD COLUMN IF NOT EXISTS settled BOOLEAN NOT NULL DEFAULT FALSE;
-
 -- Каталог книг магазина «Чтение» (личные книги ребёнка)
 CREATE TABLE IF NOT EXISTS reading_books (
     id         BIGSERIAL PRIMARY KEY,
@@ -357,3 +347,16 @@ CREATE TABLE IF NOT EXISTS daily_logs (
     CONSTRAINT uq_daily_log UNIQUE (child_id, skill, day)
 );
 CREATE INDEX IF NOT EXISTS idx_daily_logs_child ON daily_logs (child_id);
+
+-- ============================================================
+-- Миграция существующих таблиц (идемпотентно)
+-- Выполняется в конце скрипта, чтобы все таблицы уже существовали
+-- ============================================================
+ALTER TABLE children ADD COLUMN IF NOT EXISTS theme VARCHAR(32) NOT NULL DEFAULT 'rainbow';
+ALTER TABLE children ADD COLUMN IF NOT EXISTS home_widgets VARCHAR(500) NOT NULL DEFAULT '["balances","stats","achievements","orders"]';
+ALTER TABLE reading_books ADD COLUMN IF NOT EXISTS child_id BIGINT REFERENCES children (id) ON DELETE CASCADE;
+ALTER TABLE reading_logs ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'APPROVED';
+ALTER TABLE math_tasks ADD COLUMN IF NOT EXISTS child_id BIGINT REFERENCES children (id) ON DELETE CASCADE;
+ALTER TABLE house_days ADD COLUMN IF NOT EXISTS room_score INT NOT NULL DEFAULT 0;
+ALTER TABLE house_days ADD COLUMN IF NOT EXISTS living_score INT NOT NULL DEFAULT 0;
+ALTER TABLE house_days ADD COLUMN IF NOT EXISTS settled BOOLEAN NOT NULL DEFAULT FALSE;

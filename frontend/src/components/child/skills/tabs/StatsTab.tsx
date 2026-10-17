@@ -1,6 +1,6 @@
 import { CheckCircle2, ListChecks, Swords } from 'lucide-react';
 import { SkillConfig, SkillQuest, SkillStats } from '../../../../lib/skills';
-import { skillRank } from '../../../../lib/rpg';
+import { skillLevelFromProgress } from '../../../../lib/rpg';
 import { EmptyState } from '../../../ui';
 
 interface Props {
@@ -10,7 +10,7 @@ interface Props {
 }
 
 export default function StatsTab({ config, stats, quests }: Props) {
-  const rank = skillRank(stats.progress);
+  const level = skillLevelFromProgress(stats.progress);
 
   return (
     <div className="space-y-4">
@@ -23,9 +23,7 @@ export default function StatsTab({ config, stats, quests }: Props) {
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline justify-between gap-2">
               <span className="rpg-title text-lg">{config.name}</span>
-              <span className="text-sm font-bold text-amber-200">
-                {rank.emoji} {rank.name}
-              </span>
+              <span className="text-sm font-bold text-amber-200">Ур. {level}</span>
             </div>
             <div className="rpg-progress-track mt-2 h-3">
               <div
@@ -34,7 +32,7 @@ export default function StatsTab({ config, stats, quests }: Props) {
               />
             </div>
             <div className="mt-1 text-right text-xs font-semibold text-amber-100/60">
-              {stats.progress}% · уровень {Math.max(1, Math.floor(stats.progress / 10) + 1)}
+              Ур. {level} · {stats.progress}% прогресса
             </div>
           </div>
         </div>

@@ -120,15 +120,34 @@ export default function ChildAchievementsTab() {
             return (
               <div
                 key={achievement.achievementId}
-                className={`rpg-panel flex flex-col gap-3 p-4 ${achievement.unlocked ? 'rpg-panel-gold' : ''}`}
+                className={`rpg-panel flex flex-col gap-3 p-4 ${
+                  achievement.unlocked ? `${tier.border} ${tier.glow ?? ''}` : 'border-stone-800'
+                }`}
               >
                 <div className="flex items-start gap-3">
-                  <div
-                    className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-2xl text-white ${
-                      achievement.unlocked ? tier.iconBox : 'bg-stone-700'
-                    }`}
-                  >
-                    {achievement.unlocked ? achievement.icon : <Lock size={20} />}
+                  <div className="relative h-12 w-12 shrink-0">
+                    {hasTarget && (
+                      <svg viewBox="0 0 48 48" className="absolute inset-0 h-full w-full -rotate-90">
+                        <circle cx="24" cy="24" r="21" fill="none" strokeWidth="3.5" className="stroke-stone-700" />
+                        <circle
+                          cx="24"
+                          cy="24"
+                          r="21"
+                          fill="none"
+                          strokeWidth="3.5"
+                          strokeLinecap="round"
+                          stroke={done || achievement.unlocked ? '#10b981' : '#fbbf24'}
+                          strokeDasharray={`${(percent / 100) * 132} 132`}
+                        />
+                      </svg>
+                    )}
+                    <span
+                      className={`absolute inset-[3px] flex items-center justify-center rounded-full text-xl text-white ${
+                        achievement.unlocked ? tier.iconBox : 'bg-stone-800'
+                      }`}
+                    >
+                      {achievement.unlocked ? achievement.icon : <Lock size={17} />}
+                    </span>
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="font-bold text-amber-100">

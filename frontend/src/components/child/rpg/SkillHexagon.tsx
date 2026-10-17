@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { SkillId, SkillProgressDto } from '../../../api/types';
 import { SKILLS } from '../../../lib/skills';
-import { skillRank } from '../../../lib/rpg';
+import { skillLevelFromProgress } from '../../../lib/rpg';
 
 interface Props {
   skills: SkillProgressDto[];
@@ -101,7 +101,7 @@ export default function SkillHexagon({ skills, onSelect }: Props) {
 
         {/* Вершины-кнопки */}
         {valuePoints.map(({ x, y, value, skill }) => {
-          const rank = skillRank(value);
+          const level = skillLevelFromProgress(value);
           return (
             <g
               key={skill.id}
@@ -118,7 +118,7 @@ export default function SkillHexagon({ skills, onSelect }: Props) {
               >
                 {skill.icon}
               </text>
-              <title>{`${skill.name}: ${value}% · ${rank.name}`}</title>
+              <title>{`${skill.name}: ур. ${level}`}</title>
             </g>
           );
         })}
@@ -155,7 +155,7 @@ export default function SkillHexagon({ skills, onSelect }: Props) {
                 fontWeight={600}
                 fill={value >= 10 ? '#fbbf24' : '#7a6c58'}
               >
-                {value}%
+                Ур. {skillLevelFromProgress(value)}
               </text>
             </g>
           );

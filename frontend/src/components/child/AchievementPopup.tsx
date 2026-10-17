@@ -62,8 +62,13 @@ export default function AchievementPopup({ achievements }: Props) {
           {current.icon}
         </span>
         <div className="min-w-0">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
-            <Trophy size={13} /> Достижение получено
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-bold uppercase tracking-wider text-slate-500">
+            <span className="flex items-center gap-1.5">
+              <Trophy size={13} /> Достижение получено
+            </span>
+            <span className={`rounded-full px-2 py-0.5 text-[10px] uppercase ${tier.badge}`}>
+              {tier.emoji} {tier.name}
+            </span>
           </div>
           <div className="truncate text-lg font-extrabold text-slate-900">{current.name}</div>
           {current.description && <div className="truncate text-sm text-slate-600">{current.description}</div>}

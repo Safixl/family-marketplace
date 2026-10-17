@@ -1,4 +1,5 @@
-import { RpgLevel } from '../../../lib/rpg';
+import { rankTier } from '../../../lib/achievementTiers';
+import { RpgLevel, RANKS } from '../../../lib/rpg';
 
 interface Props {
   level: RpgLevel;
@@ -6,7 +7,10 @@ interface Props {
 }
 
 export default function LevelBar({ level, compact }: Props) {
-  const percent = Math.round(level.ratio * 100);
+  const isMax = level.level >= 60;
+  const percent = isMax ? 100 : Math.round(level.ratio * 100);
+  const currentRank = RANKS.filter((r) => r.min <= level.level).pop() ?? RANKS[0];
+  const tier = rankTier(currentRank.min);
   return (
     <div className="rpg-panel rpg-panel-gold px-4 py-3">
       <div className="flex items-center gap-3">
@@ -16,21 +20,26 @@ export default function LevelBar({ level, compact }: Props) {
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-2">
-            <span className="truncate text-sm font-bold text-amber-200">
+            <span className={`rpg-badge border ${tier.badge}`}>
               {level.rankEmoji} {level.rank}
             </span>
             {!compact && (
               <span className="shrink-0 text-xs font-semibold text-amber-100/70">
-                {level.xpInLevel} / {level.xpToNext} опыта
+                {isMax ? '🏆 Максимальный уровень' : `${level.xpInLevel} / ${level.xpToNext} опыта`}
               </span>
             )}
           </div>
           <div className="rpg-progress-track mt-1.5 h-3">
-            <div className="rpg-progress-fill" style={{ width: `${percent}%` }} />
+            <div
+              className={isMax ? 'rpg-progress-fill !bg-gradient-to-r !from-amber-400 !via-yellow-300 !to-amber-500' : 'rpg-progress-fill'}
+              style={{ width: `${percent}%` }}
+            />
           </div>
           {!compact && (
             <div className="mt-1 text-right text-[11px] font-medium text-amber-100/50">
-              до следующего уровня: {level.xpToNext - level.xpInLevel} опыта
+              {isMax
+                ? 'Ты достиг вершины — Чемпион! 👑'
+                : `до следующего уровня: ${level.xpToNext - level.xpInLevel} опыта`}
             </div>
           )}
         </div>

@@ -1,7 +1,7 @@
 import { ChevronRight } from 'lucide-react';
 import { SkillId, SkillProgressDto } from '../../../api/types';
 import { SKILLS } from '../../../lib/skills';
-import { skillRank } from '../../../lib/rpg';
+import { skillLevelFromProgress } from '../../../lib/rpg';
 
 interface Props {
   skills: SkillProgressDto[];
@@ -16,7 +16,7 @@ export default function SkillsGrid({ skills, onSelect }: Props) {
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {SKILLS.map((skill) => {
         const progress = byId.get(skill.id)?.progress ?? 0;
-        const rank = skillRank(progress);
+        const level = skillLevelFromProgress(progress);
         return (
           <button
             key={skill.id}
@@ -31,8 +31,8 @@ export default function SkillsGrid({ skills, onSelect }: Props) {
             </div>
             <div className="min-w-0 flex-1">
               <div className="truncate font-bold text-amber-100">{skill.name}</div>
-              <div className="text-xs text-stone-400">
-                {rank.emoji} {rank.name} · {progress}%
+              <div className="mt-0.5 text-xs text-stone-400">
+                <span className="font-semibold text-amber-200/90">Ур. {level}</span> · {progress}%
               </div>
               <div className="rpg-progress-track mt-1.5 h-2">
                 <div

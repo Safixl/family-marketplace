@@ -7,9 +7,10 @@ import {
   SkillProgressDto,
 } from '../../api/types';
 import { fmtAmount, fmtDate } from '../../lib/format';
-import { tierForLevel } from '../../lib/achievementTiers';
-import { RpgLevel } from '../../lib/rpg';
+import { rankTier, tierForLevel } from '../../lib/achievementTiers';
+import { RANKS, RpgLevel } from '../../lib/rpg';
 import { EmptyState, StatCard } from '../ui';
+import RankLadder from './rpg/RankLadder';
 import SkillHexagon from './rpg/SkillHexagon';
 
 export type HomeWidgetId = 'balances' | 'stats' | 'achievements' | 'orders';
@@ -44,6 +45,8 @@ export default function ChildHomeTab({
 }: Props) {
   const show = (id: HomeWidgetId) => widgets.includes(id);
 
+  const currentRank = RANKS.filter((r) => r.min <= level.level).pop() ?? RANKS[0];
+
   const unlockedCount = achievements.filter((a) => a.unlocked).length;
   const nextAchievements = achievements
     .filter((a) => !a.unlocked && a.targetType && a.targetType !== 'NONE')
@@ -63,7 +66,7 @@ export default function ChildHomeTab({
             <Swords size={20} className="text-amber-400" /> Карта навыков
           </h2>
           <div className="flex items-center gap-2">
-            <span className="rpg-badge border border-amber-500/30 bg-amber-500/15 text-amber-300">
+            <span className={`rpg-badge border ${rankTier(currentRank.min).badge}`}>
               {level.rankEmoji} {level.rank} · ур. {level.level}
             </span>
             <button
@@ -80,6 +83,9 @@ export default function ChildHomeTab({
         </p>
         <SkillHexagon skills={skills} onSelect={onOpenSkill} />
       </section>
+
+      {/* Путь героя: лесенка рангов */}
+      <RankLadder level={level} />
 
       {show('balances') && profile && profile.balances.length > 0 && (
         <section>

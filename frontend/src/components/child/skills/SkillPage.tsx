@@ -1,7 +1,7 @@
 import { ArrowLeft } from 'lucide-react';
 import { SkillProgressDto, StoreDto } from '../../../api/types';
 import { SkillConfig } from '../../../lib/skills';
-import { skillRank } from '../../../lib/rpg';
+import { skillLevelFromProgress } from '../../../lib/rpg';
 import SkillModule from './SkillModule';
 
 interface Props {
@@ -14,7 +14,7 @@ interface Props {
 }
 
 export default function SkillPage({ config, store, balance, progress, onBack, onPurchased }: Props) {
-  const rank = skillRank(progress?.progress ?? 0);
+  const level = skillLevelFromProgress(progress?.progress ?? 0);
   return (
     <div className="space-y-4">
       <button
@@ -31,9 +31,8 @@ export default function SkillPage({ config, store, balance, progress, onBack, on
         <div className="min-w-0 flex-1">
           <h2 className="rpg-title text-xl">{config.name}</h2>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-stone-300">
-            <span className="font-bold text-amber-200">
-              {rank.emoji} {rank.name}
-            </span>
+            <span className="font-bold text-amber-200">Ур. {level}</span>
+            <span className="text-stone-400">·</span>
             <span className="text-stone-400">·</span>
             <span>{progress?.progress ?? 0}%</span>
             <span className="text-stone-400">·</span>
