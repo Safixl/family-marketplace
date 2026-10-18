@@ -174,6 +174,32 @@ public class ReadingService {
         Child child = childRepository.findById(childId)
                 .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
 
+        // Кнопка «Прочитал»: сначала проставляем последнюю страницу книги,
+        // затем отправляем запрос родителю на подтверждение.
+        if (book.getPages() > 0) {
+            Instant now = Instant.now();
+            ReadingBookmark bookmark = bookmarkRepository.findByChildIdAndBookId(childId, bookId)
+                    .orElseGet(() -> {
+                        ReadingBookmark b = new ReadingBookmark();
+                        b.setChild(book.getChild());
+                        b.setBook(book);
+                        return b;
+                    });
+            bookmark.setPage(book.getPages());
+            bookmark.setUpdatedAt(now);
+            bookmarkRepository.save(bookmark);
+
+            ReadingPageMark mark = new ReadingPageMark();
+            mark.setChild(book.getChild());
+            mark.setBook(book);
+            mark.setPage(book.getPages());
+            mark.setDay(LocalDate.now());
+            mark.setCreatedAt(now);
+            pageMarkRepository.save(mark);
+
+            dailyService.recordReading(childId, pagesToday(childId, LocalDate.now()));
+        }
+
         ReadingLog log = new ReadingLog();
         log.setChild(child);
         log.setBook(book);
