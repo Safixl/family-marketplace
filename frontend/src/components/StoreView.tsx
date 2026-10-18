@@ -1,53 +1,20 @@
-import { useState } from 'react';
-import { Clock3, Package, ShoppingCart } from 'lucide-react';
-import { api } from '../api/client';
+import { Package, ShoppingCart } from 'lucide-react';
 import { ChildProductDto, StoreDto } from '../api/types';
-import { errMsg, fmtAmount } from '../lib/format';
-import ChildHouseView from './child/ChildHouseView';
-import ChildMathView from './child/ChildMathView';
-import ChildReadingView from './child/ChildReadingView';
+import { fmtAmount } from '../lib/format';
 
 interface StoreViewProps {
   store: StoreDto;
   products: ChildProductDto[];
+  /** Остаток баланса магазина с учётом уже добавленного в корзину */
   balance: number | undefined;
-  onPurchased: () => void;
+  /** Сколько штук этого товара уже в корзине */
+  cartCount: number;
+  onAddToCart: (product: ChildProductDto) => void;
 }
 
-export default function StoreView({ store, products, balance, onPurchased }: StoreViewProps) {
-  const [busyId, setBusyId] = useState<number | null>(null);
-
-  const buy = async (product: ChildProductDto) => {
-    setBusyId(product.id);
-    try {
-      await api.post('/child/purchases', { productId: product.id });
-      onPurchased();
-    } catch (e) {
-      alert(errMsg(e));
-    } finally {
-      setBusyId(null);
-    }
-  };
-
+export default function StoreView({ store, products, balance, cartCount, onAddToCart }: StoreViewProps) {
   return (
-    <section className="space-y-4">
-      <div className="theme-card flex flex-wrap items-center gap-3 rounded-2xl border p-5 shadow-sm">
-        <div className="theme-btn-soft flex h-12 w-12 items-center justify-center rounded-2xl text-2xl">
-          {store.currencyIcon}
-        </div>
-        <div className="min-w-0 flex-1">
-          <h2 className="font-bold">{store.name}</h2>
-          {store.description && <p className="theme-muted text-sm">{store.description}</p>}
-        </div>
-        <div className="theme-btn-soft rounded-xl px-4 py-2 text-sm font-bold">
-          Баланс: {store.currencyIcon} {fmtAmount(balance ?? 0, store.currencyName)}
-        </div>
-      </div>
-
-      {store.templateType === 'READING' && <ChildReadingView store={store} />}
-      {store.templateType === 'MATH' && <ChildMathView storeId={store.id} />}
-      {store.templateType === 'HOME' && <ChildHouseView storeId={store.id} />}
-
+    <div className="space-y-4">
       {products.length === 0 ? (
         <p className="theme-card rounded-2xl border border-dashed px-6 py-10 text-center text-sm theme-muted">
           В этом магазине пока нет товаров
@@ -55,13 +22,13 @@ export default function StoreView({ store, products, balance, onPurchased }: Sto
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {products.map((product) => {
-            const disabled = product.hasPending || (balance ?? 0) < product.price;
             const limitReached =
               product.limitPerChild != null && product.boughtCount >= product.limitPerChild;
             const percent =
               product.limitPerChild != null
                 ? Math.min(100, Math.round((product.boughtCount / product.limitPerChild) * 100))
                 : 0;
+            const notEnough = (balance ?? 0) < product.price;
 
             return (
               <div key={product.id} className="theme-card flex flex-col gap-3 rounded-2xl border p-5 shadow-sm">
@@ -77,9 +44,7 @@ export default function StoreView({ store, products, balance, onPurchased }: Sto
                   </div>
                 </div>
 
-                {product.description && (
-                  <p className="theme-muted text-sm">{product.description}</p>
-                )}
+                {product.description && <p className="theme-muted text-sm">{product.description}</p>}
 
                 {product.limitPerChild != null && (
                   <div>
@@ -98,20 +63,19 @@ export default function StoreView({ store, products, balance, onPurchased }: Sto
                   </div>
                 )}
 
-                {product.hasPending ? (
-                  <span className="badge justify-center bg-amber-100 py-2 text-amber-700">
-                    <Clock3 size={14} /> Ожидает подтверждения
-                  </span>
+                {limitReached ? (
+                  <span className="badge justify-center bg-slate-100 py-2 text-slate-500">лимит исчерпан</span>
                 ) : (
                   <button
                     className="theme-btn w-full rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={disabled || busyId === product.id}
-                    onClick={() => void buy(product)}
+                    disabled={notEnough}
+                    onClick={() => onAddToCart(product)}
                   >
-                    <ShoppingCart size={16} /> Купить
+                    <ShoppingCart size={16} />
+                    {cartCount > 0 ? `В корзине: ${cartCount}` : 'В корзину'}
                   </button>
                 )}
-                {!product.hasPending && !limitReached && (balance ?? 0) < product.price && (
+                {!limitReached && notEnough && (
                   <p className="-mt-2 text-center text-xs text-rose-600">Недостаточно средств</p>
                 )}
               </div>
@@ -119,6 +83,6 @@ export default function StoreView({ store, products, balance, onPurchased }: Sto
           })}
         </div>
       )}
-    </section>
+    </div>
   );
 }

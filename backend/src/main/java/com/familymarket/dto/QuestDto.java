@@ -30,7 +30,9 @@ public record QuestDto(
         Instant createdAt,
         String childStatus,
         Instant childStartsAt,
-        Instant childNextAvailableAt) {
+        Instant childNextAvailableAt,
+        long activeChildren,
+        long doneChildren) {
 
     public static QuestDto from(Quest quest) {
         return new QuestDto(
@@ -57,7 +59,9 @@ public record QuestDto(
                 quest.getCreatedAt(),
                 null,
                 null,
-                null);
+                null,
+                0,
+                0);
     }
 
     /** Для ребёнка: квест + его состояние (стадия, таймер, время повторного взятия). */
@@ -71,6 +75,19 @@ public record QuestDto(
                 dto.basicDescription(), dto.acceptDescription(), dto.durationMinutes(), dto.cooldownHours(),
                 dto.icon(), dto.rewardStoreId(), dto.rewardStoreName(), dto.currencyName(), dto.currencyIcon(),
                 dto.rewardAmount(), dto.xpReward(), dto.seasonalEventId(), dto.repeatable(), dto.active(),
-                dto.createdAt(), state.getStatus(), state.getStartsAt(), state.getNextAvailableAt());
+                dto.createdAt(), state.getStatus(), state.getStartsAt(), state.getNextAvailableAt(),
+                0, 0);
+    }
+
+    /** Для родителя: квест + сколько детей активировали и завершили его. */
+    public static QuestDto from(Quest quest, long activeChildren, long doneChildren) {
+        QuestDto dto = from(quest);
+        return new QuestDto(
+                dto.id(), dto.parentId(), dto.childId(), dto.type(), dto.title(), dto.description(),
+                dto.basicDescription(), dto.acceptDescription(), dto.durationMinutes(), dto.cooldownHours(),
+                dto.icon(), dto.rewardStoreId(), dto.rewardStoreName(), dto.currencyName(), dto.currencyIcon(),
+                dto.rewardAmount(), dto.xpReward(), dto.seasonalEventId(), dto.repeatable(), dto.active(),
+                dto.createdAt(), null, null, null,
+                activeChildren, doneChildren);
     }
 }

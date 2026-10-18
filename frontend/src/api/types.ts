@@ -510,6 +510,9 @@ export interface QuestDto {
   childStatus: string | null;
   childStartsAt: string | null;
   childNextAvailableAt: string | null;
+  /** Для родителя: сколько детей активировали / завершили квест */
+  activeChildren: number;
+  doneChildren: number;
 }
 
 export type SubmissionStatus = 'PENDING' | 'APPROVED' | 'REJECTED';

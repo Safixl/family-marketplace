@@ -5,11 +5,9 @@ import {
   History,
   Package,
   Send,
-  ShoppingBag,
 } from 'lucide-react';
 import { api } from '../../../api/client';
 import {
-  ChildProductDto,
   ChildPurchaseDto,
   InventoryStackDto,
   SkillProgressDto,
@@ -23,16 +21,14 @@ import ArchiveTab from './tabs/ArchiveTab';
 import InventoryTab from './tabs/InventoryTab';
 import PurchaseHistoryTab from './tabs/PurchaseHistoryTab';
 import RequestsTab from './tabs/RequestsTab';
-import ShopTab from './tabs/ShopTab';
 import StatsTab from './tabs/StatsTab';
 import TaskCardsTab from './tabs/TaskCardsTab';
 
-type TabId = 'archive' | 'requests' | 'shop' | 'history' | 'inventory' | 'stats';
+type TabId = 'archive' | 'requests' | 'history' | 'inventory' | 'stats';
 
 const TABS: Array<{ id: TabId; label: string; icon: typeof Archive }> = [
   { id: 'archive', label: 'Архив', icon: Archive },
   { id: 'requests', label: 'Запросы', icon: Send },
-  { id: 'shop', label: 'Магазин', icon: ShoppingBag },
   { id: 'history', label: 'Покупки', icon: History },
   { id: 'inventory', label: 'Инвентарь', icon: Package },
   { id: 'stats', label: 'Статистика', icon: BarChart3 },
@@ -41,19 +37,16 @@ const TABS: Array<{ id: TabId; label: string; icon: typeof Archive }> = [
 interface Props {
   config: SkillConfig;
   store: StoreDto | null;
-  balance: number | undefined;
   progress: SkillProgressDto | undefined;
-  onPurchased: () => void;
 }
 
-export default function SkillModule({ config, store, balance, progress, onPurchased }: Props) {
+export default function SkillModule({ config, store, progress }: Props) {
   const [tab, setTab] = useState<TabId>('archive');
   const [loading, setLoading] = useState(true);
   const [archive, setArchive] = useState<Awaited<ReturnType<SkillConfig['loadArchive']>>>([]);
   const [requests, setRequests] = useState<SkillRequestRow[]>([]);
   const [stats, setStats] = useState<SkillStats>({ level: 0, progress: 0, counters: [] });
   const [quests, setQuests] = useState<SkillQuest[]>([]);
-  const [products, setProducts] = useState<ChildProductDto[]>([]);
   const [purchases, setPurchases] = useState<ChildPurchaseDto[]>([]);
   const [inventory, setInventory] = useState<InventoryStackDto[]>([]);
 
@@ -72,16 +65,13 @@ export default function SkillModule({ config, store, balance, progress, onPurcha
       setQuests(qu);
 
       if (store) {
-        const [prods, allPurchases, allInventory] = await Promise.all([
-          api.get<ChildProductDto[]>(`/child/stores/${store.id}/products`),
+        const [allPurchases, allInventory] = await Promise.all([
           api.get<ChildPurchaseDto[]>('/child/purchases'),
           api.get<InventoryStackDto[]>('/child/inventory'),
         ]);
-        setProducts(prods);
         setPurchases(allPurchases.filter((p) => p.storeId === store.id));
         setInventory(allInventory.filter((i) => i.storeId === store.id));
       } else {
-        setProducts([]);
         setPurchases([]);
         setInventory([]);
       }
@@ -131,17 +121,6 @@ export default function SkillModule({ config, store, balance, progress, onPurcha
         ) : (
           <RequestsTab config={config} store={store} requests={requests} onReload={() => void load()} />
         ))}
-      {tab === 'shop' && (
-        <ShopTab
-          store={store}
-          products={products}
-          balance={balance}
-          onPurchased={() => {
-            onPurchased();
-            void load();
-          }}
-        />
-      )}
       {tab === 'history' && <PurchaseHistoryTab purchases={purchases} />}
       {tab === 'inventory' && (
         <InventoryTab inventory={inventory} onReload={() => void load()} />

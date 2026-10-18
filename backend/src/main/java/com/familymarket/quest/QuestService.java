@@ -71,7 +71,17 @@ public class QuestService {
     @Transactional(readOnly = true)
     public List<QuestDto> listForParent(Long parentId) {
         return questRepository.findByParentIdOrderByCreatedAtDesc(parentId)
-                .stream().map(QuestDto::from).toList();
+                .stream().map(this::toParentDto).toList();
+    }
+
+    /** Для родителя: квест + счётчики активных и завершённых детей. */
+    private QuestDto toParentDto(Quest quest) {
+        List<ChildQuestState> states = childQuestStateRepository.findByQuestId(quest.getId());
+        long active = states.stream()
+                .filter(s -> "ACTIVE".equals(s.getStatus()) || "SUBMITTED".equals(s.getStatus()))
+                .count();
+        long done = states.stream().filter(s -> "DONE".equals(s.getStatus())).count();
+        return QuestDto.from(quest, active, done);
     }
 
     @Transactional

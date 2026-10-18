@@ -58,7 +58,8 @@ public class PurchaseService {
     }
 
     /**
-     * Создание заказа: проверка лимита и баланса, статус PENDING (баланс не меняется).
+     * Мгновенная покупка без подтверждения родителя: транзакционное списание
+     * баланса, статус PAID, товар в инвентарь, эффекты и ачивки применяются сразу.
      */
     @Transactional
     public ChildPurchaseDto create(Long childId, CreatePurchaseRequest request) {
@@ -75,26 +76,46 @@ public class PurchaseService {
         Integer limit = product.getLimitPerChild();
         if (limit != null) {
             long used = purchaseRepository.countByProductIdAndChildIdAndStatusIn(
-                    product.getId(), childId, List.of(PurchaseStatus.PENDING, PurchaseStatus.PAID));
+                    product.getId(), childId, List.of(PurchaseStatus.PAID));
             if (used >= limit) {
                 throw new BadRequestException("Лимит покупок этого товара исчерпан");
             }
         }
 
-        Balance balance = balanceRepository.findByChildIdAndStoreId(childId, store.getId())
+        Balance balance = balanceRepository.findByChildIdAndStoreIdForUpdate(childId, store.getId())
                 .orElseThrow(() -> new BadRequestException("Недостаточно средств"));
         if (balance.getAmount().compareTo(product.getPrice()) < 0) {
             throw new BadRequestException("Недостаточно средств");
         }
+        balance.setAmount(balance.getAmount().subtract(product.getPrice()));
+        balance.setUpdatedAt(Instant.now());
 
+        Instant now = Instant.now();
         Purchase purchase = new Purchase();
         purchase.setChild(balance.getChild());
         purchase.setStore(store);
         purchase.setProduct(product);
         purchase.setAmount(product.getPrice());
-        purchase.setStatus(PurchaseStatus.PENDING);
-        purchase.setCreatedAt(Instant.now());
-        return ChildPurchaseDto.from(purchaseRepository.save(purchase));
+        purchase.setStatus(PurchaseStatus.PAID);
+        purchase.setCreatedAt(now);
+        purchase.setConfirmedAt(now);
+        purchaseRepository.save(purchase);
+
+        // Одноразовая покупка: товар магазина «Дом» пропадает из магазина после покупки
+        if ("HOME".equals(store.getTemplateType())) {
+            product.setActive(false);
+            productRepository.save(product);
+        }
+
+        // Купленный товар попадает в инвентарь ребёнка
+        inventoryService.addFromPurchase(purchase);
+
+        // Эффект товара: увеличение лимита (одноразовое на сегодня / постоянное)
+        limitService.applyProductEffect(childId, product);
+
+        // Автоначисление достижений
+        achievementService.checkProgress(childId);
+        return ChildPurchaseDto.from(purchase);
     }
 
     /**

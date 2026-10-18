@@ -62,9 +62,20 @@ const TYPE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'SEASONAL', label: 'Сезонный (жетоны)' },
 ];
 
+type QuestFilter = 'draft' | 'available' | 'active' | 'completed' | 'dailies';
+
+const QUEST_FILTERS: Array<{ id: QuestFilter; label: string }> = [
+  { id: 'draft', label: 'В Разработке' },
+  { id: 'available', label: 'Доступные' },
+  { id: 'active', label: 'Активные' },
+  { id: 'completed', label: 'Завершенные' },
+  { id: 'dailies', label: 'Дейлики' },
+];
+
 /**
  * Квесты ГМа: родитель создаёт дейлики и сюжетные квесты с наградой
  * [валюта магазина + общий XP], одобряет или отклоняет заявки детей.
+ * Вкладки: В Разработке / Доступные / Активные / Завершенные / Дейлики.
  */
 export default function QuestsTab() {
   const [quests, setQuests] = useState<QuestDto[]>([]);
@@ -75,6 +86,7 @@ export default function QuestsTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [questFilter, setQuestFilter] = useState<QuestFilter>('active');
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<QuestDto | null>(null);
@@ -208,6 +220,36 @@ export default function QuestsTab() {
   const filtered = statusFilter === 'ALL' ? submissions : submissions.filter((s) => s.status === statusFilter);
   const pendingCount = submissions.filter((s) => s.status === 'PENDING').length;
 
+  // Группировка квестов по вкладкам
+  const filteredQuests = quests.filter((q) => {
+    switch (questFilter) {
+      case 'draft':
+        return !q.active;
+      case 'available':
+        return q.active && !q.repeatable && q.activeChildren === 0 && q.doneChildren === 0;
+      case 'active':
+        return q.activeChildren > 0;
+      case 'completed':
+        return q.doneChildren > 0 && !q.repeatable;
+      case 'dailies':
+        return q.active && q.repeatable;
+      default:
+        return true;
+    }
+  });
+
+  const markDone = async (quest: QuestDto) => {
+    setBusy(true);
+    try {
+      await api.put(`/parent/quests/${quest.id}`, { active: true });
+      await load();
+    } catch (e) {
+      alert(errMsg(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loading) return <Spinner label="Загружаем квесты…" />;
 
   return (
@@ -231,15 +273,42 @@ export default function QuestsTab() {
           </button>
         </div>
 
-        {quests.length === 0 ? (
+        {/* Вкладки-группы */}
+        <div className="mb-4 flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1">
+          {QUEST_FILTERS.map((f) => {
+            const count =
+              f.id === 'draft'
+                ? quests.filter((q) => !q.active).length
+                : f.id === 'available'
+                  ? quests.filter((q) => q.active && !q.repeatable && q.activeChildren === 0 && q.doneChildren === 0).length
+                  : f.id === 'active'
+                    ? quests.filter((q) => q.activeChildren > 0).length
+                    : f.id === 'completed'
+                      ? quests.filter((q) => q.doneChildren > 0 && !q.repeatable).length
+                      : quests.filter((q) => q.active && q.repeatable).length;
+            return (
+              <button
+                key={f.id}
+                onClick={() => setQuestFilter(f.id)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                  questFilter === f.id ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {f.label} ({count})
+              </button>
+            );
+          })}
+        </div>
+
+        {filteredQuests.length === 0 ? (
           <EmptyState
-            title="Квестов пока нет"
-            hint="Создайте первый квест: например, «Прочитать главу книги» с наградой 10 баллов + 5 XP"
+            title="В этой группе квестов пока пусто"
+            hint="Создайте квест или переключите вкладку"
             icon={<ScrollText size={40} />}
           />
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
-            {quests.map((quest) => (
+            {filteredQuests.map((quest) => (
               <div key={quest.id} className="rounded-xl border border-slate-200 p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-start gap-3">
@@ -258,6 +327,16 @@ export default function QuestsTab() {
                     </div>
                   </div>
                   <div className="flex gap-1">
+                    {!quest.active && (
+                      <button
+                        onClick={() => void markDone(quest)}
+                        disabled={busy}
+                        className="rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50"
+                        title="Доделан — переместить в Доступные/Дейлики"
+                      >
+                        <CheckCircle2 size={16} />
+                      </button>
+                    )}
                     <button
                       onClick={() => openEdit(quest)}
                       className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"

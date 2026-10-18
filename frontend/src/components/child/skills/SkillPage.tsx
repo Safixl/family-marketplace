@@ -7,13 +7,11 @@ import SkillModule from './SkillModule';
 interface Props {
   config: SkillConfig;
   store: StoreDto | null;
-  balance: number | undefined;
   progress: SkillProgressDto | undefined;
   onBack: () => void;
-  onPurchased: () => void;
 }
 
-export default function SkillPage({ config, store, balance, progress, onBack, onPurchased }: Props) {
+export default function SkillPage({ config, store, progress, onBack }: Props) {
   const level = skillLevelFromProgress(progress?.progress ?? 0);
   return (
     <div className="space-y-4">
@@ -49,13 +47,7 @@ export default function SkillPage({ config, store, balance, progress, onBack, on
         </div>
       </div>
 
-      <SkillModule
-        config={config}
-        store={store}
-        balance={balance}
-        progress={progress}
-        onPurchased={onPurchased}
-      />
+      <SkillModule config={config} store={store} progress={progress} />
     </div>
   );
 }

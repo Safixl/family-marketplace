@@ -4,6 +4,7 @@ import { api } from '../../api/client';
 import { DailySkillDto, DailyStateDto } from '../../api/types';
 import { errMsg } from '../../lib/format';
 import { EmptyState, Spinner } from '../ui';
+import TaskCardsTab from './skills/tabs/TaskCardsTab';
 
 /**
  * Экран «Дейлики»: ежедневные задания по навыкам.
@@ -171,8 +172,8 @@ function DailySkillCard({ skill, answers, busy, onAnswerChange, onSubmitAnswer, 
         </div>
       </div>
 
-      {/* Логика и математика: задачи с ответами */}
-      {(isLogic || isMath) && (
+      {/* Логика: задачи с ответами */}
+      {isLogic && (
         <div className="mt-3 space-y-3">
           {skill.tasks.map((task) => {
             const value = answers[`${skill.skill}-${task.index}`] ?? '';
@@ -200,6 +201,13 @@ function DailySkillCard({ skill, answers, busy, onAnswerChange, onSubmitAnswer, 
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Математика: карточки с заданиями (выбор по сложности, решение на 80%+) */}
+      {isMath && (
+        <div className="mt-3">
+          <TaskCardsTab skill="MATH" />
         </div>
       )}
 

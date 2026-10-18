@@ -226,9 +226,6 @@ export default function ChildDashboard() {
     return stores.find((s) => s.templateType === template) ?? null;
   };
 
-  const balanceForStore = (storeId: number | undefined) =>
-    storeId != null ? profile?.balances.find((b) => b.storeId === storeId)?.amount : undefined;
-
   const skillProgress = (skill: SkillId) => skills.find((s) => s.skill === skill);
 
   return (
@@ -352,17 +349,14 @@ export default function ChildDashboard() {
             <SkillPage
               config={skillById(selectedSkill)}
               store={storeForSkill(selectedSkill)}
-              balance={balanceForStore(storeForSkill(selectedSkill)?.id)}
               progress={skillProgress(selectedSkill)}
               onBack={() => setSelectedSkill(null)}
-              onPurchased={afterPurchase}
             />
           ) : (
             <div className="space-y-4">
               <h2 className="rpg-title text-xl">Навыки героя</h2>
               <p className="text-sm text-stone-400">
-                Выбери направление, чтобы открыть его модуль: карточки, магазин, покупки, инвентарь и
-                статистику.
+                Выбери направление, чтобы открыть его модуль: карточки, покупки, инвентарь и статистику.
               </p>
               <SkillsGrid skills={skills} onSelect={openSkill} />
             </div>

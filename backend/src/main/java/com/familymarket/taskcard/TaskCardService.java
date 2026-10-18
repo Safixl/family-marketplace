@@ -25,6 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +37,14 @@ import java.util.stream.Collectors;
 public class TaskCardService {
 
     private static final int MAX_HOUSE_BONUS_PER_DAY = 6;
+    private static final ZoneId ZONE = ZoneId.of("Europe/Moscow");
+
+    /** День карточки: начинается в 09:00 МСК (до 09:00 действует вчерашний день). */
+    private LocalDate limitDay(Instant now) {
+        ZonedDateTime msk = now.atZone(ZONE);
+        ZonedDateTime dayStart = msk.toLocalDate().atTime(9, 0).atZone(ZONE);
+        return msk.isBefore(dayStart) ? msk.toLocalDate().minusDays(1) : msk.toLocalDate();
+    }
 
     private final TaskCardRepository cardRepository;
     private final ChildTaskCardRepository childCardRepository;
@@ -160,9 +170,17 @@ public class TaskCardService {
         Long parentId = childRepository.findParentIdById(childId)
                 .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
         List<TaskCard> cards = cardRepository.findByParentIdAndSkillAndActiveTrueOrderByCreatedAtDesc(parentId, skill);
-        LocalDate today = LocalDate.now();
-        Map<Long, ChildTaskCard> taken = childCardRepository.findByChildIdAndDay(childId, today).stream()
+        LocalDate today = limitDay(Instant.now());
+        List<ChildTaskCard> takenToday = childCardRepository.findByChildIdAndDay(childId, today);
+        Map<Long, ChildTaskCard> taken = takenToday.stream()
                 .collect(Collectors.toMap(c -> c.getCard().getId(), Function.identity()));
+
+        // После выбора карточки остальные скрываются до следующего дня (09:00 МСК)
+        if (!takenToday.isEmpty()) {
+            return takenToday.stream()
+                    .map(c -> toDto(c.getCard(), c))
+                    .toList();
+        }
         return cards.stream()
                 .filter(c -> c.getChild() == null || c.getChild().getId().equals(childId))
                 .map(c -> toDto(c, taken.get(c.getId())))
@@ -186,7 +204,7 @@ public class TaskCardService {
         }
         Child child = childRepository.findById(childId)
                 .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
-        LocalDate today = LocalDate.now();
+        LocalDate today = limitDay(Instant.now());
         boolean hasActive = childCardRepository.findByChildIdAndDay(childId, today).stream()
                 .anyMatch(c -> List.of("PENDING_PARENT", "REVEALED", "IN_PROGRESS").contains(c.getStatus()));
         if (hasActive) {
@@ -299,7 +317,7 @@ public class TaskCardService {
         if (card.getHouseBonus() <= 0 || card.getStore() == null) {
             return;
         }
-        LocalDate today = LocalDate.now();
+        LocalDate today = limitDay(Instant.now());
         HouseDay day = houseDayRepository.findByStoreIdAndChildIdAndDay(card.getStore().getId(), childId, today)
                 .orElseGet(() -> {
                     HouseDay d = new HouseDay();

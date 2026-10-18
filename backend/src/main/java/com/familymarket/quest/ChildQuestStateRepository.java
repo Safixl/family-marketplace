@@ -10,4 +10,6 @@ public interface ChildQuestStateRepository extends JpaRepository<ChildQuestState
     Optional<ChildQuestState> findByChildIdAndQuestId(Long childId, Long questId);
 
     List<ChildQuestState> findByChildId(Long childId);
+
+    List<ChildQuestState> findByQuestId(Long questId);
 }
