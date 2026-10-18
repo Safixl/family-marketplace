@@ -10,6 +10,7 @@ import com.familymarket.common.BadRequestException;
 import com.familymarket.common.NotFoundException;
 import com.familymarket.daily.DailyService;
 import com.familymarket.dto.TaskCardDto;
+import com.familymarket.notification.NotificationService;
 import com.familymarket.dto.TaskCardSubmitRequest;
 import com.familymarket.dto.TaskCardUpsertRequest;
 import com.familymarket.dto.TaskItem;
@@ -55,6 +56,7 @@ public class TaskCardService {
     private final BalanceService balanceService;
     private final AchievementService achievementService;
     private final DailyService dailyService;
+    private final NotificationService notificationService;
     private final ObjectMapper objectMapper;
 
     public TaskCardService(TaskCardRepository cardRepository,
@@ -66,6 +68,7 @@ public class TaskCardService {
                            BalanceService balanceService,
                            AchievementService achievementService,
                            DailyService dailyService,
+                           NotificationService notificationService,
                            ObjectMapper objectMapper) {
         this.cardRepository = cardRepository;
         this.childCardRepository = childCardRepository;
@@ -76,6 +79,7 @@ public class TaskCardService {
         this.balanceService = balanceService;
         this.achievementService = achievementService;
         this.dailyService = dailyService;
+        this.notificationService = notificationService;
         this.objectMapper = objectMapper;
     }
 
@@ -223,7 +227,11 @@ public class TaskCardService {
         } else {
             taken.setStatus("PENDING_PARENT");
         }
-        childCardRepository.save(taken);
+        ChildTaskCard saved = childCardRepository.save(taken);
+        if ("PENDING_PARENT".equals(saved.getStatus())) {
+            notificationService.create(childId, "CARD_REVEAL", "Выбрал карточку: " + card.getTitle(),
+                    "Хочет раскрыть карточку", "card", saved.getId());
+        }
     }
 
     @Transactional(readOnly = true)
@@ -245,6 +253,7 @@ public class TaskCardService {
         if (!"PENDING_PARENT".equals(taken.getStatus())) {
             throw new BadRequestException("Запрос уже обработан");
         }
+        notificationService.markDoneByRef("card", childCardId);
         TaskCard card = taken.getCard();
         if ("HOUSE".equals(card.getSkill())) {
             taken.setStatus("DONE");
@@ -265,6 +274,7 @@ public class TaskCardService {
         if (!"PENDING_PARENT".equals(taken.getStatus())) {
             throw new BadRequestException("Запрос уже обработан");
         }
+        notificationService.markDoneByRef("card", childCardId);
         childCardRepository.delete(taken);
     }
 
@@ -289,6 +299,8 @@ public class TaskCardService {
             // отчёт родителю: помощь принята → +n к living_score (см. approve)
             taken.setStatus("PENDING_PARENT");
             childCardRepository.save(taken);
+            notificationService.create(childId, "CARD_HELP", "Просит помощи: " + card.getTitle(),
+                    "Отчёт по домашней карточке", "card", taken.getId());
             return toDto(card, taken);
         }
 

@@ -9,6 +9,7 @@ import com.familymarket.dto.QuestDto;
 import com.familymarket.dto.QuestSubmissionDto;
 import com.familymarket.dto.QuestSubmitRequest;
 import com.familymarket.dto.QuestUpsertRequest;
+import com.familymarket.notification.NotificationService;
 import com.familymarket.seasonal.SeasonalEvent;
 import com.familymarket.seasonal.SeasonalEventRepository;
 import com.familymarket.store.Store;
@@ -47,6 +48,7 @@ public class QuestService {
     private final StoreRepository storeRepository;
     private final SeasonalEventRepository seasonalEventRepository;
     private final BalanceService balanceService;
+    private final NotificationService notificationService;
 
     public QuestService(QuestRepository questRepository,
                         QuestSubmissionRepository submissionRepository,
@@ -55,7 +57,8 @@ public class QuestService {
                         UserRepository userRepository,
                         StoreRepository storeRepository,
                         SeasonalEventRepository seasonalEventRepository,
-                        BalanceService balanceService) {
+                        BalanceService balanceService,
+                        NotificationService notificationService) {
         this.questRepository = questRepository;
         this.submissionRepository = submissionRepository;
         this.childQuestStateRepository = childQuestStateRepository;
@@ -64,6 +67,7 @@ public class QuestService {
         this.storeRepository = storeRepository;
         this.seasonalEventRepository = seasonalEventRepository;
         this.balanceService = balanceService;
+        this.notificationService = notificationService;
     }
 
     // ---------- Родитель: пул квестов ----------
@@ -256,6 +260,8 @@ public class QuestService {
         submission.setPhotoUrl(request.photoUrl());
         submission.setCreatedAt(now);
         QuestSubmission saved = submissionRepository.save(submission);
+        notificationService.create(childId, "QUEST", "Сдал квест: " + quest.getTitle(),
+                "submission", "submission", saved.getId());
 
         if (state == null) {
             state = new ChildQuestState();
@@ -302,6 +308,7 @@ public class QuestService {
         submission.setStatus("APPROVED");
         submission.setResolvedAt(Instant.now());
         QuestSubmissionDto dto = QuestSubmissionDto.from(submissionRepository.save(submission));
+        notificationService.markDoneByRef("submission", submission.getId());
 
         Long childId = submission.getChild().getId();
         childQuestStateRepository.findByChildIdAndQuestId(childId, quest.getId()).ifPresent(state -> {
@@ -332,6 +339,7 @@ public class QuestService {
         submission.setStatus("REJECTED");
         submission.setResolvedAt(Instant.now());
         QuestSubmissionDto dto = QuestSubmissionDto.from(submissionRepository.save(submission));
+        notificationService.markDoneByRef("submission", submission.getId());
 
         // Возвращаем квест в работу (стадия ?)
         childQuestStateRepository

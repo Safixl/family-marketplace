@@ -627,3 +627,31 @@ export interface DailyStateDto {
   day: string;
   skills: DailySkillDto[];
 }
+
+export type NotificationType =
+  | 'QUEST'
+  | 'CARD_REVEAL'
+  | 'CARD_HELP'
+  | 'HOUSE_CHECK'
+  | 'POCKET'
+  | 'READING_DONE'
+  | 'BOOK_REQUEST'
+  | 'LIMIT_TV'
+  | 'LIMIT_PC'
+  | 'LIMIT_CONSOLE'
+  | 'LIMIT_PHONE'
+  | 'LIMIT_TABLET';
+
+export interface NotificationDto {
+  id: number;
+  childId: number | null;
+  childName: string | null;
+  childAvatar: string | null;
+  type: NotificationType;
+  title: string;
+  payload: string | null;
+  refType: string | null;
+  refId: number | null;
+  status: 'NEW' | 'DONE';
+  createdAt: string;
+}

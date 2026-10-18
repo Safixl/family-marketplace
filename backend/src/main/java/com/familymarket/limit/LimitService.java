@@ -12,6 +12,7 @@ import com.familymarket.dto.LimitTypeState;
 import com.familymarket.dto.PocketRequestCreateRequest;
 import com.familymarket.dto.PocketRequestDto;
 import com.familymarket.dto.PocketState;
+import com.familymarket.notification.NotificationService;
 import com.familymarket.product.Product;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +42,7 @@ public class LimitService {
     private final PocketDisbursementRepository pocketDisbursementRepository;
     private final PocketExtensionRepository pocketExtensionRepository;
     private final ChildRepository childRepository;
+    private final NotificationService notificationService;
 
     public LimitService(ChildLimitRepository childLimitRepository,
                         LimitUsageRepository limitUsageRepository,
@@ -49,7 +51,8 @@ public class LimitService {
                         PocketRequestRepository pocketRequestRepository,
                         PocketDisbursementRepository pocketDisbursementRepository,
                         PocketExtensionRepository pocketExtensionRepository,
-                        ChildRepository childRepository) {
+                        ChildRepository childRepository,
+                        NotificationService notificationService) {
         this.childLimitRepository = childLimitRepository;
         this.limitUsageRepository = limitUsageRepository;
         this.limitFreezeRepository = limitFreezeRepository;
@@ -58,6 +61,7 @@ public class LimitService {
         this.pocketDisbursementRepository = pocketDisbursementRepository;
         this.pocketExtensionRepository = pocketExtensionRepository;
         this.childRepository = childRepository;
+        this.notificationService = notificationService;
     }
 
     // ---------- Время ----------
@@ -202,12 +206,32 @@ public class LimitService {
         LimitUsage usage = usageFor(childId, t, limitDay(Instant.now()));
         if (usage.isRunning() && usage.getStartedAt() != null) {
             int seconds = (int) Math.max(0, Duration.between(usage.getStartedAt(), Instant.now()).getSeconds());
-            usage.setUsedSeconds(usage.getUsedSeconds() + seconds);
+            ChildLimit cl = childLimitRepository.findById(childId).orElseGet(ChildLimit::new);
+            int limitSeconds = baseMinutes(cl, t) * 60 + usage.getExtendedSeconds();
+            int usedBefore = usage.getUsedSeconds();
+            usage.setUsedSeconds(usedBefore + seconds);
+            int usedAfter = usage.getUsedSeconds();
             usage.setRunning(false);
             usage.setStartedAt(null);
             limitUsageRepository.save(usage);
             recordEvent(childId, t, "STOP", seconds);
+            if (limitSeconds > 0 && usedBefore < limitSeconds && usedAfter >= limitSeconds) {
+                notificationService.create(childId, "LIMIT_" + t,
+                        "Лимит «" + limitLabel(t) + "» на сегодня исчерпан",
+                        "Время на устройстве закончилось", "limit", childId);
+            }
         }
+    }
+
+    private String limitLabel(String type) {
+        return switch (type) {
+            case "TV" -> "ТВ";
+            case "PC" -> "Компьютер";
+            case "CONSOLE" -> "Консоль";
+            case "PHONE" -> "Телефон";
+            case "TABLET" -> "Планшет";
+            default -> type;
+        };
     }
 
     private void recordEvent(Long childId, String type, String action, int seconds) {
@@ -268,6 +292,7 @@ public class LimitService {
             disbursement.setCreatedAt(now);
             pocketDisbursementRepository.save(disbursement);
         }
+        notificationService.markDoneForChild("POCKET", childId);
         return new PocketState(cl.getPocketWeekly(), spent.add(available), BigDecimal.ZERO);
     }
 
@@ -338,7 +363,10 @@ public class LimitService {
         pocketRequest.setAmount(request.amount());
         pocketRequest.setStatus("PENDING");
         pocketRequest.setCreatedAt(Instant.now());
-        return PocketRequestDto.from(pocketRequestRepository.save(pocketRequest));
+        PocketRequest saved = pocketRequestRepository.save(pocketRequest);
+        notificationService.create(childId, "POCKET", "Просит карманные деньги",
+                "Сумма: " + saved.getAmount(), "pocket", saved.getId());
+        return PocketRequestDto.from(saved);
     }
 
     @Transactional(readOnly = true)
@@ -354,6 +382,7 @@ public class LimitService {
         if (!"PENDING".equals(pocketRequest.getStatus())) {
             throw new BadRequestException("Запрос уже обработан");
         }
+        notificationService.markDoneByRef("pocket", requestId);
         Long childId = pocketRequest.getChild().getId();
         Instant now = Instant.now();
         LocalDate weekStart = weekStart(now);
@@ -386,6 +415,7 @@ public class LimitService {
         if (!"PENDING".equals(pocketRequest.getStatus())) {
             throw new BadRequestException("Запрос уже обработан");
         }
+        notificationService.markDoneByRef("pocket", requestId);
         pocketRequest.setStatus("REJECTED");
         pocketRequest.setResolvedAt(Instant.now());
         return PocketRequestDto.from(pocketRequestRepository.save(pocketRequest));

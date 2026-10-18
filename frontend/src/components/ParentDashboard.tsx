@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   BookOpen,
   Calculator,
@@ -17,7 +17,9 @@ import {
   Zap,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../api/client';
 import AchievementsTab from './tabs/AchievementsTab';
+import { NotificationBell, NotificationPanel } from './NotificationCenter';
 import ChildrenTab from './tabs/ChildrenTab';
 import OverviewTab from './tabs/OverviewTab';
 import PurchasesTab from './tabs/PurchasesTab';
@@ -59,7 +61,24 @@ const TABS: Array<{ id: TabId; label: string; icon: typeof LayoutDashboard }> = 
 export default function ParentDashboard() {
   const { session, logout } = useAuth();
   const [tab, setTab] = useState<TabId>('overview');
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifCount, setNotifCount] = useState(0);
   const profile = session?.type === 'parent' ? session.profile : null;
+
+  const refreshNotifCount = useCallback(async () => {
+    try {
+      const count = await api.get<number>('/parent/notifications/count');
+      setNotifCount(count);
+    } catch {
+      // тихо — бейдж просто не обновится
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshNotifCount();
+    const timer = setInterval(() => void refreshNotifCount(), 15000);
+    return () => clearInterval(timer);
+  }, [refreshNotifCount]);
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -91,7 +110,10 @@ export default function ParentDashboard() {
           })}
         </nav>
         <div className="border-t border-slate-800 pt-4">
-          <div className="mb-2 truncate px-2 text-sm font-semibold text-white">{profile?.name}</div>
+          <div className="mb-2 flex items-center justify-between px-2">
+            <span className="truncate text-sm font-semibold text-white">{profile?.name}</span>
+            <NotificationBell count={notifCount} onClick={() => setNotifOpen(true)} />
+          </div>
           <button
             onClick={logout}
             className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white"
@@ -107,9 +129,12 @@ export default function ParentDashboard() {
           <Zap size={20} className="text-indigo-400" />
           <span className="font-bold">Дейлики</span>
         </div>
-        <button onClick={logout} className="rounded-xl p-2 text-slate-300 hover:bg-slate-800" title="Выйти">
-          <LogOut size={20} />
-        </button>
+        <div className="flex items-center gap-1">
+          <NotificationBell count={notifCount} onClick={() => setNotifOpen(true)} />
+          <button onClick={logout} className="rounded-xl p-2 text-slate-300 hover:bg-slate-800" title="Выйти">
+            <LogOut size={20} />
+          </button>
+        </div>
       </header>
 
       {/* Контент */}
@@ -130,6 +155,8 @@ export default function ParentDashboard() {
           {tab === 'seasonal' && <SeasonalTab />}
         </div>
       </main>
+
+      <NotificationPanel open={notifOpen} onClose={() => setNotifOpen(false)} onChanged={refreshNotifCount} />
 
       {/* Нижняя навигация (мобильный) */}
       <nav className="fixed inset-x-0 bottom-0 z-30 flex justify-around border-t border-slate-200 bg-white px-2 py-2 lg:hidden">

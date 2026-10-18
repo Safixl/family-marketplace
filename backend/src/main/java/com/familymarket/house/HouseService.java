@@ -11,6 +11,7 @@ import com.familymarket.dto.HouseCheckRequestDto;
 import com.familymarket.dto.HouseDayDto;
 import com.familymarket.dto.HouseDayUpsertRequest;
 import com.familymarket.dto.HouseMonthResponse;
+import com.familymarket.notification.NotificationService;
 import com.familymarket.store.Store;
 import com.familymarket.store.StoreService;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,7 @@ public class HouseService {
     private final BalanceService balanceService;
     private final AchievementService achievementService;
     private final DailyService dailyService;
+    private final NotificationService notificationService;
 
     public HouseService(HouseDayRepository houseDayRepository,
                         HouseCheckRequestRepository checkRequestRepository,
@@ -39,7 +41,8 @@ public class HouseService {
                         StoreService storeService,
                         BalanceService balanceService,
                         AchievementService achievementService,
-                        DailyService dailyService) {
+                        DailyService dailyService,
+                        NotificationService notificationService) {
         this.houseDayRepository = houseDayRepository;
         this.checkRequestRepository = checkRequestRepository;
         this.childRepository = childRepository;
@@ -47,6 +50,7 @@ public class HouseService {
         this.balanceService = balanceService;
         this.achievementService = achievementService;
         this.dailyService = dailyService;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -127,7 +131,10 @@ public class HouseService {
         request.setDay(today);
         request.setStatus("PENDING");
         request.setCreatedAt(Instant.now());
-        return HouseCheckRequestDto.from(checkRequestRepository.save(request));
+        HouseCheckRequest saved = checkRequestRepository.save(request);
+        notificationService.create(childId, "HOUSE_CHECK", "Проверь комнату",
+                "Ребёнок просит проверить комнату (" + today + ")", "house", saved.getId());
+        return HouseCheckRequestDto.from(saved);
     }
 
     @Transactional(readOnly = true)
@@ -146,6 +153,7 @@ public class HouseService {
         if (!"PENDING".equals(request.getStatus())) {
             throw new BadRequestException("Запрос уже обработан");
         }
+        notificationService.markDoneByRef("house", requestId);
         request.setStatus("APPROVED");
         request.setResolvedAt(Instant.now());
         checkRequestRepository.save(request);
@@ -176,6 +184,7 @@ public class HouseService {
         if (!"PENDING".equals(request.getStatus())) {
             throw new BadRequestException("Запрос уже обработан");
         }
+        notificationService.markDoneByRef("house", requestId);
         request.setStatus("REJECTED");
         request.setResolvedAt(Instant.now());
         return HouseCheckRequestDto.from(checkRequestRepository.save(request));

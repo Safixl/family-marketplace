@@ -21,6 +21,7 @@ import com.familymarket.dto.ReadingRequestDto;
 import com.familymarket.dto.ReadingSettingsDto;
 import com.familymarket.dto.ReadingSettingsUpdateRequest;
 import com.familymarket.dto.ReadingStatsDto;
+import com.familymarket.notification.NotificationService;
 import com.familymarket.store.Store;
 import com.familymarket.store.StoreService;
 import org.springframework.stereotype.Service;
@@ -51,6 +52,7 @@ public class ReadingService {
     private final BalanceService balanceService;
     private final AchievementService achievementService;
     private final DailyService dailyService;
+    private final NotificationService notificationService;
 
     public ReadingService(ReadingBookRepository bookRepository,
                           ReadingLogRepository logRepository,
@@ -63,7 +65,8 @@ public class ReadingService {
                           com.familymarket.store.StoreRepository storeRepository,
                           BalanceService balanceService,
                           AchievementService achievementService,
-                          DailyService dailyService) {
+                          DailyService dailyService,
+                          NotificationService notificationService) {
         this.bookRepository = bookRepository;
         this.logRepository = logRepository;
         this.requestRepository = requestRepository;
@@ -76,6 +79,7 @@ public class ReadingService {
         this.balanceService = balanceService;
         this.achievementService = achievementService;
         this.dailyService = dailyService;
+        this.notificationService = notificationService;
     }
 
     // ---------- Каталог книг (родитель, личные книги ребёнка) ----------
@@ -207,7 +211,10 @@ public class ReadingService {
         log.setStatus("PENDING");
         log.setReadAt(LocalDate.now());
         log.setCreatedAt(Instant.now());
-        return ReadingLogDto.from(logRepository.save(log));
+        ReadingLog saved = logRepository.save(log);
+        notificationService.create(childId, "READING_DONE", "Прочитал книгу: " + book.getName(),
+                "Подтверди прочитанное", "readingLog", saved.getId());
+        return ReadingLogDto.from(saved);
     }
 
     /**
@@ -219,6 +226,7 @@ public class ReadingService {
         if ("APPROVED".equals(log.getStatus())) {
             throw new ConflictException("Книга уже подтверждена");
         }
+        notificationService.markDoneByRef("readingLog", logId);
         log.setStatus("APPROVED");
         logRepository.save(log);
         balanceService.credit(log.getChild().getId(), log.getBook().getStore().getId(), log.getPoints());
@@ -229,6 +237,7 @@ public class ReadingService {
     @Transactional
     public void rejectLog(Long parentId, Long logId) {
         ReadingLog log = getOwnedLog(parentId, logId);
+        notificationService.markDoneByRef("readingLog", logId);
         logRepository.delete(log);
     }
 
@@ -245,7 +254,10 @@ public class ReadingService {
         readingRequest.setTitle(request.title().trim());
         readingRequest.setStatus("PENDING");
         readingRequest.setCreatedAt(Instant.now());
-        return ReadingRequestDto.from(requestRepository.save(readingRequest));
+        ReadingRequest saved = requestRepository.save(readingRequest);
+        notificationService.create(childId, "BOOK_REQUEST", "Хочет книгу: " + saved.getTitle(),
+                "Заявка на новую книгу", "readingRequest", saved.getId());
+        return ReadingRequestDto.from(saved);
     }
 
     @Transactional(readOnly = true)
@@ -265,6 +277,7 @@ public class ReadingService {
         if (!"PENDING".equals(readingRequest.getStatus())) {
             throw new ConflictException("Заявка уже обработана");
         }
+        notificationService.markDoneByRef("readingRequest", requestId);
         readingRequest.setStatus("APPROVED");
         readingRequest.setResolvedAt(Instant.now());
         requestRepository.save(readingRequest);
@@ -289,6 +302,7 @@ public class ReadingService {
         if (!"PENDING".equals(readingRequest.getStatus())) {
             throw new ConflictException("Заявка уже обработана");
         }
+        notificationService.markDoneByRef("readingRequest", requestId);
         readingRequest.setStatus("REJECTED");
         readingRequest.setResolvedAt(Instant.now());
         requestRepository.save(readingRequest);

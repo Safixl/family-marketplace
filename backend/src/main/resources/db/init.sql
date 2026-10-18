@@ -101,6 +101,21 @@ CREATE TABLE IF NOT EXISTS child_achievements (
     CONSTRAINT uq_child_achievements UNIQUE (child_id, achievement_id)
 );
 
+-- Уведомления родителя: запросы/отбивки ребёнка, требующие ответа, и события (исчерпание лимита)
+CREATE TABLE IF NOT EXISTS parent_notifications (
+    id         BIGSERIAL PRIMARY KEY,
+    parent_id  BIGINT       NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    child_id   BIGINT       REFERENCES children (id) ON DELETE CASCADE,
+    type       VARCHAR(40)  NOT NULL,   -- QUEST / CARD_REVEAL / CARD_HELP / HOUSE_CHECK / POCKET / READING_DONE / BOOK_REQUEST / LIMIT_TV ...
+    title      VARCHAR(255) NOT NULL,
+    payload    VARCHAR(2000),
+    ref_type   VARCHAR(40),
+    ref_id     BIGINT,
+    status     VARCHAR(20)  NOT NULL DEFAULT 'NEW',  -- NEW / DONE
+    created_at TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_parent_notif_parent ON parent_notifications (parent_id, status);
+
 -- Достижения, которые ребёнок отслеживает (появляются на главной)
 CREATE TABLE IF NOT EXISTS child_tracked_achievements (
     id             BIGSERIAL PRIMARY KEY,
