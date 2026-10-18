@@ -75,7 +75,8 @@ export default function ChildHomeTab({
     void loadTracked();
   }, [loadReading, loadTracked]);
 
-  const readingBooks = (reading?.books ?? []).filter((b) => b.currentPage != null && b.status !== 'APPROVED');
+  // Все книги, которые ещё не зачтены (в т.ч. без закладки) — статус «Читаю сейчас»
+  const readingBooks = (reading?.books ?? []).filter((b) => b.status !== 'APPROVED');
 
   const savePage = async (book: ChildBookDto) => {
     const page = Number(pageInput[book.id]);
@@ -177,7 +178,7 @@ export default function ChildHomeTab({
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-semibold text-amber-100">{book.name}</div>
                   <div className="text-sm text-sky-300">
-                    Стр. {book.currentPage}/{book.pages}
+                    Стр. {book.currentPage ?? 0}/{book.pages}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">

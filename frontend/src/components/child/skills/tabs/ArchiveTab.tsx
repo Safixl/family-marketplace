@@ -101,7 +101,8 @@ export default function ArchiveTab({ config, rows }: Props) {
             <tbody>
               {filtered.map((row) => {
                 const meta = STATUS_META[row.status];
-                const isReading = row.currentPage != null;
+                const isReading = row.status === 'IN_PROGRESS';
+                const shownPage = row.currentPage ?? 0;
                 return (
                   <tr key={row.id}>
                     <td className="font-semibold text-amber-100">{row.title}</td>
@@ -115,7 +116,7 @@ export default function ArchiveTab({ config, rows }: Props) {
                             <>
                               <input
                                 type="number"
-                                min={1}
+                                min={shownPage > 0 ? shownPage : 1}
                                 max={row.pages}
                                 className="rpg-input w-20"
                                 value={editPage}
@@ -134,24 +135,27 @@ export default function ArchiveTab({ config, rows }: Props) {
                             </>
                           ) : (
                             <>
-                              <span className="font-bold text-sky-300">
-                                {row.currentPage}/{row.pages}
-                              </span>
+                              {/* Кнопка «Изменить» слева от страниц */}
                               <button
                                 className="rounded-lg p-1 text-sky-300 hover:bg-sky-500/20"
                                 onClick={() => {
                                   setEditId(row.id);
-                                  setEditPage(String(row.currentPage ?? ''));
+                                  setEditPage(String(shownPage > 0 ? shownPage : ''));
                                 }}
                                 title="Изменить страницу"
                               >
                                 <Pencil size={13} />
                               </button>
+                              <span className="font-bold text-sky-300">
+                                {shownPage}/{row.pages}
+                              </span>
                             </>
                           )}
                         </div>
                       ) : (
-                        <span className="text-stone-300">{row.pages ?? '—'}</span>
+                        <span className="text-stone-300">
+                          {row.status === 'DONE' ? `${row.pages}/${row.pages}` : (row.pages ?? '—')}
+                        </span>
                       )}
                     </td>
                     <td className="text-right font-bold text-amber-300">+{row.points}</td>
