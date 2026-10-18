@@ -1,5 +1,21 @@
 import { useState } from 'react';
-import { LayoutDashboard, LogOut, ScrollText, ShoppingCart, Sparkles, Store, Trophy, Users, Zap } from 'lucide-react';
+import {
+  BookOpen,
+  Calculator,
+  Dumbbell,
+  Globe2,
+  Home,
+  LayoutDashboard,
+  LogOut,
+  Package,
+  Puzzle,
+  ScrollText,
+  ShoppingCart,
+  Sparkles,
+  Trophy,
+  Users,
+  Zap,
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import AchievementsTab from './tabs/AchievementsTab';
 import ChildrenTab from './tabs/ChildrenTab';
@@ -9,12 +25,31 @@ import QuestsTab from './tabs/QuestsTab';
 import SeasonalTab from './tabs/SeasonalTab';
 import StoresTab from './tabs/StoresTab';
 
-type TabId = 'overview' | 'children' | 'stores' | 'achievements' | 'purchases' | 'quests' | 'seasonal';
+type TabId =
+  | 'overview'
+  | 'children'
+  | 'reading'
+  | 'math'
+  | 'logic'
+  | 'lang'
+  | 'sport'
+  | 'house'
+  | 'other'
+  | 'achievements'
+  | 'purchases'
+  | 'quests'
+  | 'seasonal';
 
 const TABS: Array<{ id: TabId; label: string; icon: typeof LayoutDashboard }> = [
   { id: 'overview', label: 'Обзор', icon: LayoutDashboard },
   { id: 'children', label: 'Дети', icon: Users },
-  { id: 'stores', label: 'Магазины', icon: Store },
+  { id: 'reading', label: 'Чтение', icon: BookOpen },
+  { id: 'math', label: 'Математика', icon: Calculator },
+  { id: 'logic', label: 'Логика', icon: Puzzle },
+  { id: 'lang', label: 'Иностранный язык', icon: Globe2 },
+  { id: 'sport', label: 'Спорт и хобби', icon: Dumbbell },
+  { id: 'house', label: 'Порядок в комнате', icon: Home },
+  { id: 'other', label: 'Прочее', icon: Package },
   { id: 'quests', label: 'Квесты', icon: ScrollText },
   { id: 'seasonal', label: 'Сезоны', icon: Sparkles },
   { id: 'achievements', label: 'Достижения', icon: Trophy },
@@ -82,7 +117,13 @@ export default function ParentDashboard() {
         <div className="mx-auto max-w-6xl">
           {tab === 'overview' && <OverviewTab />}
           {tab === 'children' && <ChildrenTab />}
-          {tab === 'stores' && <StoresTab />}
+          {tab === 'reading' && <StoresTab templateFilter="READING" title="📚 Чтение" />}
+          {tab === 'math' && <StoresTab templateFilter="MATH" title="🧮 Математика" />}
+          {tab === 'logic' && <StoresTab templateFilter="LOGIC" title="🧩 Логика" />}
+          {tab === 'lang' && <StoresTab templateFilter="LANG" title="🌍 Иностранный язык" />}
+          {tab === 'sport' && <StoresTab templateFilter="SPORT" title="⚽ Спорт и хобби" />}
+          {tab === 'house' && <StoresTab templateFilter="HOME" title="🏠 Порядок в комнате" />}
+          {tab === 'other' && <StoresTab templateFilter="NONE" title="📦 Прочее" />}
           {tab === 'achievements' && <AchievementsTab />}
           {tab === 'purchases' && <PurchasesTab />}
           {tab === 'quests' && <QuestsTab />}

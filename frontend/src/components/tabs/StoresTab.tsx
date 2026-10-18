@@ -41,7 +41,14 @@ const EMPTY_PRODUCT: ProductForm = {
   effectValue: '',
 };
 
-export default function StoresTab() {
+interface StoresTabProps {
+  /** Фильтр магазинов по типу шаблона: 'READING' | 'MATH' | ... | 'NONE' (без шаблона) */
+  templateFilter?: string;
+  /** Заголовок вкладки */
+  title?: string;
+}
+
+export default function StoresTab({ templateFilter, title }: StoresTabProps) {
   const [stores, setStores] = useState<StoreDto[]>([]);
   const [productsByStore, setProductsByStore] = useState<Record<number, ProductDto[]>>({});
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
@@ -263,10 +270,15 @@ export default function StoresTab() {
 
   if (error) return <div className="card text-sm text-rose-600">{error}</div>;
 
+  // Фильтр по типу шаблона (вкладка навыка): 'NONE' — магазины без шаблона
+  const visibleStores = templateFilter
+    ? stores.filter((s) => (templateFilter === 'NONE' ? !s.templateType : s.templateType === templateFilter))
+    : stores;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-extrabold">Магазины</h1>
+        <h1 className="text-xl font-extrabold">{title ?? 'Магазины'}</h1>
         <div className="flex gap-2">
           <button className="btn-secondary" onClick={() => setTemplateModal(true)}>
             <Sparkles size={18} /> Из шаблона
@@ -277,14 +289,18 @@ export default function StoresTab() {
         </div>
       </div>
 
-      {stores.length === 0 ? (
+      {visibleStores.length === 0 ? (
         <EmptyState
-          title="Пока нет магазинов"
-          hint="Создайте магазин с кастомной валютой и добавьте товары"
+          title={templateFilter ? 'В этом навыке пока нет магазина' : 'Пока нет магазинов'}
+          hint={
+            templateFilter
+              ? 'Включите готовый магазин из шаблона или создайте новый'
+              : 'Создайте магазин с кастомной валютой и добавьте товары'
+          }
         />
       ) : (
         <div className="space-y-4">
-          {stores.map((store) => {
+          {visibleStores.map((store) => {
             const products = productsByStore[store.id] ?? [];
             const isExpanded = expanded.has(store.id);
             return (
