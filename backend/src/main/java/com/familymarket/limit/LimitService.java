@@ -156,13 +156,14 @@ public class LimitService {
 
     // ---------- Ребенок ----------
 
-    @Transactional(readOnly = true)
+    @Transactional
     public LimitStateDto getState(Long childId) {
         ChildLimit cl = childLimitRepository.findById(childId).orElseGet(ChildLimit::new);
         Instant now = Instant.now();
         LocalDate day = limitDay(now);
         List<LimitTypeState> limits = new ArrayList<>();
         for (String type : TIME_LIMIT_TYPES) {
+            autoStopIfExceeded(childId, type); // исчерпанный таймер останавливается сам
             LimitUsage usage = usageFor(childId, type, day);
             int used = usage.getUsedSeconds();
             if (usage.isRunning() && usage.getStartedAt() != null) {
@@ -191,8 +192,14 @@ public class LimitService {
                 .map(LimitFreeze::isFrozen).orElse(false)) {
             throw new BadRequestException("Лимит заморожен родителем");
         }
+        autoStopIfExceeded(childId, t);
         LimitUsage usage = usageFor(childId, t, limitDay(Instant.now()));
         if (!usage.isRunning()) {
+            ChildLimit cl = childLimitRepository.findById(childId).orElseGet(ChildLimit::new);
+            int limitSeconds = baseMinutes(cl, t) * 60 + usage.getExtendedSeconds();
+            if (limitSeconds > 0 && usage.getUsedSeconds() >= limitSeconds) {
+                throw new BadRequestException("Лимит на сегодня исчерпан");
+            }
             usage.setRunning(true);
             usage.setStartedAt(Instant.now());
             limitUsageRepository.save(usage);
@@ -215,11 +222,45 @@ public class LimitService {
             usage.setStartedAt(null);
             limitUsageRepository.save(usage);
             recordEvent(childId, t, "STOP", seconds);
-            if (limitSeconds > 0 && usedBefore < limitSeconds && usedAfter >= limitSeconds) {
-                notificationService.create(childId, "LIMIT_" + t,
-                        "Лимит «" + limitLabel(t) + "» на сегодня исчерпан",
-                        "Время на устройстве закончилось", "limit", childId);
-            }
+            notifyLimitExceeded(childId, t, usedBefore, usedAfter, limitSeconds);
+        }
+    }
+
+    /**
+     * Авто-остановка: если таймер тикает дольше выделенного времени (базовый лимит
+     * + покупные расширения), фиксируем исчерпание и создаём родителю уведомление LIMIT_<TYPE>.
+     */
+    private boolean autoStopIfExceeded(Long childId, String type) {
+        LimitUsage usage = usageFor(childId, type, limitDay(Instant.now()));
+        if (!usage.isRunning() || usage.getStartedAt() == null) {
+            return false;
+        }
+        ChildLimit cl = childLimitRepository.findById(childId).orElseGet(ChildLimit::new);
+        int limitSeconds = baseMinutes(cl, type) * 60 + usage.getExtendedSeconds();
+        if (limitSeconds <= 0) {
+            return false;
+        }
+        int usedBefore = usage.getUsedSeconds();
+        int elapsed = (int) Math.max(0, Duration.between(usage.getStartedAt(), Instant.now()).getSeconds());
+        int usedAfter = usedBefore + elapsed;
+        if (usedAfter >= limitSeconds) {
+            usage.setUsedSeconds(limitSeconds);
+            usage.setRunning(false);
+            usage.setStartedAt(null);
+            limitUsageRepository.save(usage);
+            recordEvent(childId, type, "STOP", elapsed);
+            notifyLimitExceeded(childId, type, usedBefore, usedAfter, limitSeconds);
+            return true;
+        }
+        return false;
+    }
+
+    /** Уведомление родителю при пересечении дневного лимита (один раз за пересечение). */
+    private void notifyLimitExceeded(Long childId, String type, int usedBefore, int usedAfter, int limitSeconds) {
+        if (limitSeconds > 0 && usedBefore < limitSeconds && usedAfter >= limitSeconds) {
+            notificationService.create(childId, "LIMIT_" + type,
+                    "Лимит «" + limitLabel(type) + "» на сегодня исчерпан",
+                    "Время на устройстве закончилось", "limit", childId);
         }
     }
 

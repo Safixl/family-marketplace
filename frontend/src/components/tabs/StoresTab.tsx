@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { BookOpen, CalendarDays, ChevronDown, ChevronUp, Package, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { BookOpen, CalendarDays, CheckCircle2, ChevronDown, ChevronUp, Package, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { api } from '../../api/client';
-import { ProductDto, StoreDto, StoreTemplateDto } from '../../api/types';
+import { ChildDto, ProductDto, SkillActivationDto, StoreDto, StoreTemplateDto } from '../../api/types';
 import { errMsg, fmtAmount } from '../../lib/format';
 import Modal from '../Modal';
 import BooksManager from '../managers/BooksManager';
@@ -57,6 +57,9 @@ export default function StoresTab({ templateFilter, title }: StoresTabProps) {
   const [busy, setBusy] = useState(false);
 
   const [templates, setTemplates] = useState<StoreTemplateDto[]>([]);
+  const [children, setChildren] = useState<ChildDto[]>([]);
+  const [activations, setActivations] = useState<SkillActivationDto[]>([]);
+  const [activateChildId, setActivateChildId] = useState<string>('');
   const [templateModal, setTemplateModal] = useState(false);
   const [managerFor, setManagerFor] = useState<
     { store: StoreDto; type: 'books' | 'tasks' | 'house' | 'cards'; skill?: 'MATH' | 'HOUSE' } | null
@@ -75,12 +78,17 @@ export default function StoresTab({ templateFilter, title }: StoresTabProps) {
     setLoading(true);
     setError(null);
     try {
-      const [storeList, templateList] = await Promise.all([
+      const [storeList, templateList, childList, activationList] = await Promise.all([
         api.get<StoreDto[]>('/parent/stores'),
         api.get<StoreTemplateDto[]>('/parent/store-templates'),
+        api.get<ChildDto[]>('/parent/children'),
+        api.get<SkillActivationDto[]>('/parent/skill-activations'),
       ]);
       setStores(storeList);
       setTemplates(templateList);
+      setChildren(childList.filter((c) => c.active));
+      setActivations(activationList);
+      setActivateChildId((prev) => prev || String(childList.find((c) => c.active)?.id ?? ''));
     } catch (e) {
       setError(errMsg(e));
     } finally {
@@ -92,11 +100,19 @@ export default function StoresTab({ templateFilter, title }: StoresTabProps) {
     void load();
   }, [load]);
 
+  /** Активировать навык конкретному ребёнку (магазин шаблона включается идемпотентно). */
   const activateTemplate = async (slug: string) => {
+    if (!activateChildId) {
+      alert('Выберите ребёнка, для которого активируется навык');
+      return;
+    }
     setBusy(true);
     try {
-      await api.post(`/parent/store-templates/${slug}/activate`);
+      await api.post(`/parent/store-templates/${slug}/activate?childId=${activateChildId}`);
       setTemplateModal(false);
+      const activatedFor = children.find((c) => String(c.id) === activateChildId);
+      const name = activatedFor ? `${activatedFor.avatarEmoji} ${activatedFor.name}` : `ребёнка #${activateChildId}`;
+      alert(`Навык активирован для ${name}`);
       await load();
     } catch (e) {
       alert(errMsg(e));
@@ -278,14 +294,38 @@ export default function StoresTab({ templateFilter, title }: StoresTabProps) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-extrabold">{title ?? 'Магазины'}</h1>
+        <div>
+          <h1 className="text-xl font-extrabold">{title ?? 'Магазины'}</h1>
+          {templateFilter && templateFilter !== 'NONE' && (
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              {(() => {
+                const act = activations.filter((a) => a.skill === templateFilter);
+                if (act.length === 0) {
+                  return <span className="text-sm text-slate-400">Навык пока не активирован ни одному ребёнку</span>;
+                }
+                return (
+                  <>
+                    <CheckCircle2 size={15} className="text-emerald-500" />
+                    {act.map((a) => (
+                      <span key={a.childId} className="badge bg-emerald-50 text-emerald-700">
+                        {a.childAvatar} {a.childName}
+                      </span>
+                    ))}
+                  </>
+                );
+              })()}
+            </div>
+          )}
+        </div>
         <div className="flex gap-2">
-          <button className="btn-secondary" onClick={() => setTemplateModal(true)}>
-            <Sparkles size={18} /> Из шаблона
+          <button className="btn-primary" onClick={() => setTemplateModal(true)}>
+            <Sparkles size={18} /> {templateFilter ? 'Активировать навык' : 'Из шаблона'}
           </button>
-          <button className="btn-primary" onClick={openStoreCreate}>
-            <Plus size={18} /> Создать магазин
-          </button>
+          {!templateFilter && (
+            <button className="btn-secondary" onClick={openStoreCreate}>
+              <Plus size={18} /> Создать магазин
+            </button>
+          )}
         </div>
       </div>
 
@@ -657,37 +697,69 @@ export default function StoresTab({ templateFilter, title }: StoresTabProps) {
         </Modal>
       )}
 
-      {/* Модалка шаблонов */}
+      {/* Модалка шаблонов / активации навыка */}
       {templateModal && (
-        <Modal title="Готовые магазины" onClose={() => setTemplateModal(false)} wide>
+        <Modal
+          title={templateFilter ? 'Активация навыка для ребёнка' : 'Готовые магазины'}
+          onClose={() => setTemplateModal(false)}
+          wide
+        >
           <div className="space-y-3">
             <p className="text-sm text-slate-500">
-              Включите готовый магазин — он создастся с валютой и товарами. Настроить можно в любой момент.
+              {templateFilter
+                ? 'Выберите ребёнка — навык включится именно для него. Готовый магазин с валютой и товарами создастся автоматически.'
+                : 'Выберите ребёнка — шаблонный магазин с товарами создастся и закрепится за выбранным ребёнком.'}
             </p>
-            {templates.map((t) => {
-              const already = stores.some((s) => s.templateType === t.type);
-              return (
-                <div key={t.slug} className="flex items-start gap-3 rounded-2xl border border-slate-200 p-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-100 to-fuchsia-100 text-2xl">
-                    {t.currencyIcon}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="font-bold">{t.name}</div>
-                    <p className="text-sm text-slate-500">{t.description}</p>
-                    <div className="mt-1 text-xs font-medium text-indigo-600">
-                      Валюта: {t.currencyIcon} {t.currencyName}
+            {children.length === 0 ? (
+              <div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-700">
+                Сначала создайте ребёнка во вкладке «Дети».
+              </div>
+            ) : (
+              <div>
+                <label className="label">Ребёнок</label>
+                <select
+                  className="input"
+                  value={activateChildId}
+                  onChange={(e) => setActivateChildId(e.target.value)}
+                >
+                  {children.map((c) => (
+                    <option key={c.id} value={String(c.id)}>
+                      {c.avatarEmoji} {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {templates
+              .filter((t) => !templateFilter || templateFilter === 'NONE' || t.type === templateFilter)
+              .map((t) => {
+                const store = stores.find((s) => s.templateType === t.type);
+                const isOn = activations.some((a) => a.skill === t.type && String(a.childId) === activateChildId);
+                return (
+                  <div key={t.slug} className="flex items-start gap-3 rounded-2xl border border-slate-200 p-4">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-100 to-fuchsia-100 text-2xl">
+                      {t.currencyIcon}
                     </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold">{t.name}</div>
+                      <p className="text-sm text-slate-500">{t.description}</p>
+                      <div className="mt-1 text-xs font-medium text-indigo-600">
+                        Валюта: {t.currencyIcon} {t.currencyName}
+                      </div>
+                      {store && (
+                        <div className="mt-0.5 text-xs text-slate-400">магазин настроен → {store.name}</div>
+                      )}
+                    </div>
+                    <button
+                      className={isOn ? 'btn-secondary' : 'btn-primary'}
+                      disabled={busy || children.length === 0}
+                      onClick={() => void activateTemplate(t.slug)}
+                    >
+                      {isOn ? 'Активировать ещё раз' : 'Активировать'}
+                    </button>
                   </div>
-                  <button
-                    className={already ? 'btn-secondary' : 'btn-primary'}
-                    disabled={busy}
-                    onClick={() => void activateTemplate(t.slug)}
-                  >
-                    {already ? 'Открыть' : 'Включить'}
-                  </button>
-                </div>
-              );
-            })}
+                );
+              })}
           </div>
         </Modal>
       )}

@@ -116,6 +116,17 @@ CREATE TABLE IF NOT EXISTS parent_notifications (
 );
 CREATE INDEX IF NOT EXISTS idx_parent_notif_parent ON parent_notifications (parent_id, status);
 
+-- Активированные навыки детей: какие направления включены конкретному ребёнку
+CREATE TABLE IF NOT EXISTS skill_activations (
+    id         BIGSERIAL PRIMARY KEY,
+    child_id   BIGINT      NOT NULL REFERENCES children (id) ON DELETE CASCADE,
+    skill      VARCHAR(40) NOT NULL,   -- READING / MATH / LOGIC / LANG / SPORT / HOME
+    store_id   BIGINT      REFERENCES stores (id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_skill_activations UNIQUE (child_id, skill)
+);
+CREATE INDEX IF NOT EXISTS idx_skill_activations_child ON skill_activations (child_id);
+
 -- Достижения, которые ребёнок отслеживает (появляются на главной)
 CREATE TABLE IF NOT EXISTS child_tracked_achievements (
     id             BIGSERIAL PRIMARY KEY,

@@ -1,9 +1,14 @@
 package com.familymarket.store;
 
+import com.familymarket.child.Child;
+import com.familymarket.child.ChildRepository;
 import com.familymarket.common.NotFoundException;
+import com.familymarket.dto.SkillActivationDto;
 import com.familymarket.dto.StoreTemplateDto;
 import com.familymarket.product.Product;
 import com.familymarket.product.ProductRepository;
+import com.familymarket.skill.SkillActivation;
+import com.familymarket.skill.SkillActivationRepository;
 import com.familymarket.user.User;
 import com.familymarket.user.UserRepository;
 import org.springframework.stereotype.Service;
@@ -31,13 +36,19 @@ public class StoreTemplateService {
     private final StoreRepository storeRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
+    private final ChildRepository childRepository;
+    private final SkillActivationRepository skillActivationRepository;
 
     public StoreTemplateService(StoreRepository storeRepository,
                                 ProductRepository productRepository,
-                                UserRepository userRepository) {
+                                UserRepository userRepository,
+                                ChildRepository childRepository,
+                                SkillActivationRepository skillActivationRepository) {
         this.storeRepository = storeRepository;
         this.productRepository = productRepository;
         this.userRepository = userRepository;
+        this.childRepository = childRepository;
+        this.skillActivationRepository = skillActivationRepository;
     }
 
     public List<Template> templates() {
@@ -60,6 +71,34 @@ public class StoreTemplateService {
         Template template = get(slug);
         return storeRepository.findByParentIdAndTemplateType(parentId, template.type())
                 .orElseGet(() -> createFromTemplate(parentId, template));
+    }
+
+    /**
+     * Активировать навык конкретному ребёнку: включает шаблонный магазин навыка
+     * (идемпотентно) и фиксирует активацию навыка для выбранного ребёнка.
+     */
+    @Transactional
+    public Store activate(Long parentId, String slug, Long childId) {
+        Store store = activate(parentId, slug);
+        Child child = childRepository.findByIdAndParentId(childId, parentId)
+                .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
+        skillActivationRepository.findByChildIdAndSkill(childId, store.getTemplateType())
+                .orElseGet(() -> {
+                    SkillActivation activation = new SkillActivation();
+                    activation.setChild(child);
+                    activation.setSkill(store.getTemplateType());
+                    activation.setStore(store);
+                    activation.setCreatedAt(Instant.now());
+                    return skillActivationRepository.save(activation);
+                });
+        return store;
+    }
+
+    /** Список активированных ребёнку навыков (для вкладок навыков и обзора). */
+    @Transactional(readOnly = true)
+    public List<SkillActivationDto> activations(Long parentId) {
+        return skillActivationRepository.findByChild_ParentId(parentId)
+                .stream().map(SkillActivationDto::from).toList();
     }
 
     private Store createFromTemplate(Long parentId, Template template) {

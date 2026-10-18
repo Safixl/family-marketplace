@@ -655,3 +655,26 @@ export interface NotificationDto {
   status: 'NEW' | 'DONE';
   createdAt: string;
 }
+
+export interface SkillActivationDto {
+  childId: number;
+  childName: string;
+  childAvatar: string;
+  skill: string;
+}
+
+/** Карточка ребёнка в обзоре родителя (уровень, баллы, лимиты, квесты, дейлики, навыки). */
+export interface OverviewChildDto {
+  id: number;
+  name: string;
+  avatarEmoji: string;
+  age: number | null;
+  active: boolean;
+  level: LevelDto;
+  balances: BalanceRowDto[];
+  limits: LimitStateDto;
+  activeQuests: QuestDto[];
+  dailies: DailySkillDto[];
+  skills: SkillProgressDto[];
+  activatedSkills: string[];
+}

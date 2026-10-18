@@ -31,10 +31,14 @@ export default function LimitsPanel() {
   const [pocketAmount, setPocketAmount] = useState('');
   const [busy, setBusy] = useState(false);
   const tickRef = useRef<number | null>(null);
+  /** Типы, для которых уже отправлен серверный stop при исчерпании лимита. */
+  const stopRef = useRef<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     try {
-      setState(await api.get<LimitStateDto>('/child/limits'));
+      const next = await api.get<LimitStateDto>('/child/limits');
+      stopRef.current = new Set();
+      setState(next);
     } catch (e) {
       alert(errMsg(e));
     }
@@ -54,9 +58,19 @@ export default function LimitsPanel() {
         if (!prev) return prev;
         return {
           ...prev,
-          limits: prev.limits.map((l) =>
-            l.running ? { ...l, remainingSeconds: Math.max(0, l.remainingSeconds - 1) } : l,
-          ),
+          limits: prev.limits.map((l) => {
+            if (!l.running || l.frozen) return l;
+            const rem = Math.max(0, l.remainingSeconds - 1);
+            // Лимит исчерпан: останавливаем счётчик и уведомляем сервер (родителю придёт LIMIT-уведомление)
+            if (rem === 0) {
+              if (!stopRef.current.has(l.type)) {
+                stopRef.current.add(l.type);
+                void api.post(`/child/limits/${l.type}/stop`).catch(() => {});
+              }
+              return { ...l, remainingSeconds: 0, running: false };
+            }
+            return { ...l, remainingSeconds: rem };
+          }),
         };
       });
     }, 1000);
