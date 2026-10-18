@@ -129,5 +129,14 @@ public class ProductController {
         if (request.active() != null) {
             product.setActive(request.active());
         }
+        if (request.effectType() != null) {
+            product.setEffectType(request.effectType().trim().toUpperCase());
+        }
+        if (request.effectLimit() != null) {
+            product.setEffectLimit(request.effectLimit().trim().toUpperCase());
+        }
+        if (request.effectValue() != null) {
+            product.setEffectValue(request.effectValue());
+        }
     }
 }

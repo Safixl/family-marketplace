@@ -21,6 +21,18 @@ export interface AchievementTier {
 }
 
 export function tierForLevel(level: number): AchievementTier {
+  // Одиночные достижения (level 0) — золотые
+  if (level <= 0) {
+    return {
+      name: 'Золото',
+      emoji: '🥇',
+      card: 'border-yellow-500/60 bg-gradient-to-br from-yellow-50 via-amber-50 to-orange-100',
+      border: 'border-amber-400/70',
+      badge: 'bg-amber-500 text-white',
+      iconBox: 'bg-gradient-to-br from-yellow-400 to-amber-500',
+      glow: 'shadow-lg shadow-amber-500/20',
+    };
+  }
   if (level >= 9) {
     return {
       name: 'Алмаз',

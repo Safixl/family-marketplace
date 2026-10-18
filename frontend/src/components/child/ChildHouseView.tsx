@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, Clock3, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock3, Send, Sparkles } from 'lucide-react';
 import { api } from '../../api/client';
 import { HouseDayDto, HouseMonthResponse } from '../../api/types';
 import { errMsg, fmtAmount } from '../../lib/format';
@@ -23,6 +23,8 @@ export default function ChildHouseView({ storeId }: Props) {
   const [cursor, setCursor] = useState(() => new Date());
   const [data, setData] = useState<HouseMonthResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [checkRequested, setCheckRequested] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -39,6 +41,19 @@ export default function ChildHouseView({ storeId }: Props) {
     void load();
   }, [load]);
 
+  const requestCheck = async () => {
+    setBusy(true);
+    try {
+      await api.post(`/child/stores/${storeId}/house/check-request`);
+      setCheckRequested(true);
+      alert('Запрос на проверку комнаты отправлен родителю');
+    } catch (e) {
+      alert(errMsg(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const year = cursor.getFullYear();
   const month = cursor.getMonth() + 1;
   const firstDay = new Date(year, month - 1, 1);
@@ -47,6 +62,10 @@ export default function ChildHouseView({ storeId }: Props) {
 
   const dayMap = new Map<string, HouseDayDto>();
   data?.days.forEach((d) => dayMap.set(d.day, d));
+
+  const todayKey = dayKey(new Date().getFullYear(), new Date().getMonth() + 1, new Date().getDate());
+  const todayDay = dayMap.get(todayKey);
+  const roomNotChecked = !todayDay || todayDay.roomScore <= 0;
 
   const cellClass = (d: HouseDayDto | undefined) => {
     if (!d || (d.roomScore === 0 && d.livingScore === 0)) {
@@ -59,6 +78,20 @@ export default function ChildHouseView({ storeId }: Props) {
 
   return (
     <div className="space-y-4">
+      {/* Напоминалка: комната ещё не проверена сегодня */}
+      {roomNotChecked && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
+          <span className="flex-1">🧹 Убери комнату! Проверка ещё не проводилась.</span>
+          <button
+            className="rpg-btn !px-3 !py-1.5 text-xs"
+            disabled={busy || checkRequested}
+            onClick={() => void requestCheck()}
+          >
+            <Send size={14} /> {checkRequested ? 'Запрос отправлен' : 'Попросить проверить'}
+          </button>
+        </div>
+      )}
+
       <div className="flex items-center justify-center gap-2">
         <button className="btn-secondary !px-2.5 !py-2" onClick={() => setCursor(new Date(year, month - 2, 1))}>
           <ChevronLeft size={18} />
@@ -104,10 +137,17 @@ export default function ChildHouseView({ storeId }: Props) {
               const day = i + 1;
               const key = dayKey(year, month, day);
               const d = dayMap.get(key);
+              const isToday = key === todayKey;
               return (
-                <div
+                <button
                   key={key}
-                  className={`flex h-14 flex-col items-center justify-center rounded-xl text-sm font-semibold ${cellClass(d)}`}
+                  type="button"
+                  disabled={!isToday || !roomNotChecked || busy || checkRequested}
+                  onClick={() => void requestCheck()}
+                  title={isToday && roomNotChecked ? 'Попросить проверить комнату' : undefined}
+                  className={`flex h-14 flex-col items-center justify-center rounded-xl text-sm font-semibold transition ${cellClass(d)} ${
+                    isToday ? 'ring-2 ring-amber-400 ring-offset-1' : ''
+                  } ${isToday && roomNotChecked ? 'cursor-pointer hover:brightness-95' : 'cursor-default'}`}
                 >
                   <span>{day}</span>
                   {d && (d.roomScore !== 0 || d.livingScore !== 0) && (
@@ -116,7 +156,7 @@ export default function ChildHouseView({ storeId }: Props) {
                       {!d.settled && <span className="text-amber-500">*</span>}
                     </span>
                   )}
-                </div>
+                </button>
               );
             })}
           </div>

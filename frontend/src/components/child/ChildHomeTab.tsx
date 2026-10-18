@@ -1,4 +1,4 @@
-import { Coins, Package, ShoppingBag, Sparkles, Swords, Trophy } from 'lucide-react';
+import { CalendarDays, Coins, Package, ShoppingBag, Sparkles, Swords, Trophy } from 'lucide-react';
 import {
   ChildAchievementGroupDto,
   ChildProfileResponse,
@@ -10,8 +10,10 @@ import { fmtAmount, fmtDate } from '../../lib/format';
 import { rankTier, tierForLevel } from '../../lib/achievementTiers';
 import { RANKS, RpgLevel } from '../../lib/rpg';
 import { EmptyState, StatCard } from '../ui';
-import RankLadder from './rpg/RankLadder';
+import ChildHouseView from './ChildHouseView';
+import LevelBar from './rpg/LevelBar';
 import SkillHexagon from './rpg/SkillHexagon';
+import LimitsPanel from './LimitsPanel';
 
 export type HomeWidgetId = 'balances' | 'stats' | 'achievements' | 'orders';
 
@@ -29,6 +31,7 @@ interface Props {
   skills: SkillProgressDto[];
   level: RpgLevel;
   widgets: string[];
+  homeStoreId: number | null;
   onNavigate: (tab: string) => void;
   onOpenSkill: (skill: SkillId) => void;
 }
@@ -40,6 +43,7 @@ export default function ChildHomeTab({
   skills,
   level,
   widgets,
+  homeStoreId,
   onNavigate,
   onOpenSkill,
 }: Props) {
@@ -59,33 +63,52 @@ export default function ChildHomeTab({
 
   return (
     <div className="space-y-6">
-      {/* Гексагон навыков */}
-      <section className="rpg-panel rpg-panel-gold p-4 sm:p-6">
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-lg font-bold text-amber-200">
-            <Swords size={20} className="text-amber-400" /> Карта навыков
-          </h2>
-          <div className="flex items-center gap-2">
-            <span className={`rpg-badge border ${rankTier(currentRank.min).badge}`}>
-              {level.rankEmoji} {level.rank} · ур. {level.level}
-            </span>
-            <button
-              onClick={() => onNavigate('skills')}
-              className="rpg-btn rpg-btn-ghost !px-3 !py-1.5 text-xs"
-            >
-              Все навыки
-            </button>
-          </div>
+      {/* Верхний блок: слева опыт + лимиты, справа карта навыков */}
+      <div className="grid gap-4 lg:grid-cols-5">
+        <div className="space-y-4 lg:col-span-2">
+          <LevelBar level={level} compact />
+          <section className="rpg-panel rpg-panel-gold p-4">
+            <h2 className="mb-3 flex items-center gap-2 text-base font-bold text-amber-200">
+              <Sparkles size={18} className="text-amber-400" /> Лимиты дня
+            </h2>
+            <LimitsPanel />
+          </section>
         </div>
-        <p className="mb-3 text-sm text-stone-400">
-          Нажми на вершину шестиугольника, чтобы открыть модуль навыка. Навыки растут от центра к
-          краям по мере выполнения заданий и получения ачивок.
-        </p>
-        <SkillHexagon skills={skills} onSelect={onOpenSkill} />
-      </section>
 
-      {/* Путь героя: лесенка рангов */}
-      <RankLadder level={level} />
+        <section className="rpg-panel rpg-panel-gold p-4 sm:p-6 lg:col-span-3">
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-lg font-bold text-amber-200">
+              <Swords size={20} className="text-amber-400" /> Карта навыков
+            </h2>
+            <div className="flex items-center gap-2">
+              <span className={`rpg-badge border ${rankTier(currentRank.min).badge}`}>
+                {level.rankEmoji} {level.rank} · ур. {level.level}
+              </span>
+              <button
+                onClick={() => onNavigate('skills')}
+                className="rpg-btn rpg-btn-ghost !px-3 !py-1.5 text-xs"
+              >
+                Все навыки
+              </button>
+            </div>
+          </div>
+          <p className="mb-3 text-sm text-stone-400">
+            Нажми на вершину шестиугольника, чтобы открыть модуль навыка. Навыки растут от центра к
+            краям по мере выполнения заданий и получения ачивок.
+          </p>
+          <SkillHexagon skills={skills} onSelect={onOpenSkill} />
+        </section>
+      </div>
+
+      {/* Календарь уборки */}
+      {homeStoreId != null && (
+        <section className="rpg-panel rpg-panel-gold p-4 sm:p-6">
+          <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-amber-200">
+            <CalendarDays size={20} className="text-amber-400" /> Календарь уборки
+          </h2>
+          <ChildHouseView storeId={homeStoreId} />
+        </section>
+      )}
 
       {show('balances') && profile && profile.balances.length > 0 && (
         <section>

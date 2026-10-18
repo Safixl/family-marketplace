@@ -20,18 +20,28 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Пул квестов ГМа: Дейлики (повторяемые), Сюжетные (разовые) и Сезонные.
- * Ребёнок отправляет заявку («Выполнено» + фото/комментарий), родитель подтверждает —
- * начисляется награда: валюта магазина + опыт + сезонные жетоны.
+ *
+ * Стадии квеста для ребёнка:
+ *  - AVAILABLE (!) — доступен для принятия, видно базовое описание;
+ *  - ACTIVE (?) — взят, видно описание выполнения и таймер (если задан);
+ *  - SUBMITTED — отправлен на проверку;
+ *  - DONE — одноразовый выполнен (скрывается из списка);
+ *  - SLEEPING — повторяемый после одобрения, ожидание повторного взятия (cooldown).
  */
 @Service
 public class QuestService {
 
     private final QuestRepository questRepository;
     private final QuestSubmissionRepository submissionRepository;
+    private final ChildQuestStateRepository childQuestStateRepository;
     private final ChildRepository childRepository;
     private final UserRepository userRepository;
     private final StoreRepository storeRepository;
@@ -40,6 +50,7 @@ public class QuestService {
 
     public QuestService(QuestRepository questRepository,
                         QuestSubmissionRepository submissionRepository,
+                        ChildQuestStateRepository childQuestStateRepository,
                         ChildRepository childRepository,
                         UserRepository userRepository,
                         StoreRepository storeRepository,
@@ -47,6 +58,7 @@ public class QuestService {
                         BalanceService balanceService) {
         this.questRepository = questRepository;
         this.submissionRepository = submissionRepository;
+        this.childQuestStateRepository = childQuestStateRepository;
         this.childRepository = childRepository;
         this.userRepository = userRepository;
         this.storeRepository = storeRepository;
@@ -92,6 +104,18 @@ public class QuestService {
         if (request.description() != null) {
             quest.setDescription(request.description());
         }
+        if (request.basicDescription() != null) {
+            quest.setBasicDescription(request.basicDescription());
+        }
+        if (request.acceptDescription() != null) {
+            quest.setAcceptDescription(request.acceptDescription());
+        }
+        if (request.durationMinutes() != null) {
+            quest.setDurationMinutes(request.durationMinutes());
+        }
+        if (request.cooldownHours() != null) {
+            quest.setCooldownHours(request.cooldownHours());
+        }
         if (request.icon() != null && !request.icon().isBlank()) {
             quest.setIcon(request.icon().trim());
         }
@@ -131,8 +155,57 @@ public class QuestService {
     public List<QuestDto> listActiveForChild(Long childId) {
         Long parentId = childRepository.findParentIdById(childId)
                 .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
-        return questRepository.findActiveForChild(parentId, childId)
-                .stream().map(QuestDto::from).toList();
+        List<Quest> quests = questRepository.findActiveForChild(parentId, childId);
+        Map<Long, ChildQuestState> states = childQuestStateRepository.findByChildId(childId).stream()
+                .collect(Collectors.toMap(s -> s.getQuest().getId(), Function.identity()));
+        return quests.stream()
+                // одноразовые выполненные квесты скрываем
+                .filter(q -> {
+                    ChildQuestState state = states.get(q.getId());
+                    return state == null || !"DONE".equals(state.getStatus());
+                })
+                .map(q -> QuestDto.from(q, states.get(q.getId())))
+                .toList();
+    }
+
+    /**
+     * Взять квест: AVAILABLE (!) → ACTIVE (?). Для повторяемых проверяется
+     * время повторного взятия (SLEEPING).
+     */
+    @Transactional
+    public void accept(Long childId, Long questId) {
+        Quest quest = questRepository.findById(questId)
+                .orElseThrow(() -> new NotFoundException("Квест не найден"));
+        if (!quest.isActive()) {
+            throw new BadRequestException("Квест неактивен");
+        }
+        if (quest.getChild() != null && !quest.getChild().getId().equals(childId)) {
+            throw new NotFoundException("Квест не найден");
+        }
+        ChildQuestState state = childQuestStateRepository.findByChildIdAndQuestId(childId, questId)
+                .orElseGet(() -> {
+                    ChildQuestState s = new ChildQuestState();
+                    s.setChild(childRepository.getReferenceById(childId));
+                    s.setQuest(quest);
+                    return s;
+                });
+        Instant now = Instant.now();
+        if ("SLEEPING".equals(state.getStatus())
+                && state.getNextAvailableAt() != null
+                && state.getNextAvailableAt().isAfter(now)) {
+            throw new BadRequestException("Квест ещё не готов к повторному взятию");
+        }
+        if ("DONE".equals(state.getStatus())) {
+            throw new BadRequestException("Квест уже выполнен");
+        }
+        if ("ACTIVE".equals(state.getStatus()) || "SUBMITTED".equals(state.getStatus())) {
+            throw new BadRequestException("Квест уже взят");
+        }
+        state.setStatus("ACTIVE");
+        state.setAcceptedAt(now);
+        state.setStartsAt(now);
+        state.setNextAvailableAt(null);
+        childQuestStateRepository.save(state);
     }
 
     @Transactional
@@ -147,6 +220,21 @@ public class QuestService {
         if (quest.getChild() != null && !quest.getChild().getId().equals(childId)) {
             throw new NotFoundException("Квест не найден");
         }
+        ChildQuestState state = childQuestStateRepository.findByChildIdAndQuestId(childId, questId).orElse(null);
+        Instant now = Instant.now();
+        if (state != null) {
+            if ("SUBMITTED".equals(state.getStatus())) {
+                throw new BadRequestException("Заявка на этот квест уже ожидает подтверждения");
+            }
+            if ("DONE".equals(state.getStatus())) {
+                throw new BadRequestException("Квест уже выполнен");
+            }
+            if ("SLEEPING".equals(state.getStatus())
+                    && state.getNextAvailableAt() != null
+                    && state.getNextAvailableAt().isAfter(now)) {
+                throw new BadRequestException("Квест ещё не готов к повторному взятию");
+            }
+        }
         if (!quest.isRepeatable() && submissionRepository.existsByQuestIdAndChildIdAndStatus(questId, childId, "PENDING")) {
             throw new BadRequestException("Заявка на этот квест уже ожидает подтверждения");
         }
@@ -156,8 +244,17 @@ public class QuestService {
         submission.setStatus("PENDING");
         submission.setComment(request.comment());
         submission.setPhotoUrl(request.photoUrl());
-        submission.setCreatedAt(Instant.now());
-        return QuestSubmissionDto.from(submissionRepository.save(submission));
+        submission.setCreatedAt(now);
+        QuestSubmission saved = submissionRepository.save(submission);
+
+        if (state == null) {
+            state = new ChildQuestState();
+            state.setChild(child);
+            state.setQuest(quest);
+        }
+        state.setStatus("SUBMITTED");
+        childQuestStateRepository.save(state);
+        return QuestSubmissionDto.from(saved);
     }
 
     @Transactional(readOnly = true)
@@ -180,7 +277,7 @@ public class QuestService {
 
     /**
      * Одобрение заявки: начисляется награда квеста (валюта магазина + сезонные жетоны).
-     * Общий опыт квеста учитывается в XpService по одобренным заявкам.
+     * Одноразовый квест → DONE (скрывается), повторяемый → SLEEPING с cooldown.
      */
     @Transactional
     public QuestSubmissionDto approve(Long parentId, Long submissionId) {
@@ -194,7 +291,26 @@ public class QuestService {
         }
         submission.setStatus("APPROVED");
         submission.setResolvedAt(Instant.now());
-        return QuestSubmissionDto.from(submissionRepository.save(submission));
+        QuestSubmissionDto dto = QuestSubmissionDto.from(submissionRepository.save(submission));
+
+        Long childId = submission.getChild().getId();
+        childQuestStateRepository.findByChildIdAndQuestId(childId, quest.getId()).ifPresent(state -> {
+            Instant now = Instant.now();
+            if (quest.isRepeatable()) {
+                if (quest.getCooldownHours() > 0) {
+                    state.setStatus("SLEEPING");
+                    state.setNextAvailableAt(now.plus(quest.getCooldownHours(), ChronoUnit.HOURS));
+                } else {
+                    state.setStatus("AVAILABLE");
+                    state.setNextAvailableAt(null);
+                }
+            } else {
+                state.setStatus("DONE");
+                state.setCompletedAt(now);
+            }
+            childQuestStateRepository.save(state);
+        });
+        return dto;
     }
 
     @Transactional
@@ -205,7 +321,18 @@ public class QuestService {
         }
         submission.setStatus("REJECTED");
         submission.setResolvedAt(Instant.now());
-        return QuestSubmissionDto.from(submissionRepository.save(submission));
+        QuestSubmissionDto dto = QuestSubmissionDto.from(submissionRepository.save(submission));
+
+        // Возвращаем квест в работу (стадия ?)
+        childQuestStateRepository
+                .findByChildIdAndQuestId(submission.getChild().getId(), submission.getQuest().getId())
+                .ifPresent(state -> {
+                    if ("SUBMITTED".equals(state.getStatus())) {
+                        state.setStatus("ACTIVE");
+                        childQuestStateRepository.save(state);
+                    }
+                });
+        return dto;
     }
 
     private Quest getOwned(Long parentId, Long questId) {

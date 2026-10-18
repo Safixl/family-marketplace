@@ -3,6 +3,7 @@ import { Award, Layers, Pencil, Plus, Trash2 } from 'lucide-react';
 import { api } from '../../api/client';
 import { AchievementDto, ChildDto, StoreDto } from '../../api/types';
 import { errMsg, fmtAmount } from '../../lib/format';
+import { tierForLevel } from '../../lib/achievementTiers';
 import Modal from '../Modal';
 import { EmptyState, Spinner } from '../ui';
 
@@ -13,9 +14,7 @@ interface AchievementForm {
   rewardAmount: string;
   targetType: string;
   targetValue: string;
-  groupKey: string;
   skill: string;
-  level: string;
   hiddenReward: boolean;
   rewardStoreId: string;
 }
@@ -27,9 +26,7 @@ const EMPTY_FORM: AchievementForm = {
   rewardAmount: '',
   targetType: 'NONE',
   targetValue: '',
-  groupKey: '',
   skill: '',
-  level: '0',
   hiddenReward: false,
   rewardStoreId: '',
 };
@@ -116,9 +113,7 @@ export default function AchievementsTab() {
       rewardAmount: String(achievement.rewardAmount),
       targetType: achievement.targetType ?? 'NONE',
       targetValue: achievement.targetValue ? String(achievement.targetValue) : '',
-      groupKey: achievement.groupKey ?? '',
       skill: achievement.skill ?? '',
-      level: String(achievement.level ?? 0),
       hiddenReward: achievement.hiddenReward,
       rewardStoreId: achievement.rewardStoreId != null ? String(achievement.rewardStoreId) : '',
     });
@@ -149,9 +144,7 @@ export default function AchievementsTab() {
         rewardAmount: reward,
         targetType: form.targetType,
         targetValue,
-        groupKey: form.groupKey.trim() || null,
         skill: form.skill || null,
-        level: Number(form.level || 0),
         hiddenReward: form.hiddenReward,
         rewardStoreId: form.rewardStoreId ? Number(form.rewardStoreId) : null,
       };
@@ -176,6 +169,18 @@ export default function AchievementsTab() {
       await load();
     } catch (e) {
       alert(errMsg(e));
+    }
+  };
+
+  const addLevel = async (achievement: AchievementDto) => {
+    setBusy(true);
+    try {
+      await api.post(`/parent/achievements/${achievement.id}/add-level`);
+      await load();
+    } catch (e) {
+      alert(errMsg(e));
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -247,7 +252,7 @@ export default function AchievementsTab() {
                       {sorted[0].name}
                       {sorted.length > 1 && (
                         <span className="badge ml-2 bg-indigo-100 text-indigo-700">
-                          {sorted.length} уровней
+                          {sorted.length} ступеней
                         </span>
                       )}
                     </div>
@@ -261,6 +266,7 @@ export default function AchievementsTab() {
                   {sorted.map((achievement) => {
                     const unit = TARGET_OPTIONS.find((o) => o.value === achievement.targetType)?.unit ?? '';
                     const store = stores.find((s) => s.id === achievement.rewardStoreId);
+                    const tier = tierForLevel(achievement.level);
                     return (
                       <div
                         key={achievement.id}
@@ -268,6 +274,9 @@ export default function AchievementsTab() {
                       >
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-1.5 text-sm font-semibold">
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] uppercase ${tier.badge}`}>
+                              {tier.emoji} {tier.name}
+                            </span>
                             {achievement.targetType !== 'NONE'
                               ? `${achievement.name}: ${achievement.targetValue} ${unit}`
                               : achievement.name}
@@ -286,6 +295,13 @@ export default function AchievementsTab() {
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => void addLevel(achievement)}
+                            className="rounded-lg p-1.5 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600"
+                            title="Добавить следующий уровень"
+                          >
+                            <Plus size={15} />
+                          </button>
                           <button
                             onClick={() => openEdit(achievement)}
                             className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-200"
@@ -429,31 +445,10 @@ export default function AchievementsTab() {
                 </select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label">Группа уровней (ключ, напр. reading-rang)</label>
-                <input
-                  className="input"
-                  value={form.groupKey}
-                  onChange={(e) => setForm({ ...form, groupKey: e.target.value })}
-                  placeholder="пусто = одиночное достижение"
-                />
-              </div>
-              <div>
-                <label className="label">Номер уровня</label>
-                <input
-                  className="input"
-                  type="number"
-                  min="0"
-                  value={form.level}
-                  onChange={(e) => setForm({ ...form, level: e.target.value })}
-                />
-              </div>
-            </div>
             <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-500">
-              Уровни с одинаковым ключом группы образуют ранги (дерево → железо → бронза…). Награда за
-              достигнутую цель начисляется автоматически, затем открывается следующий уровень. Ребёнок видит
-              только ближайший уровень.
+              Нажми «+» на карточке достижения, чтобы добавить следующий уровень (Бронза → Серебро → Золото →
+              Платина → Изумруд → Алмаз). Одиночные достижения — золотые. Награда за достигнутую цель
+              начисляется автоматически, затем открывается следующий уровень.
             </div>
             <label className="flex items-center gap-2 text-sm">
               <input

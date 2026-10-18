@@ -11,7 +11,7 @@ import { api } from '../../../api/client';
 import {
   ChildProductDto,
   ChildPurchaseDto,
-  InventoryItemDto,
+  InventoryStackDto,
   SkillProgressDto,
   StoreDto,
 } from '../../../api/types';
@@ -25,6 +25,7 @@ import PurchaseHistoryTab from './tabs/PurchaseHistoryTab';
 import RequestsTab from './tabs/RequestsTab';
 import ShopTab from './tabs/ShopTab';
 import StatsTab from './tabs/StatsTab';
+import TaskCardsTab from './tabs/TaskCardsTab';
 
 type TabId = 'archive' | 'requests' | 'shop' | 'history' | 'inventory' | 'stats';
 
@@ -54,7 +55,7 @@ export default function SkillModule({ config, store, balance, progress, onPurcha
   const [quests, setQuests] = useState<SkillQuest[]>([]);
   const [products, setProducts] = useState<ChildProductDto[]>([]);
   const [purchases, setPurchases] = useState<ChildPurchaseDto[]>([]);
-  const [inventory, setInventory] = useState<InventoryItemDto[]>([]);
+  const [inventory, setInventory] = useState<InventoryStackDto[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -74,7 +75,7 @@ export default function SkillModule({ config, store, balance, progress, onPurcha
         const [prods, allPurchases, allInventory] = await Promise.all([
           api.get<ChildProductDto[]>(`/child/stores/${store.id}/products`),
           api.get<ChildPurchaseDto[]>('/child/purchases'),
-          api.get<InventoryItemDto[]>('/child/inventory'),
+          api.get<InventoryStackDto[]>('/child/inventory'),
         ]);
         setProducts(prods);
         setPurchases(allPurchases.filter((p) => p.storeId === store.id));
@@ -103,13 +104,14 @@ export default function SkillModule({ config, store, balance, progress, onPurcha
       <div className="flex gap-1.5 overflow-x-auto pb-1">
         {TABS.map((t) => {
           const Icon = t.icon;
+          const label = t.id === 'requests' ? config.requestTitle : t.label;
           return (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
               className={`rpg-tab ${tab === t.id ? 'rpg-tab-active' : ''}`}
             >
-              <Icon size={15} /> {t.label}
+              <Icon size={15} /> {label}
             </button>
           );
         })}
@@ -121,9 +123,14 @@ export default function SkillModule({ config, store, balance, progress, onPurcha
         ) : (
           <ArchiveTab config={config} rows={archive} />
         ))}
-      {tab === 'requests' && (
-        <RequestsTab config={config} store={store} requests={requests} onReload={() => void load()} />
-      )}
+      {tab === 'requests' &&
+        (config.id === 'MATH' ? (
+          <TaskCardsTab skill="MATH" />
+        ) : config.id === 'HOUSE' ? (
+          <TaskCardsTab skill="HOUSE" />
+        ) : (
+          <RequestsTab config={config} store={store} requests={requests} onReload={() => void load()} />
+        ))}
       {tab === 'shop' && (
         <ShopTab
           store={store}

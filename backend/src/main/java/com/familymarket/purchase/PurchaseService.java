@@ -9,6 +9,7 @@ import com.familymarket.dto.ChildPurchaseDto;
 import com.familymarket.dto.CreatePurchaseRequest;
 import com.familymarket.dto.PurchaseDto;
 import com.familymarket.inventory.InventoryService;
+import com.familymarket.limit.LimitService;
 import com.familymarket.product.Product;
 import com.familymarket.product.ProductRepository;
 import com.familymarket.store.Store;
@@ -26,17 +27,20 @@ public class PurchaseService {
     private final BalanceRepository balanceRepository;
     private final AchievementService achievementService;
     private final InventoryService inventoryService;
+    private final LimitService limitService;
 
     public PurchaseService(PurchaseRepository purchaseRepository,
                            ProductRepository productRepository,
                            BalanceRepository balanceRepository,
                            AchievementService achievementService,
-                           InventoryService inventoryService) {
+                           InventoryService inventoryService,
+                           LimitService limitService) {
         this.purchaseRepository = purchaseRepository;
         this.productRepository = productRepository;
         this.balanceRepository = balanceRepository;
         this.achievementService = achievementService;
         this.inventoryService = inventoryService;
+        this.limitService = limitService;
     }
 
     @Transactional(readOnly = true)
@@ -123,6 +127,9 @@ public class PurchaseService {
 
         // Купленный товар попадает в инвентарь ребёнка (доступен для активации)
         inventoryService.addFromPurchase(purchase);
+
+        // Эффект товара: увеличение лимита (одноразовое на сегодня / постоянное)
+        limitService.applyProductEffect(purchase.getChild().getId(), purchase.getProduct());
 
         // Автоначисление достижений (например, «выкупить N товаров в магазине Дом»)
         achievementService.checkProgress(purchase.getChild().getId());

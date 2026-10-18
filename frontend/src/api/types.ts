@@ -48,6 +48,9 @@ export interface ProductDto {
   price: number;
   limitPerChild: number | null;
   active: boolean;
+  effectType: string;
+  effectLimit: string | null;
+  effectValue: number;
 }
 
 export interface ChildProductDto {
@@ -198,6 +201,49 @@ export interface ChildSettingsDto {
   homeWidgets: string[];
 }
 
+// ---------- Лимиты экрана и карманные деньги ----------
+
+export interface ChildLimitsDto {
+  childId: number;
+  tvMinutes: number;
+  pcMinutes: number;
+  consoleMinutes: number;
+  phoneMinutes: number;
+  tabletMinutes: number;
+  pocketWeekly: number;
+}
+
+export interface LimitTypeState {
+  type: string;
+  baseMinutes: number;
+  usedSeconds: number;
+  extendedSeconds: number;
+  remainingSeconds: number;
+  running: boolean;
+}
+
+export interface PocketState {
+  weeklyLimit: number;
+  spentThisWeek: number;
+  remaining: number;
+}
+
+export interface LimitStateDto {
+  limits: LimitTypeState[];
+  pocket: PocketState;
+}
+
+export interface PocketRequestDto {
+  id: number;
+  childId: number;
+  childName: string;
+  childAvatar: string;
+  amount: number;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  createdAt: string;
+  resolvedAt: string | null;
+}
+
 // ---------- Шаблонные магазины: чтение / математика / дом ----------
 
 export interface ReadingBookDto {
@@ -264,6 +310,17 @@ export interface ChildReadingResponse {
   books: ChildBookDto[];
   requests: ReadingRequestDto[];
   stats: ReadingStatsDto;
+  bookmarks: Record<number, number>;
+  pagesToday: number;
+  pagesTarget: number;
+}
+
+export interface ReadingSettingsDto {
+  childId: number;
+  storeId: number | null;
+  pagesTarget: number;
+  rewardAmount: number;
+  xpReward: number;
 }
 
 export interface MathTaskDto {
@@ -275,6 +332,37 @@ export interface MathTaskDto {
   points: number;
   active: boolean;
   createdAt: string;
+}
+
+// ---------- Карточки с заданиями (математика / помощь по дому) ----------
+
+export interface TaskItem {
+  q: string;
+  a: string;
+}
+
+export interface TaskCardDto {
+  id: number;
+  skill: string;
+  title: string;
+  description: string | null;
+  icon: string;
+  difficulty: string;
+  tasks: TaskItem[];
+  durationMinutes: number;
+  rewardAmount: number;
+  rewardStoreId: number | null;
+  currencyName: string | null;
+  currencyIcon: string | null;
+  xpReward: number;
+  houseBonus: number;
+  rarity: string;
+  hiddenReward: boolean;
+  successPercent: number;
+  active: boolean;
+  childStatus: string | null;
+  startedAt: string | null;
+  resultPercent: number | null;
 }
 
 export interface MathAttemptDto {
@@ -322,6 +410,18 @@ export interface HouseMonthResponse {
   pendingPoints: number;
 }
 
+export interface HouseCheckRequestDto {
+  id: number;
+  childId: number;
+  childName: string;
+  childAvatar: string;
+  storeId: number;
+  day: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  createdAt: string;
+  resolvedAt: string | null;
+}
+
 // ---------- RPG: навыки и инвентарь ----------
 
 export type SkillId = 'MATH' | 'READING' | 'LOGIC' | 'LANG' | 'SPORT' | 'HOUSE';
@@ -355,6 +455,21 @@ export interface InventoryItemDto {
   resolvedAt: string | null;
 }
 
+/**
+ * Стопка неиспользованных покупок в «Инвентаре» (без статусов):
+ * одинаковые товары сгруппированы по product_id, count — количество штук.
+ */
+export interface InventoryStackDto {
+  productId: number;
+  productName: string;
+  storeId: number;
+  storeName: string;
+  price: number;
+  currencyName: string;
+  currencyIcon: string;
+  count: number;
+}
+
 // ---------- «Дейлики»: квесты, уровень, депозиты, сезонные ивенты ----------
 
 export interface LevelDto {
@@ -376,6 +491,10 @@ export interface QuestDto {
   type: QuestType;
   title: string;
   description: string | null;
+  basicDescription: string | null;
+  acceptDescription: string | null;
+  durationMinutes: number | null;
+  cooldownHours: number;
   icon: string;
   rewardStoreId: number | null;
   rewardStoreName: string | null;
@@ -387,6 +506,10 @@ export interface QuestDto {
   repeatable: boolean;
   active: boolean;
   createdAt: string;
+  /** Стадия квеста для ребёнка: AVAILABLE / ACTIVE / SUBMITTED / SLEEPING / DONE */
+  childStatus: string | null;
+  childStartsAt: string | null;
+  childNextAvailableAt: string | null;
 }
 
 export type SubmissionStatus = 'PENDING' | 'APPROVED' | 'REJECTED';

@@ -156,6 +156,41 @@ public class AchievementService {
     }
 
     /**
+     * Добавить следующий уровень к достижению (кнопка «+» у родителя):
+     * одиночное достижение становится группой (генерируется group_key),
+     * у группы — следующий уровень. Имя уровня — метрика (Бронза/Серебро/Золото/…).
+     */
+    @Transactional
+    public Achievement addLevel(Long parentId, Long achievementId) {
+        Achievement base = getOwned(parentId, achievementId);
+        final String groupKey = base.getGroupKey() != null
+                ? base.getGroupKey()
+                : "g-" + base.getId() + "-" + System.currentTimeMillis();
+        int maxLevel = achievementRepository.findByParentIdOrderByCreatedAtAsc(parentId).stream()
+                .filter(a -> groupKey.equals(a.getGroupKey()))
+                .mapToInt(Achievement::getLevel)
+                .max().orElse(0);
+
+        Achievement next = new Achievement();
+        next.setParent(base.getParent());
+        next.setName(base.getName());
+        next.setDescription(base.getDescription());
+        next.setIcon(base.getIcon());
+        next.setRewardAmount(base.getRewardAmount());
+        next.setTargetType(base.getTargetType());
+        next.setTargetValue(base.getTargetValue());
+        next.setGroupKey(groupKey);
+        next.setSkill(base.getSkill());
+        next.setLevel(maxLevel + 1);
+        next.setHiddenReward(base.isHiddenReward());
+        next.setXpReward(base.getXpReward());
+        next.setTitle(base.getTitle());
+        next.setRewardStore(base.getRewardStore());
+        next.setCreatedAt(Instant.now());
+        return achievementRepository.save(next);
+    }
+
+    /**
      * Ручная выдача достижения ребенку (для целей без автоначисления).
      */
     @Transactional
@@ -266,7 +301,7 @@ public class AchievementService {
                     current.getTargetType(),
                     current.getTargetValue(),
                     progressFor(current, childId),
-                    current.getName(),
+                    tierName(current.getLevel()),
                     current.getSkill(),
                     current.getLevel(),
                     reward,
@@ -333,6 +368,19 @@ public class AchievementService {
     private Achievement getOwned(Long parentId, Long id) {
         return achievementRepository.findByIdAndParentId(id, parentId)
                 .orElseThrow(() -> new NotFoundException("Достижение не найдено"));
+    }
+
+    /** Метрика уровня достижения: одиночные (0) — Золото, далее Бронза→Серебро→Золото→… */
+    private String tierName(int level) {
+        return switch (level) {
+            case 0 -> "Золото";
+            case 1 -> "Бронза";
+            case 2 -> "Серебро";
+            case 3 -> "Золото";
+            case 4 -> "Платина";
+            case 5 -> "Изумруд";
+            default -> "Алмаз";
+        };
     }
 
     private String defaultIcon(String icon) {

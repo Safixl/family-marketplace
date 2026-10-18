@@ -52,6 +52,22 @@ public class Quest {
     @Column(length = 2000)
     private String description;
 
+    /** Описание на этапе (!) — доступен для принятия (базовое описание). */
+    @Column(name = "basic_description", length = 2000)
+    private String basicDescription;
+
+    /** Описание на этапе (?) — после принятия (критерии сдачи). */
+    @Column(name = "accept_description", length = 2000)
+    private String acceptDescription;
+
+    /** Таймер на выполнение (минуты), опционально. */
+    @Column(name = "duration_minutes")
+    private Integer durationMinutes;
+
+    /** Перерыв между выполнениями повторяемого квеста (часы). */
+    @Column(name = "cooldown_hours", nullable = false)
+    private int cooldownHours;
+
     @Column(nullable = false, length = 64)
     private String icon = "📜";
 

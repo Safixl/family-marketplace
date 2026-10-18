@@ -126,8 +126,8 @@ export const SKILLS: SkillConfig[] = [
     storeTemplate: 'MATH',
     archiveTitle: 'Архив решённых задач',
     archiveEmpty: 'Решённые задачи появятся здесь',
-    requestTitle: 'Запрос на добавление задачи',
-    requestPlaceholder: 'Какая задача нужна? Например: примеры на умножение…',
+    requestTitle: 'Карточки с заданиями',
+    requestPlaceholder: 'Карточки с заданиями разной сложности и наградами',
     statsTitle: 'Статистика по математике',
     loadArchive: async () => {
       try {
@@ -207,6 +207,7 @@ export const SKILLS: SkillConfig[] = [
           counters: [
             { label: 'Книг засчитано', value: data.stats.booksRead, icon: '📖' },
             { label: 'Страниц прочитано', value: data.stats.pagesRead, icon: '📄' },
+            { label: 'Страниц сегодня', value: `${data.pagesToday}/${data.pagesTarget}`, icon: '📅' },
             { label: 'Жанров', value: genres, icon: '🎭' },
             { label: 'Баллов заработано', value: data.stats.pointsEarned, icon: '⭐' },
             { label: 'Ачивок получено', value: progress?.unlockedAchievements ?? 0, icon: '🏆' },
@@ -299,8 +300,8 @@ export const SKILLS: SkillConfig[] = [
     storeTemplate: 'HOME',
     archiveTitle: 'Календарь уборки',
     archiveEmpty: 'Отмеченные дни появятся здесь',
-    requestTitle: 'Запрос на добавление',
-    requestPlaceholder: 'Что добавить?',
+    requestTitle: 'Помощь по дому',
+    requestPlaceholder: 'Карточки помощи по дому с бонусом в календарь',
     statsTitle: 'Статистика по порядку в комнате',
     loadArchive: async () => [],
     loadRequests: async () => [],

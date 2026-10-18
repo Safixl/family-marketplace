@@ -15,6 +15,10 @@ import com.familymarket.dto.DailyTaskDto;
 import com.familymarket.dto.LangLearnRequest;
 import com.familymarket.dto.LangWordDto;
 import com.familymarket.dto.SportLogRequest;
+import com.familymarket.house.HouseDayRepository;
+import com.familymarket.reading.ReadingPageMarkRepository;
+import com.familymarket.reading.ReadingSettings;
+import com.familymarket.reading.ReadingSettingsRepository;
 import com.familymarket.store.Store;
 import com.familymarket.store.StoreRepository;
 import org.springframework.stereotype.Service;
@@ -95,6 +99,9 @@ public class DailyService {
     private final DailyLogRepository dailyLogRepository;
     private final ChildRepository childRepository;
     private final StoreRepository storeRepository;
+    private final ReadingSettingsRepository readingSettingsRepository;
+    private final ReadingPageMarkRepository readingPageMarkRepository;
+    private final HouseDayRepository houseDayRepository;
     private final BalanceService balanceService;
     private final AchievementService achievementService;
     private final ObjectMapper objectMapper;
@@ -102,12 +109,18 @@ public class DailyService {
     public DailyService(DailyLogRepository dailyLogRepository,
                         ChildRepository childRepository,
                         StoreRepository storeRepository,
+                        ReadingSettingsRepository readingSettingsRepository,
+                        ReadingPageMarkRepository readingPageMarkRepository,
+                        HouseDayRepository houseDayRepository,
                         BalanceService balanceService,
                         AchievementService achievementService,
                         ObjectMapper objectMapper) {
         this.dailyLogRepository = dailyLogRepository;
         this.childRepository = childRepository;
         this.storeRepository = storeRepository;
+        this.readingSettingsRepository = readingSettingsRepository;
+        this.readingPageMarkRepository = readingPageMarkRepository;
+        this.houseDayRepository = houseDayRepository;
         this.balanceService = balanceService;
         this.achievementService = achievementService;
         this.objectMapper = objectMapper;
@@ -128,6 +141,8 @@ public class DailyService {
         skills.add(langState(childId, parentId, age, today));
         skills.add(sportState(childId, parentId, today));
         skills.add(mathState(childId, parentId, age, today));
+        skills.add(readingState(childId, parentId, today));
+        skills.add(houseState(childId, parentId, today));
         skills.removeIf(s -> s.currencyName() == null); // нет магазина — навык не активен
         return new DailyStateDto(today.toString(), skills);
     }
@@ -330,6 +345,132 @@ public class DailyService {
         }
         return skill("MATH", "Математика", "🧮", store, taskDtos, List.of(), 0, 0,
                 payload.doneIndexes().size(), tasks.size(), payload.doneIndexes().size() >= tasks.size());
+    }
+
+    // ---------- Чтение (страницы за день) ----------
+
+    private DailySkillDto readingState(Long childId, Long parentId, LocalDate day) {
+        Store store = storeRepository.findByParentIdAndTemplateType(parentId, "READING").orElse(null);
+        if (store == null) {
+            return disabled("READING");
+        }
+        ReadingSettings settings = readingSettingsRepository.findByChildId(childId).orElse(null);
+        int target = settings == null ? 20 : settings.getPagesTarget();
+        int pages = readingPageMarkRepository.findByChildIdAndDayOrderByCreatedAtAsc(childId, day).isEmpty()
+                ? 0 : pagesToday(childId, day);
+        return skill("READING", "Чтение", "📚", store, List.of(), List.of(), 0, 0,
+                pages, target, pages >= target);
+    }
+
+    /** Сумма дельт отметок страниц за день (дейлик чтения). */
+    private int pagesToday(Long childId, LocalDate day) {
+        var marks = readingPageMarkRepository.findByChildIdAndDayOrderByCreatedAtAsc(childId, day);
+        if (marks.isEmpty()) {
+            return 0;
+        }
+        java.util.Map<Long, Integer> prevByBook = new java.util.LinkedHashMap<>();
+        readingPageMarkRepository.findByChildIdAndDayBeforeOrderByCreatedAtDesc(childId, day)
+                .forEach(m -> prevByBook.putIfAbsent(m.getBook().getId(), m.getPage()));
+        int total = 0;
+        java.util.Map<Long, Integer> lastByBook = new java.util.LinkedHashMap<>();
+        for (var mark : marks) {
+            Integer prev = lastByBook.get(mark.getBook().getId());
+            if (prev == null) {
+                prev = prevByBook.getOrDefault(mark.getBook().getId(), 0);
+            }
+            int delta = mark.getPage() - prev;
+            if (delta > 0) {
+                total += delta;
+            }
+            lastByBook.put(mark.getBook().getId(), mark.getPage());
+        }
+        return total;
+    }
+
+    /**
+     * Начисление награды за дейлик чтения (идемпотентно, 1 раз в день):
+     * вызывается из ReadingService при отметке страницы.
+     */
+    @Transactional
+    public void recordReading(Long childId, int pagesToday) {
+        Child child = getChild(childId);
+        Store store = storeFor(child, "READING");
+        ReadingSettings settings = readingSettingsRepository.findByChildId(childId).orElse(null);
+        if (store == null || settings == null) {
+            return;
+        }
+        LocalDate today = LocalDate.now();
+        if (pagesToday < settings.getPagesTarget()) {
+            return;
+        }
+        DailyLog log = dailyLogRepository.findByChildIdAndSkillAndDay(childId, "READING", today)
+                .orElseGet(() -> {
+                    DailyLog created = new DailyLog();
+                    created.setChild(child);
+                    created.setSkill("READING");
+                    created.setDay(today);
+                    created.setCreatedAt(Instant.now());
+                    return created;
+                });
+        if (log.getPoints() != null && log.getPoints().signum() > 0) {
+            return; // уже начислено сегодня
+        }
+        if (settings.getRewardAmount().signum() > 0) {
+            balanceService.credit(childId, store.getId(), settings.getRewardAmount());
+        }
+        log.setPoints(settings.getRewardAmount());
+        log.setXp(settings.getXpReward());
+        log.setFullClear(true);
+        log.setPayload("{\"pages\":" + pagesToday + "}");
+        dailyLogRepository.save(log);
+        achievementService.checkProgress(childId);
+    }
+
+    // ---------- Дом (проверенная комната / помощь) ----------
+
+    private DailySkillDto houseState(Long childId, Long parentId, LocalDate day) {
+        Store store = storeRepository.findByParentIdAndTemplateType(parentId, "HOME").orElse(null);
+        if (store == null) {
+            return disabled("HOUSE");
+        }
+        boolean done = houseDayRepository.findByStoreIdAndChildIdAndDay(store.getId(), childId, day)
+                .map(d -> d.getRoomScore() > 0 || d.getLivingScore() > 0)
+                .orElse(false);
+        return skill("HOUSE", "Порядок в комнате", "🏠", store, List.of(), List.of(), 0, 0,
+                done ? 1 : 0, 1, done);
+    }
+
+    /**
+     * Начисление награды за дейлик дома (идемпотентно, 1 раз в день):
+     * вызывается из HouseService при подтверждении проверки комнаты или помощи.
+     */
+    @Transactional
+    public void recordHouse(Long childId) {
+        Child child = getChild(childId);
+        Store store = storeFor(child, "HOME");
+        if (store == null) {
+            return;
+        }
+        LocalDate today = LocalDate.now();
+        DailyLog log = dailyLogRepository.findByChildIdAndSkillAndDay(childId, "HOUSE", today)
+                .orElseGet(() -> {
+                    DailyLog created = new DailyLog();
+                    created.setChild(child);
+                    created.setSkill("HOUSE");
+                    created.setDay(today);
+                    created.setCreatedAt(Instant.now());
+                    return created;
+                });
+        if (log.getPoints() != null && log.getPoints().signum() > 0) {
+            return;
+        }
+        balanceService.credit(childId, store.getId(), BigDecimal.ONE);
+        log.setPoints(BigDecimal.ONE);
+        log.setXp(1);
+        log.setFullClear(true);
+        log.setPayload("{}");
+        dailyLogRepository.save(log);
+        achievementService.checkProgress(childId);
     }
 
     private DailySkillDto skill(String skill, String name, String icon, Store store,

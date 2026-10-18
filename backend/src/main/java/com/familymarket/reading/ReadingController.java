@@ -1,6 +1,7 @@
 package com.familymarket.reading;
 
 import com.familymarket.common.CurrentUser;
+import com.familymarket.dto.BookmarkRequest;
 import com.familymarket.dto.ChildReadingResponse;
 import com.familymarket.dto.ReadingBookDto;
 import com.familymarket.dto.ReadingBookUpsertRequest;
@@ -9,6 +10,8 @@ import com.familymarket.dto.ReadingLogDto;
 import com.familymarket.dto.ReadingRequestApproveRequest;
 import com.familymarket.dto.ReadingRequestCreateRequest;
 import com.familymarket.dto.ReadingRequestDto;
+import com.familymarket.dto.ReadingSettingsDto;
+import com.familymarket.dto.ReadingSettingsUpdateRequest;
 import com.familymarket.dto.ReadingStatsDto;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -82,6 +85,19 @@ public class ReadingController {
         return readingService.statsForChild(CurrentUser.parentId(), childId);
     }
 
+    // ---------- Настройки дейлика чтения (родитель) ----------
+
+    @GetMapping("/api/parent/children/{childId}/reading-settings")
+    public ReadingSettingsDto getReadingSettings(@PathVariable Long childId) {
+        return readingService.getSettings(CurrentUser.parentId(), childId);
+    }
+
+    @PutMapping("/api/parent/children/{childId}/reading-settings")
+    public ReadingSettingsDto updateReadingSettings(@PathVariable Long childId,
+                                                    @Valid @RequestBody ReadingSettingsUpdateRequest request) {
+        return readingService.updateSettings(CurrentUser.parentId(), childId, request);
+    }
+
     // ---------- Заявки ребёнка (родитель) ----------
 
     @GetMapping("/api/parent/children/{childId}/reading-requests")
@@ -112,6 +128,11 @@ public class ReadingController {
     @ResponseStatus(HttpStatus.CREATED)
     public ReadingLogDto childMarkRead(@PathVariable Long id) {
         return readingService.childMarkRead(CurrentUser.childId(), id);
+    }
+
+    @PostMapping("/api/child/books/{id}/bookmark")
+    public void bookmark(@PathVariable Long id, @Valid @RequestBody BookmarkRequest request) {
+        readingService.bookmark(CurrentUser.childId(), id, request);
     }
 
     @PostMapping("/api/child/stores/{storeId}/reading-requests")

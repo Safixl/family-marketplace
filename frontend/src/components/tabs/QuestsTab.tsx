@@ -25,6 +25,10 @@ interface QuestForm {
   type: string;
   title: string;
   description: string;
+  basicDescription: string;
+  acceptDescription: string;
+  durationMinutes: string;
+  cooldownHours: string;
   icon: string;
   rewardStoreId: string;
   rewardAmount: string;
@@ -39,6 +43,10 @@ const EMPTY_FORM: QuestForm = {
   type: 'STORY',
   title: '',
   description: '',
+  basicDescription: '',
+  acceptDescription: '',
+  durationMinutes: '',
+  cooldownHours: '',
   icon: '📜',
   rewardStoreId: '',
   rewardAmount: '',
@@ -114,6 +122,10 @@ export default function QuestsTab() {
       type: quest.type,
       title: quest.title,
       description: quest.description ?? '',
+      basicDescription: quest.basicDescription ?? '',
+      acceptDescription: quest.acceptDescription ?? '',
+      durationMinutes: quest.durationMinutes != null ? String(quest.durationMinutes) : '',
+      cooldownHours: quest.cooldownHours > 0 ? String(quest.cooldownHours) : '',
       icon: quest.icon,
       rewardStoreId: quest.rewardStoreId != null ? String(quest.rewardStoreId) : '',
       rewardAmount: quest.rewardAmount > 0 ? String(quest.rewardAmount) : '',
@@ -133,6 +145,10 @@ export default function QuestsTab() {
         type: form.type,
         title: form.title,
         description: form.description || null,
+        basicDescription: form.basicDescription || null,
+        acceptDescription: form.acceptDescription || null,
+        durationMinutes: form.durationMinutes ? Number(form.durationMinutes) : null,
+        cooldownHours: form.cooldownHours ? Number(form.cooldownHours) : 0,
         icon: form.icon || '📜',
         rewardStoreId: form.rewardStoreId ? Number(form.rewardStoreId) : null,
         rewardAmount: form.rewardAmount ? Number(form.rewardAmount) : 0,
@@ -398,10 +414,34 @@ export default function QuestsTab() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-500">Описание</label>
+            <label className="mb-1 block text-xs font-semibold text-slate-500">
+              Описание для принятия (этап «!»)
+            </label>
             <textarea
               className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
-              rows={3}
+              rows={2}
+              value={form.basicDescription}
+              onChange={(e) => setForm({ ...form, basicDescription: e.target.value })}
+              placeholder="Что это за квест — ребёнок видит до того, как взять"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-500">
+              Описание выполнения (этап «?»)
+            </label>
+            <textarea
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+              rows={2}
+              value={form.acceptDescription}
+              onChange={(e) => setForm({ ...form, acceptDescription: e.target.value })}
+              placeholder="Критерии сдачи — ребёнок видит после принятия"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-500">Описание (общее)</label>
+            <textarea
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+              rows={2}
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
             />
@@ -503,6 +543,34 @@ export default function QuestsTab() {
                 />
                 Активен
               </label>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-500">
+                Время на выполнение (мин)
+              </label>
+              <input
+                type="number"
+                min="1"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                value={form.durationMinutes}
+                onChange={(e) => setForm({ ...form, durationMinutes: e.target.value })}
+                placeholder="без таймера"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-500">
+                Перерыв между выполнениями (ч)
+              </label>
+              <input
+                type="number"
+                min="0"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                value={form.cooldownHours}
+                onChange={(e) => setForm({ ...form, cooldownHours: e.target.value })}
+                placeholder="0 — сразу доступен"
+              />
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-2">

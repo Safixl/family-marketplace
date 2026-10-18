@@ -7,6 +7,8 @@ import com.familymarket.child.ChildRepository;
 import com.familymarket.common.BadRequestException;
 import com.familymarket.common.ConflictException;
 import com.familymarket.common.NotFoundException;
+import com.familymarket.daily.DailyService;
+import com.familymarket.dto.BookmarkRequest;
 import com.familymarket.dto.ChildBookDto;
 import com.familymarket.dto.ChildReadingResponse;
 import com.familymarket.dto.ReadingBookDto;
@@ -16,6 +18,8 @@ import com.familymarket.dto.ReadingLogDto;
 import com.familymarket.dto.ReadingRequestApproveRequest;
 import com.familymarket.dto.ReadingRequestCreateRequest;
 import com.familymarket.dto.ReadingRequestDto;
+import com.familymarket.dto.ReadingSettingsDto;
+import com.familymarket.dto.ReadingSettingsUpdateRequest;
 import com.familymarket.dto.ReadingStatsDto;
 import com.familymarket.store.Store;
 import com.familymarket.store.StoreService;
@@ -26,7 +30,11 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class ReadingService {
@@ -34,25 +42,40 @@ public class ReadingService {
     private final ReadingBookRepository bookRepository;
     private final ReadingLogRepository logRepository;
     private final ReadingRequestRepository requestRepository;
+    private final ReadingBookmarkRepository bookmarkRepository;
+    private final ReadingPageMarkRepository pageMarkRepository;
+    private final ReadingSettingsRepository settingsRepository;
     private final ChildRepository childRepository;
     private final StoreService storeService;
+    private final com.familymarket.store.StoreRepository storeRepository;
     private final BalanceService balanceService;
     private final AchievementService achievementService;
+    private final DailyService dailyService;
 
     public ReadingService(ReadingBookRepository bookRepository,
                           ReadingLogRepository logRepository,
                           ReadingRequestRepository requestRepository,
+                          ReadingBookmarkRepository bookmarkRepository,
+                          ReadingPageMarkRepository pageMarkRepository,
+                          ReadingSettingsRepository settingsRepository,
                           ChildRepository childRepository,
                           StoreService storeService,
+                          com.familymarket.store.StoreRepository storeRepository,
                           BalanceService balanceService,
-                          AchievementService achievementService) {
+                          AchievementService achievementService,
+                          DailyService dailyService) {
         this.bookRepository = bookRepository;
         this.logRepository = logRepository;
         this.requestRepository = requestRepository;
+        this.bookmarkRepository = bookmarkRepository;
+        this.pageMarkRepository = pageMarkRepository;
+        this.settingsRepository = settingsRepository;
         this.childRepository = childRepository;
         this.storeService = storeService;
+        this.storeRepository = storeRepository;
         this.balanceService = balanceService;
         this.achievementService = achievementService;
+        this.dailyService = dailyService;
     }
 
     // ---------- Каталог книг (родитель, личные книги ребёнка) ----------
@@ -260,7 +283,121 @@ public class ReadingService {
                 .stream().map(this::toChildBook).toList();
         List<ReadingRequestDto> requests = requestRepository.findByChildIdOrderByCreatedAtDesc(childId)
                 .stream().map(ReadingRequestDto::from).toList();
-        return new ChildReadingResponse(books, requests, buildStats(childId));
+        Map<Long, Integer> bookmarks = new LinkedHashMap<>();
+        bookmarkRepository.findByChildId(childId)
+                .forEach(b -> bookmarks.put(b.getBook().getId(), b.getPage()));
+        ReadingSettings settings = settingsRepository.findByChildId(childId).orElse(null);
+        int pagesTarget = settings == null ? 20 : settings.getPagesTarget();
+        return new ChildReadingResponse(books, requests, buildStats(childId), bookmarks,
+                pagesToday(childId, LocalDate.now()), pagesTarget);
+    }
+
+    // ---------- Закладки страниц и дейлик чтения ----------
+
+    /**
+     * Ребёнок отмечает текущую страницу книги. Разница между отметками за день
+     * засчитывается в дейлик чтения (пример: 113 → 213 = +100 страниц).
+     */
+    @Transactional
+    public void bookmark(Long childId, Long bookId, BookmarkRequest request) {
+        ReadingBook book = bookRepository.findById(bookId)
+                .orElseThrow(() -> new NotFoundException("Книга не найдена"));
+        if (book.getChild() == null || !book.getChild().getId().equals(childId)) {
+            throw new NotFoundException("Книга не найдена");
+        }
+        int page = request.page();
+        if (book.getPages() > 0 && page > book.getPages()) {
+            page = book.getPages();
+        }
+        Instant now = Instant.now();
+        ReadingBookmark bookmark = bookmarkRepository.findByChildIdAndBookId(childId, bookId)
+                .orElseGet(() -> {
+                    ReadingBookmark b = new ReadingBookmark();
+                    b.setChild(book.getChild());
+                    b.setBook(book);
+                    return b;
+                });
+        bookmark.setPage(page);
+        bookmark.setUpdatedAt(now);
+        bookmarkRepository.save(bookmark);
+
+        ReadingPageMark mark = new ReadingPageMark();
+        mark.setChild(book.getChild());
+        mark.setBook(book);
+        mark.setPage(page);
+        mark.setDay(LocalDate.now());
+        mark.setCreatedAt(now);
+        pageMarkRepository.save(mark);
+
+        dailyService.recordReading(childId, pagesToday(childId, LocalDate.now()));
+    }
+
+    /** Сумма дельт отметок страниц за день (дейлик чтения). */
+    @Transactional(readOnly = true)
+    public int pagesToday(Long childId, LocalDate day) {
+        List<ReadingPageMark> marks = pageMarkRepository.findByChildIdAndDayOrderByCreatedAtAsc(childId, day);
+        if (marks.isEmpty()) {
+            return 0;
+        }
+        // последняя отметка предыдущего дня по каждой книге — база для первой дельты
+        Map<Long, Integer> prevByBook = new LinkedHashMap<>();
+        pageMarkRepository.findByChildIdAndDayBeforeOrderByCreatedAtDesc(childId, day)
+                .forEach(m -> prevByBook.putIfAbsent(m.getBook().getId(), m.getPage()));
+
+        int total = 0;
+        Map<Long, Integer> lastByBook = new LinkedHashMap<>();
+        for (ReadingPageMark mark : marks) {
+            Integer prev = lastByBook.get(mark.getBook().getId());
+            if (prev == null) {
+                prev = prevByBook.getOrDefault(mark.getBook().getId(), 0);
+            }
+            int delta = mark.getPage() - prev;
+            if (delta > 0) {
+                total += delta;
+            }
+            lastByBook.put(mark.getBook().getId(), mark.getPage());
+        }
+        return total;
+    }
+
+    // ---------- Настройки дейлика чтения (родитель) ----------
+
+    @Transactional(readOnly = true)
+    public ReadingSettingsDto getSettings(Long parentId, Long childId) {
+        childRepository.findByIdAndParentId(childId, parentId)
+                .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
+        ReadingSettings settings = settingsRepository.findByChildId(childId).orElse(null);
+        if (settings == null) {
+            return new ReadingSettingsDto(childId, null, 20, BigDecimal.ZERO, 0);
+        }
+        return new ReadingSettingsDto(childId, settings.getStore().getId(), settings.getPagesTarget(),
+                settings.getRewardAmount(), settings.getXpReward());
+    }
+
+    @Transactional
+    public ReadingSettingsDto updateSettings(Long parentId, Long childId, ReadingSettingsUpdateRequest request) {
+        childRepository.findByIdAndParentId(childId, parentId)
+                .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
+        Store store = storeRepository.findByParentIdAndTemplateType(parentId, "READING")
+                .orElseThrow(() -> new BadRequestException("Магазин чтения не настроен"));
+        ReadingSettings settings = settingsRepository.findByChildId(childId).orElseGet(() -> {
+            ReadingSettings s = new ReadingSettings();
+            s.setChildId(childId);
+            s.setStore(store);
+            return s;
+        });
+        if (request.pagesTarget() != null) {
+            settings.setPagesTarget(request.pagesTarget());
+        }
+        if (request.rewardAmount() != null) {
+            settings.setRewardAmount(request.rewardAmount());
+        }
+        if (request.xpReward() != null) {
+            settings.setXpReward(request.xpReward());
+        }
+        settings.setUpdatedAt(Instant.now());
+        settingsRepository.save(settings);
+        return getSettings(parentId, childId);
     }
 
     private ChildBookDto toChildBook(ReadingBook book) {

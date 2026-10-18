@@ -6,6 +6,8 @@ import com.familymarket.child.Child;
 import com.familymarket.child.ChildRepository;
 import com.familymarket.common.BadRequestException;
 import com.familymarket.common.NotFoundException;
+import com.familymarket.daily.DailyService;
+import com.familymarket.dto.HouseCheckRequestDto;
 import com.familymarket.dto.HouseDayDto;
 import com.familymarket.dto.HouseDayUpsertRequest;
 import com.familymarket.dto.HouseMonthResponse;
@@ -24,21 +26,27 @@ import java.util.List;
 public class HouseService {
 
     private final HouseDayRepository houseDayRepository;
+    private final HouseCheckRequestRepository checkRequestRepository;
     private final ChildRepository childRepository;
     private final StoreService storeService;
     private final BalanceService balanceService;
     private final AchievementService achievementService;
+    private final DailyService dailyService;
 
     public HouseService(HouseDayRepository houseDayRepository,
+                        HouseCheckRequestRepository checkRequestRepository,
                         ChildRepository childRepository,
                         StoreService storeService,
                         BalanceService balanceService,
-                        AchievementService achievementService) {
+                        AchievementService achievementService,
+                        DailyService dailyService) {
         this.houseDayRepository = houseDayRepository;
+        this.checkRequestRepository = checkRequestRepository;
         this.childRepository = childRepository;
         this.storeService = storeService;
         this.balanceService = balanceService;
         this.achievementService = achievementService;
+        this.dailyService = dailyService;
     }
 
     @Transactional
@@ -96,6 +104,81 @@ public class HouseService {
         day.setUpdatedAt(Instant.now());
         houseDayRepository.save(day);
         return HouseDayDto.from(day);
+    }
+
+    // ---------- Запросы проверки комнаты ----------
+
+    /**
+     * Ребёнок просит проверить комнату (клик по сегодняшнему дню в календаре).
+     */
+    @Transactional
+    public HouseCheckRequestDto requestCheck(Long childId, Long storeId) {
+        Store store = storeService.getOwned(childRepository.findParentIdById(childId)
+                .orElseThrow(() -> new NotFoundException("Ребенок не найден")), storeId);
+        Child child = childRepository.findById(childId)
+                .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
+        LocalDate today = LocalDate.now();
+        if (checkRequestRepository.findByChildIdAndDay(childId, today).isPresent()) {
+            throw new BadRequestException("Запрос на сегодня уже отправлен");
+        }
+        HouseCheckRequest request = new HouseCheckRequest();
+        request.setChild(child);
+        request.setStore(store);
+        request.setDay(today);
+        request.setStatus("PENDING");
+        request.setCreatedAt(Instant.now());
+        return HouseCheckRequestDto.from(checkRequestRepository.save(request));
+    }
+
+    @Transactional(readOnly = true)
+    public List<HouseCheckRequestDto> listCheckRequests(Long parentId) {
+        return checkRequestRepository.findByChild_ParentIdOrderByCreatedAtDesc(parentId)
+                .stream().map(HouseCheckRequestDto::from).toList();
+    }
+
+    /**
+     * Родитель подтверждает проверку: +1 к оценке комнаты за день, дейлик дома выполнен.
+     */
+    @Transactional
+    public HouseCheckRequestDto approveCheck(Long parentId, Long requestId) {
+        HouseCheckRequest request = checkRequestRepository.findByIdAndChild_ParentId(requestId, parentId)
+                .orElseThrow(() -> new NotFoundException("Запрос не найден"));
+        if (!"PENDING".equals(request.getStatus())) {
+            throw new BadRequestException("Запрос уже обработан");
+        }
+        request.setStatus("APPROVED");
+        request.setResolvedAt(Instant.now());
+        checkRequestRepository.save(request);
+
+        HouseDay day = houseDayRepository
+                .findByStoreIdAndChildIdAndDay(request.getStore().getId(), request.getChild().getId(), request.getDay())
+                .orElseGet(() -> {
+                    HouseDay created = new HouseDay();
+                    created.setStore(request.getStore());
+                    created.setChild(request.getChild());
+                    created.setDay(request.getDay());
+                    created.setSettled(false);
+                    return created;
+                });
+        day.setRoomScore(Math.max(day.getRoomScore(), request.getRoomScore()));
+        day.setPoints(BigDecimal.valueOf(day.getRoomScore() + day.getLivingScore()));
+        day.setUpdatedAt(Instant.now());
+        houseDayRepository.save(day);
+
+        dailyService.recordHouse(request.getChild().getId());
+        return HouseCheckRequestDto.from(request);
+    }
+
+    @Transactional
+    public HouseCheckRequestDto rejectCheck(Long parentId, Long requestId) {
+        HouseCheckRequest request = checkRequestRepository.findByIdAndChild_ParentId(requestId, parentId)
+                .orElseThrow(() -> new NotFoundException("Запрос не найден"));
+        if (!"PENDING".equals(request.getStatus())) {
+            throw new BadRequestException("Запрос уже обработан");
+        }
+        request.setStatus("REJECTED");
+        request.setResolvedAt(Instant.now());
+        return HouseCheckRequestDto.from(checkRequestRepository.save(request));
     }
 
     /**

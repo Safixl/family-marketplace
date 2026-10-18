@@ -3,12 +3,18 @@ package com.familymarket.inventory;
 import com.familymarket.common.BadRequestException;
 import com.familymarket.common.NotFoundException;
 import com.familymarket.dto.InventoryItemDto;
+import com.familymarket.dto.InventoryStackDto;
+import com.familymarket.product.Product;
 import com.familymarket.purchase.Purchase;
+import com.familymarket.store.Store;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class InventoryService {
@@ -39,6 +45,46 @@ public class InventoryService {
     }
 
     // ---------- Ребенок ----------
+
+    /**
+     * Инвентарь-стопки: все неиспользованные покупки (кроме гардероба),
+     * сгруппированные по товару. Статусов в выдаче нет.
+     */
+    @Transactional(readOnly = true)
+    public List<InventoryStackDto> listStacksForChild(Long childId) {
+        List<InventoryItem> items = inventoryItemRepository.findByChildIdAndStatusOrderByCreatedAtDesc(childId, "AVAILABLE");
+        Map<Long, InventoryStackDto> byProduct = new LinkedHashMap<>();
+        for (InventoryItem item : items) {
+            if ("WARDROBE".equals(item.getItemType())) {
+                continue; // предметы гардероба живут в «Гардеробе» (Мой Герой)
+            }
+            Product p = item.getProduct();
+            Store s = item.getStore();
+            byProduct.merge(
+                    p.getId(),
+                    new InventoryStackDto(p.getId(), p.getName(), s.getId(), s.getName(),
+                            p.getPrice(), s.getCurrencyName(), s.getCurrencyIcon(), 1L),
+                    (a, b) -> new InventoryStackDto(a.productId(), a.productName(), a.storeId(), a.storeName(),
+                            a.price(), a.currencyName(), a.currencyIcon(), a.count() + 1));
+        }
+        return new ArrayList<>(byProduct.values());
+    }
+
+    /**
+     * Использование предмета: одна штука товара исчезает из инвентаря
+     * (при нескольких одинаковых количество уменьшается на 1).
+     */
+    @Transactional
+    public void useItem(Long childId, Long productId) {
+        List<InventoryItem> items = inventoryItemRepository.findByChildIdAndStatusOrderByCreatedAtDesc(childId, "AVAILABLE");
+        InventoryItem target = items.stream()
+                .filter(i -> i.getProduct().getId().equals(productId) && !"WARDROBE".equals(i.getItemType()))
+                .findFirst()
+                .orElseThrow(() -> new NotFoundException("Товар не найден в инвентаре"));
+        inventoryItemRepository.delete(target);
+    }
+
+    // ---------- Ребенок (легаси-флоу активации, обратная совместимость) ----------
 
     @Transactional(readOnly = true)
     public List<InventoryItemDto> listForChild(Long childId) {

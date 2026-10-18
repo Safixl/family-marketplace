@@ -1,5 +1,5 @@
 import { rankTier } from '../../../lib/achievementTiers';
-import { RpgLevel, RANKS } from '../../../lib/rpg';
+import { RpgLevel, RANKS, MAX_LEVEL } from '../../../lib/rpg';
 
 interface Props {
   level: RpgLevel;
@@ -7,10 +7,14 @@ interface Props {
 }
 
 export default function LevelBar({ level, compact }: Props) {
-  const isMax = level.level >= 60;
+  const isMax = level.level >= MAX_LEVEL;
   const percent = isMax ? 100 : Math.round(level.ratio * 100);
   const currentRank = RANKS.filter((r) => r.min <= level.level).pop() ?? RANKS[0];
   const tier = rankTier(currentRank.min);
+
+  // Маркер «Неизвестная награда»: если следующий уровень повышает ранг.
+  const nextRank = RANKS.find((r) => r.min === level.level + 1);
+
   return (
     <div className="rpg-panel rpg-panel-gold px-4 py-3">
       <div className="flex items-center gap-3">
@@ -29,6 +33,16 @@ export default function LevelBar({ level, compact }: Props) {
               </span>
             )}
           </div>
+
+          {/* Шильдик «Неизвестная награда за достижения N-уровня» */}
+          {nextRank && (
+            <div className="mt-1.5 flex justify-center">
+              <span className="rounded-full border border-fuchsia-400/50 bg-fuchsia-500/15 px-3 py-0.5 text-[11px] font-bold text-fuchsia-300">
+                🎁 Неизвестная награда за достижения {nextRank.min}-уровня
+              </span>
+            </div>
+          )}
+
           <div className="rpg-progress-track mt-1.5 h-3">
             <div
               className={isMax ? 'rpg-progress-fill !bg-gradient-to-r !from-amber-400 !via-yellow-300 !to-amber-500' : 'rpg-progress-fill'}

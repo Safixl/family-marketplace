@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Trophy } from 'lucide-react';
+import { Trophy, X } from 'lucide-react';
 import { ChildAchievementGroupDto } from '../../api/types';
 import { tierForLevel } from '../../lib/achievementTiers';
 
@@ -29,26 +29,70 @@ function playDing() {
   }
 }
 
+const AUTO_HIDE_MS = 4500;
+const FADE_MS = 300;
+
 /**
  * Pop-up в стиле World of Warcraft: при разблокировке нового достижения
  * показывается баннер с «дзынь!» и титулом персонажа.
+ *
+ * Исправления бага «появляется, но не исчезает»:
+ *  - очередь попапов: показываем по одному, следующий — после закрытия предыдущего;
+ *  - таймер автоскрытия хранится в ref и гарантированно очищается;
+ *  - при отсутствии «свежих» достижений current сбрасывается в null;
+ *  - добавлена кнопка закрытия и плавное появление/исчезновение.
  */
 export default function AchievementPopup({ achievements }: Props) {
+  const [queue, setQueue] = useState<ChildAchievementGroupDto[]>([]);
   const [current, setCurrent] = useState<ChildAchievementGroupDto | null>(null);
+  const [visible, setVisible] = useState(false);
   const seenRef = useRef<Set<number>>(new Set());
+  const hideTimerRef = useRef<number | null>(null);
+  const fadeTimerRef = useRef<number | null>(null);
 
+  // Собираем очередь новых (ещё не показанных) достижений.
   useEffect(() => {
     const unlocked = achievements
       .filter((a) => a.unlocked && a.targetType && a.targetType !== 'NONE')
       .sort((a, b) => b.level - a.level);
-    const fresh = unlocked.find((a) => !seenRef.current.has(a.achievementId));
-    if (!fresh) return;
-    seenRef.current.add(fresh.achievementId);
-    playDing();
-    setCurrent(fresh);
-    const timer = setTimeout(() => setCurrent(null), 4500);
-    return () => clearTimeout(timer);
+    const fresh = unlocked.filter((a) => !seenRef.current.has(a.achievementId));
+    if (fresh.length === 0) return;
+    fresh.forEach((a) => seenRef.current.add(a.achievementId));
+    setQueue((q) => [...q, ...fresh]);
   }, [achievements]);
+
+  const close = () => {
+    if (hideTimerRef.current != null) window.clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = null;
+    setVisible(false);
+    if (fadeTimerRef.current != null) window.clearTimeout(fadeTimerRef.current);
+    fadeTimerRef.current = window.setTimeout(() => setCurrent(null), FADE_MS);
+  };
+
+  // Показываем следующий попап из очереди.
+  useEffect(() => {
+    if (current || queue.length === 0) return;
+    const next = queue[0];
+    setQueue((q) => q.slice(1));
+    setCurrent(next);
+    playDing();
+    // двойной rAF — гарантированный переход к видимому состоянию
+    requestAnimationFrame(() => requestAnimationFrame(() => setVisible(true)));
+    hideTimerRef.current = window.setTimeout(close, AUTO_HIDE_MS);
+    return () => {
+      if (hideTimerRef.current != null) window.clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queue, current]);
+
+  // Размонтирование: чистим все таймеры.
+  useEffect(() => {
+    return () => {
+      if (hideTimerRef.current != null) window.clearTimeout(hideTimerRef.current);
+      if (fadeTimerRef.current != null) window.clearTimeout(fadeTimerRef.current);
+    };
+  }, []);
 
   if (!current) return null;
   const tier = tierForLevel(current.level);
@@ -56,7 +100,9 @@ export default function AchievementPopup({ achievements }: Props) {
   return (
     <div className="pointer-events-none fixed inset-x-0 top-6 z-50 flex justify-center px-4">
       <div
-        className={`wow-popup flex items-center gap-3 rounded-2xl border-2 bg-gradient-to-r ${tier.card} px-5 py-4 shadow-2xl`}
+        className={`wow-popup flex items-center gap-3 rounded-2xl border-2 bg-gradient-to-r ${tier.card} px-5 py-4 shadow-2xl transition-all duration-300 ${
+          visible ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0'
+        }`}
       >
         <span className={`flex h-12 w-12 items-center justify-center rounded-xl text-2xl text-white ${tier.iconBox}`}>
           {current.icon}
@@ -73,6 +119,14 @@ export default function AchievementPopup({ achievements }: Props) {
           <div className="truncate text-lg font-extrabold text-slate-900">{current.name}</div>
           {current.description && <div className="truncate text-sm text-slate-600">{current.description}</div>}
         </div>
+        <button
+          onClick={close}
+          className="pointer-events-auto ml-1 shrink-0 rounded-lg p-1 text-slate-400 transition hover:bg-black/10 hover:text-slate-700"
+          title="Закрыть"
+          aria-label="Закрыть"
+        >
+          <X size={16} />
+        </button>
       </div>
     </div>
   );

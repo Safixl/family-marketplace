@@ -360,3 +360,185 @@ ALTER TABLE math_tasks ADD COLUMN IF NOT EXISTS child_id BIGINT REFERENCES child
 ALTER TABLE house_days ADD COLUMN IF NOT EXISTS room_score INT NOT NULL DEFAULT 0;
 ALTER TABLE house_days ADD COLUMN IF NOT EXISTS living_score INT NOT NULL DEFAULT 0;
 ALTER TABLE house_days ADD COLUMN IF NOT EXISTS settled BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- ============================================================
+-- Лимиты экрана и карманные деньги (Этап 2)
+-- ============================================================
+
+-- Базовые лимиты ребёнка (минуты в день; карманные деньги — рубли в неделю)
+CREATE TABLE IF NOT EXISTS child_limits (
+    child_id        BIGINT PRIMARY KEY REFERENCES children (id) ON DELETE CASCADE,
+    tv_minutes      INT NOT NULL DEFAULT 0,
+    pc_minutes      INT NOT NULL DEFAULT 0,
+    console_minutes INT NOT NULL DEFAULT 0,
+    phone_minutes   INT NOT NULL DEFAULT 0,
+    tablet_minutes  INT NOT NULL DEFAULT 0,
+    pocket_weekly   INT NOT NULL DEFAULT 0,
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Расход лимита по дням: used_seconds — потрачено, extended_seconds — одноразовые
+-- увеличения на сегодня (могут превышать базовый лимит), running — идёт ли счётчик.
+CREATE TABLE IF NOT EXISTS limit_usage (
+    id               BIGSERIAL PRIMARY KEY,
+    child_id         BIGINT       NOT NULL REFERENCES children (id) ON DELETE CASCADE,
+    limit_type       VARCHAR(20)  NOT NULL,   -- TV / PC / CONSOLE / PHONE / TABLET
+    day              DATE         NOT NULL,
+    used_seconds     INT          NOT NULL DEFAULT 0,
+    extended_seconds INT          NOT NULL DEFAULT 0,
+    running          BOOLEAN      NOT NULL DEFAULT FALSE,
+    started_at       TIMESTAMPTZ,
+    CONSTRAINT uq_limit_usage UNIQUE (child_id, limit_type, day)
+);
+CREATE INDEX IF NOT EXISTS idx_limit_usage_child ON limit_usage (child_id);
+
+-- Эффекты товаров: увеличение лимита (одноразовое на день / постоянное)
+ALTER TABLE products ADD COLUMN IF NOT EXISTS effect_type VARCHAR(20) NOT NULL DEFAULT 'NONE';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS effect_limit VARCHAR(20);
+ALTER TABLE products ADD COLUMN IF NOT EXISTS effect_value INT NOT NULL DEFAULT 0;
+
+-- Запросы ребёнка на выдачу карманных денег
+CREATE TABLE IF NOT EXISTS pocket_requests (
+    id          BIGSERIAL PRIMARY KEY,
+    child_id    BIGINT        NOT NULL REFERENCES children (id) ON DELETE CASCADE,
+    amount      NUMERIC(12,2) NOT NULL,
+    status      VARCHAR(20)   NOT NULL DEFAULT 'PENDING',
+    created_at  TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    resolved_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_pocket_requests_child ON pocket_requests (child_id);
+
+-- Журнал выдач карманных денег (week_start — понедельник 09:00 МСК)
+CREATE TABLE IF NOT EXISTS pocket_disbursements (
+    id         BIGSERIAL PRIMARY KEY,
+    child_id   BIGINT        NOT NULL REFERENCES children (id) ON DELETE CASCADE,
+    amount     NUMERIC(12,2) NOT NULL,
+    week_start DATE          NOT NULL,
+    created_at TIMESTAMPTZ   NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_pocket_disb_child ON pocket_disbursements (child_id);
+
+-- Одноразовые увеличения недельного лимита карманных денег (покупка-эффект)
+CREATE TABLE IF NOT EXISTS pocket_extensions (
+    id         BIGSERIAL PRIMARY KEY,
+    child_id   BIGINT        NOT NULL REFERENCES children (id) ON DELETE CASCADE,
+    week_start DATE          NOT NULL,
+    amount     NUMERIC(12,2) NOT NULL,
+    created_at TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    CONSTRAINT uq_pocket_ext UNIQUE (child_id, week_start)
+);
+CREATE INDEX IF NOT EXISTS idx_pocket_ext_child ON pocket_extensions (child_id);
+
+-- ============================================================
+-- Квесты-стадии (Этап 3): (!) принятие → (?) выполнение → спячка/готово
+-- ============================================================
+ALTER TABLE quests ADD COLUMN IF NOT EXISTS basic_description VARCHAR(2000);
+ALTER TABLE quests ADD COLUMN IF NOT EXISTS accept_description VARCHAR(2000);
+ALTER TABLE quests ADD COLUMN IF NOT EXISTS duration_minutes INT;
+ALTER TABLE quests ADD COLUMN IF NOT EXISTS cooldown_hours INT NOT NULL DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS child_quest_states (
+    id                BIGSERIAL PRIMARY KEY,
+    child_id          BIGINT      NOT NULL REFERENCES children (id) ON DELETE CASCADE,
+    quest_id          BIGINT      NOT NULL REFERENCES quests (id) ON DELETE CASCADE,
+    status            VARCHAR(20) NOT NULL DEFAULT 'AVAILABLE', -- AVAILABLE/ACTIVE/SUBMITTED/SLEEPING/DONE
+    accepted_at       TIMESTAMPTZ,
+    starts_at         TIMESTAMPTZ,
+    next_available_at TIMESTAMPTZ,
+    completed_at      TIMESTAMPTZ,
+    CONSTRAINT uq_child_quest UNIQUE (child_id, quest_id)
+);
+CREATE INDEX IF NOT EXISTS idx_child_quest_child ON child_quest_states (child_id);
+
+-- ============================================================
+-- Чтение: закладки страниц и дейлик страниц (Этап 3)
+-- ============================================================
+
+-- Текущая страница книги (закладка ребёнка)
+CREATE TABLE IF NOT EXISTS reading_bookmarks (
+    id         BIGSERIAL PRIMARY KEY,
+    child_id   BIGINT      NOT NULL REFERENCES children (id) ON DELETE CASCADE,
+    book_id    BIGINT      NOT NULL REFERENCES reading_books (id) ON DELETE CASCADE,
+    page       INT         NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_bookmark UNIQUE (child_id, book_id)
+);
+CREATE INDEX IF NOT EXISTS idx_bookmarks_child ON reading_bookmarks (child_id);
+
+-- История отметок страниц по дням: по ней считается дейлик чтения (сумма дельт)
+CREATE TABLE IF NOT EXISTS reading_page_marks (
+    id         BIGSERIAL PRIMARY KEY,
+    child_id   BIGINT      NOT NULL REFERENCES children (id) ON DELETE CASCADE,
+    book_id    BIGINT      NOT NULL REFERENCES reading_books (id) ON DELETE CASCADE,
+    page       INT         NOT NULL,
+    day        DATE        NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_page_marks_child ON reading_page_marks (child_id, day);
+
+-- Настройки дейлика чтения: сколько страниц в день и награда (задаёт родитель)
+CREATE TABLE IF NOT EXISTS reading_settings (
+    child_id      BIGINT PRIMARY KEY REFERENCES children (id) ON DELETE CASCADE,
+    store_id      BIGINT        NOT NULL REFERENCES stores (id) ON DELETE CASCADE,
+    pages_target  INT           NOT NULL DEFAULT 20,
+    reward_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+    xp_reward     INT           NOT NULL DEFAULT 0,
+    updated_at    TIMESTAMPTZ   NOT NULL DEFAULT now()
+);
+
+-- Запросы ребёнка на проверку комнаты (клик по сегодняшнему дню в календаре)
+CREATE TABLE IF NOT EXISTS house_check_requests (
+    id          BIGSERIAL PRIMARY KEY,
+    child_id    BIGINT      NOT NULL REFERENCES children (id) ON DELETE CASCADE,
+    store_id    BIGINT      NOT NULL REFERENCES stores (id) ON DELETE CASCADE,
+    day         DATE        NOT NULL,
+    status      VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    room_score  INT         NOT NULL DEFAULT 1,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    resolved_at TIMESTAMPTZ,
+    CONSTRAINT uq_house_check UNIQUE (child_id, day)
+);
+CREATE INDEX IF NOT EXISTS idx_house_check_child ON house_check_requests (child_id);
+
+-- ============================================================
+-- Карточки с заданиями (Этап 3): математика + помощь по дому
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS task_cards (
+    id               BIGSERIAL PRIMARY KEY,
+    parent_id        BIGINT        NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    store_id         BIGINT        REFERENCES stores (id) ON DELETE SET NULL,
+    child_id         BIGINT        REFERENCES children (id) ON DELETE CASCADE,
+    skill            VARCHAR(20)   NOT NULL,                    -- MATH / HOUSE
+    title            VARCHAR(255)  NOT NULL,
+    description      VARCHAR(2000),
+    icon             VARCHAR(64)   NOT NULL DEFAULT '🎴',
+    difficulty       VARCHAR(20)   NOT NULL DEFAULT 'EASY',     -- EASY / MEDIUM / HARD
+    tasks_json       VARCHAR(8000) NOT NULL,                    -- [{"q":"...","a":"..."}]
+    duration_minutes INT           NOT NULL,
+    reward_amount    NUMERIC(12,2) NOT NULL DEFAULT 0,
+    reward_store_id  BIGINT        REFERENCES stores (id) ON DELETE SET NULL,
+    xp_reward        INT           NOT NULL DEFAULT 0,
+    house_bonus      INT           NOT NULL DEFAULT 0,          -- для HOUSE: +n к living_score
+    rarity           VARCHAR(20)   NOT NULL DEFAULT 'COMMON',   -- COMMON/RARE/UNCOMMON/EPIC/LEGENDARY
+    hidden_reward    BOOLEAN       NOT NULL DEFAULT FALSE,
+    success_percent  INT           NOT NULL DEFAULT 80,         -- порог успешных ответов для награды
+    active           BOOLEAN       NOT NULL DEFAULT TRUE,
+    created_at       TIMESTAMPTZ   NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_task_cards_parent ON task_cards (parent_id);
+CREATE INDEX IF NOT EXISTS idx_task_cards_skill  ON task_cards (skill);
+
+CREATE TABLE IF NOT EXISTS child_task_cards (
+    id             BIGSERIAL PRIMARY KEY,
+    child_id       BIGINT        NOT NULL REFERENCES children (id) ON DELETE CASCADE,
+    card_id        BIGINT        NOT NULL REFERENCES task_cards (id) ON DELETE CASCADE,
+    day            DATE          NOT NULL,
+    status         VARCHAR(20)   NOT NULL DEFAULT 'PENDING_PARENT', -- PENDING_PARENT/REVEALED/IN_PROGRESS/DONE/FAILED
+    started_at     TIMESTAMPTZ,
+    submitted_at   TIMESTAMPTZ,
+    answers_json   VARCHAR(8000),
+    result_percent INT,
+    CONSTRAINT uq_child_card UNIQUE (child_id, card_id, day)
+);
+CREATE INDEX IF NOT EXISTS idx_child_task_cards_child ON child_task_cards (child_id);

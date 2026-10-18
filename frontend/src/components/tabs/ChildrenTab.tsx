@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, Copy, Gift, KeyRound, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { CheckCircle2, Copy, Gift, KeyRound, Pencil, Plus, RefreshCw, Timer, Trash2 } from 'lucide-react';
 import { api } from '../../api/client';
 import { ChildDto, WishlistItemDto } from '../../api/types';
 import { errMsg, fmtDate } from '../../lib/format';
+import LimitsManager from '../managers/LimitsManager';
 import Modal from '../Modal';
 import { EmptyState, Spinner } from '../ui';
 
@@ -25,6 +26,7 @@ export default function ChildrenTab() {
   const [busy, setBusy] = useState(false);
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [wishlists, setWishlists] = useState<Record<number, WishlistItemDto[]>>({});
+  const [limitsFor, setLimitsFor] = useState<ChildDto | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -245,6 +247,13 @@ export default function ChildrenTab() {
                 <RefreshCw size={16} /> Перегенерировать ключ
               </button>
 
+              <button
+                onClick={() => setLimitsFor(child)}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+              >
+                <Timer size={16} /> Лимиты экрана и карманные деньги
+              </button>
+
               <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
                 <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
                   <Gift size={16} className="text-indigo-500" />
@@ -317,6 +326,8 @@ export default function ChildrenTab() {
           ))}
         </div>
       )}
+
+      {limitsFor && <LimitsManager child={limitsFor} onClose={() => setLimitsFor(null)} />}
 
       {modalOpen && (
         <Modal

@@ -6,6 +6,7 @@ import { errMsg, fmtAmount } from '../../lib/format';
 import Modal from '../Modal';
 import BooksManager from '../managers/BooksManager';
 import HouseCalendar from '../managers/HouseCalendar';
+import TaskCardsManager from '../managers/TaskCardsManager';
 import TasksManager from '../managers/TasksManager';
 import { EmptyState, Spinner } from '../ui';
 
@@ -23,10 +24,22 @@ interface ProductForm {
   price: string;
   limitPerChild: string;
   active: boolean;
+  effectType: string;
+  effectLimit: string;
+  effectValue: string;
 }
 
 const EMPTY_STORE: StoreForm = { name: '', description: '', currencyName: 'монета', currencyIcon: '🪙', active: true };
-const EMPTY_PRODUCT: ProductForm = { name: '', description: '', price: '', limitPerChild: '', active: true };
+const EMPTY_PRODUCT: ProductForm = {
+  name: '',
+  description: '',
+  price: '',
+  limitPerChild: '',
+  active: true,
+  effectType: 'NONE',
+  effectLimit: '',
+  effectValue: '',
+};
 
 export default function StoresTab() {
   const [stores, setStores] = useState<StoreDto[]>([]);
@@ -38,7 +51,9 @@ export default function StoresTab() {
 
   const [templates, setTemplates] = useState<StoreTemplateDto[]>([]);
   const [templateModal, setTemplateModal] = useState(false);
-  const [managerFor, setManagerFor] = useState<{ store: StoreDto; type: 'books' | 'tasks' | 'house' } | null>(null);
+  const [managerFor, setManagerFor] = useState<
+    { store: StoreDto; type: 'books' | 'tasks' | 'house' | 'cards'; skill?: 'MATH' | 'HOUSE' } | null
+  >(null);
 
   const [storeModal, setStoreModal] = useState(false);
   const [editingStore, setEditingStore] = useState<StoreDto | null>(null);
@@ -182,6 +197,9 @@ export default function StoresTab() {
       price: String(product.price),
       limitPerChild: product.limitPerChild != null ? String(product.limitPerChild) : '',
       active: product.active,
+      effectType: product.effectType || 'NONE',
+      effectLimit: product.effectLimit ?? '',
+      effectValue: product.effectValue ? String(product.effectValue) : '',
     });
     setProductModal(true);
   };
@@ -203,12 +221,19 @@ export default function StoresTab() {
       if (limit != null && (!Number.isFinite(limit) || limit < 1)) {
         throw new Error('Лимит должен быть положительным числом');
       }
+      const effectValue = productForm.effectValue.trim() ? Number(productForm.effectValue) : 0;
+      if (productForm.effectType !== 'NONE' && (!Number.isFinite(effectValue) || effectValue <= 0)) {
+        throw new Error('Укажите величину эффекта больше нуля');
+      }
       const body = {
         name: productForm.name.trim(),
         description: productForm.description.trim() || null,
         price,
         limitPerChild: limit,
         active: productForm.active,
+        effectType: productForm.effectType || 'NONE',
+        effectLimit: productForm.effectType !== 'NONE' ? productForm.effectLimit : null,
+        effectValue: productForm.effectType !== 'NONE' ? effectValue : 0,
       };
       if (editingProduct) {
         await api.put(`/parent/products/${editingProduct.id}`, body);
@@ -325,12 +350,28 @@ export default function StoresTab() {
                         <Sparkles size={14} /> Задачи и статистика
                       </button>
                     )}
+                    {store.templateType === 'MATH' && (
+                      <button
+                        className="btn-secondary !px-3 !py-1.5 text-xs"
+                        onClick={() => setManagerFor({ store, type: 'cards', skill: 'MATH' })}
+                      >
+                        🎴 Карточки с заданиями
+                      </button>
+                    )}
                     {store.templateType === 'HOME' && (
                       <button
                         className="btn-secondary !px-3 !py-1.5 text-xs"
                         onClick={() => setManagerFor({ store, type: 'house' })}
                       >
                         <CalendarDays size={14} /> Календарь домашних дел
+                      </button>
+                    )}
+                    {store.templateType === 'HOME' && (
+                      <button
+                        className="btn-secondary !px-3 !py-1.5 text-xs"
+                        onClick={() => setManagerFor({ store, type: 'cards', skill: 'HOUSE' })}
+                      >
+                        🏠 Помощь по дому
                       </button>
                     )}
                   </div>
@@ -535,6 +576,59 @@ export default function StoresTab() {
               />
               Активен (виден детям)
             </label>
+
+            {/* Эффект товара: увеличение лимита */}
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div className="mb-2 text-sm font-bold text-slate-600">Эффект товара (увеличение лимита)</div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div>
+                  <label className="label">Тип</label>
+                  <select
+                    className="input"
+                    value={productForm.effectType}
+                    onChange={(e) => setProductForm({ ...productForm, effectType: e.target.value })}
+                  >
+                    <option value="NONE">Нет эффекта</option>
+                    <option value="LIMIT_ONCE">Одноразовое (на сегодня)</option>
+                    <option value="LIMIT_PERMANENT">Постоянное (навсегда)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Лимит</label>
+                  <select
+                    className="input"
+                    value={productForm.effectLimit}
+                    disabled={productForm.effectType === 'NONE'}
+                    onChange={(e) => setProductForm({ ...productForm, effectLimit: e.target.value })}
+                  >
+                    <option value="">— выберите —</option>
+                    <option value="TV">Телевизор</option>
+                    <option value="PC">Компьютер</option>
+                    <option value="CONSOLE">Игровая приставка</option>
+                    <option value="PHONE">Телефон</option>
+                    <option value="TABLET">Планшет</option>
+                    <option value="POCKET">Карманные деньги</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Величина (мин или ₽)</label>
+                  <input
+                    className="input"
+                    type="number"
+                    min="1"
+                    value={productForm.effectValue}
+                    disabled={productForm.effectType === 'NONE'}
+                    onChange={(e) => setProductForm({ ...productForm, effectValue: e.target.value })}
+                    placeholder="например, 30"
+                  />
+                </div>
+              </div>
+              <p className="mt-2 text-xs text-slate-400">
+                Одноразовое — пополняет остаток на сегодня (можно больше лимита), постоянное — увеличивает
+                базовый лимит на будущие дни/недели.
+              </p>
+            </div>
+
             <div className="flex justify-end gap-2 pt-2">
               <button className="btn-secondary" onClick={() => setProductModal(false)}>
                 Отмена
@@ -591,6 +685,9 @@ export default function StoresTab() {
       )}
       {managerFor?.type === 'house' && (
         <HouseCalendar store={managerFor.store} onClose={() => setManagerFor(null)} />
+      )}
+      {managerFor?.type === 'cards' && managerFor.skill && (
+        <TaskCardsManager store={managerFor.store} skill={managerFor.skill} onClose={() => setManagerFor(null)} />
       )}
     </div>
   );

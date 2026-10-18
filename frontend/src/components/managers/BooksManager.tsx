@@ -6,6 +6,7 @@ import {
   ReadingBookDto,
   ReadingLogDto,
   ReadingRequestDto,
+  ReadingSettingsDto,
   ReadingStatsDto,
   StoreDto,
 } from '../../api/types';
@@ -36,6 +37,7 @@ export default function BooksManager({ store, onClose }: Props) {
   const [childId, setChildId] = useState('');
   const [stats, setStats] = useState<ReadingStatsDto | null>(null);
   const [requests, setRequests] = useState<ReadingRequestDto[]>([]);
+  const [readingSettings, setReadingSettings] = useState<ReadingSettingsDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -76,6 +78,32 @@ export default function BooksManager({ store, onClose }: Props) {
     }
   }, []);
 
+  const loadReadingSettings = useCallback(async (id: string) => {
+    if (!id) return;
+    try {
+      setReadingSettings(await api.get<ReadingSettingsDto>(`/parent/children/${id}/reading-settings`));
+    } catch {
+      setReadingSettings(null);
+    }
+  }, []);
+
+  const saveReadingSettings = async () => {
+    if (!childId || !readingSettings) return;
+    setBusy(true);
+    try {
+      await api.put(`/parent/children/${childId}/reading-settings`, {
+        pagesTarget: readingSettings.pagesTarget,
+        rewardAmount: readingSettings.rewardAmount,
+        xpReward: readingSettings.xpReward,
+      });
+      alert('Настройки дейлика чтения сохранены');
+    } catch (e) {
+      alert(errMsg(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const loadRequests = useCallback(async (id: string) => {
     if (!id) return;
     try {
@@ -98,7 +126,8 @@ export default function BooksManager({ store, onClose }: Props) {
     void loadBooks(childId);
     void loadStats(childId);
     void loadRequests(childId);
-  }, [childId, loadBooks, loadStats, loadRequests]);
+    void loadReadingSettings(childId);
+  }, [childId, loadBooks, loadStats, loadRequests, loadReadingSettings]);
 
   const openCreate = () => {
     setEditing(null);
@@ -292,6 +321,57 @@ export default function BooksManager({ store, onClose }: Props) {
             </div>
           )}
         </div>
+
+        {/* Дейлик чтения: настройки */}
+        {readingSettings && (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="mb-2 text-sm font-bold text-slate-600">Дейлик чтения (страницы в день)</div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div>
+                <label className="label">Страниц в день</label>
+                <input
+                  type="number"
+                  min={1}
+                  className="input"
+                  value={readingSettings.pagesTarget}
+                  onChange={(e) =>
+                    setReadingSettings({ ...readingSettings, pagesTarget: Math.max(1, Number(e.target.value) || 1) })
+                  }
+                />
+              </div>
+              <div>
+                <label className="label">Награда ({store.currencyIcon})</label>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  className="input"
+                  value={readingSettings.rewardAmount}
+                  onChange={(e) =>
+                    setReadingSettings({ ...readingSettings, rewardAmount: Math.max(0, Number(e.target.value) || 0) })
+                  }
+                />
+              </div>
+              <div>
+                <label className="label">Опыт (XP)</label>
+                <input
+                  type="number"
+                  min={0}
+                  className="input"
+                  value={readingSettings.xpReward}
+                  onChange={(e) =>
+                    setReadingSettings({ ...readingSettings, xpReward: Math.max(0, Number(e.target.value) || 0) })
+                  }
+                />
+              </div>
+            </div>
+            <div className="mt-2 flex justify-end">
+              <button className="btn-primary !px-3 !py-1.5 text-xs" disabled={busy} onClick={() => void saveReadingSettings()}>
+                Сохранить настройки
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Заявки ребёнка */}
         {requests.filter((r) => r.status === 'PENDING').length > 0 && (

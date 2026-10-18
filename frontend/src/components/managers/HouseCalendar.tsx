@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, Clock3, Sparkles } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, ChevronRight, Clock3, Sparkles, XCircle } from 'lucide-react';
 import { api } from '../../api/client';
-import { ChildDto, HouseDayDto, HouseMonthResponse, StoreDto } from '../../api/types';
+import { ChildDto, HouseCheckRequestDto, HouseDayDto, HouseMonthResponse, StoreDto } from '../../api/types';
 import { errMsg, fmtAmount } from '../../lib/format';
 import Modal from '../Modal';
 import { Spinner } from '../ui';
@@ -28,6 +28,7 @@ export default function HouseCalendar({ store, onClose }: Props) {
   const [childId, setChildId] = useState('');
   const [cursor, setCursor] = useState(() => new Date());
   const [data, setData] = useState<HouseMonthResponse | null>(null);
+  const [checkRequests, setCheckRequests] = useState<HouseCheckRequestDto[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [editDay, setEditDay] = useState<string | null>(null);
@@ -60,13 +61,46 @@ export default function HouseCalendar({ store, onClose }: Props) {
     }
   }, [childId, cursor, store.id]);
 
+  const loadCheckRequests = useCallback(async () => {
+    try {
+      setCheckRequests(await api.get<HouseCheckRequestDto[]>('/parent/house-check-requests'));
+    } catch {
+      setCheckRequests([]);
+    }
+  }, []);
+
   useEffect(() => {
     void loadChildren();
-  }, [loadChildren]);
+    void loadCheckRequests();
+  }, [loadChildren, loadCheckRequests]);
 
   useEffect(() => {
     void loadMonth();
   }, [loadMonth]);
+
+  const approveCheck = async (id: number) => {
+    setBusy(true);
+    try {
+      await api.post(`/parent/house-check-requests/${id}/approve`);
+      await Promise.all([loadCheckRequests(), loadMonth()]);
+    } catch (e) {
+      alert(errMsg(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const rejectCheck = async (id: number) => {
+    setBusy(true);
+    try {
+      await api.post(`/parent/house-check-requests/${id}/reject`);
+      await loadCheckRequests();
+    } catch (e) {
+      alert(errMsg(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const dayMap = new Map<string, HouseDayDto>();
   data?.days.forEach((d) => dayMap.set(d.day, d));
@@ -150,6 +184,34 @@ export default function HouseCalendar({ store, onClose }: Props) {
             </button>
           </div>
         </div>
+
+        {/* Запросы проверки комнаты */}
+        {checkRequests.filter((r) => r.status === 'PENDING').length > 0 && (
+          <div>
+            <h3 className="mb-2 text-sm font-bold text-slate-600">Запросы на проверку комнаты</h3>
+            <div className="space-y-2">
+              {checkRequests
+                .filter((r) => r.status === 'PENDING')
+                .map((r) => (
+                  <div key={r.id} className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+                    <span className="text-xl">{r.childAvatar}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold">{r.childName}</div>
+                      <div className="text-xs text-slate-500">
+                        просит проверить комнату · {new Date(r.day).toLocaleDateString('ru-RU')}
+                      </div>
+                    </div>
+                    <button className="btn-primary !px-3 !py-1.5 text-xs" disabled={busy} onClick={() => void approveCheck(r.id)}>
+                      <CheckCircle2 size={14} /> Комната убрана
+                    </button>
+                    <button className="btn-secondary !px-3 !py-1.5 text-xs" disabled={busy} onClick={() => void rejectCheck(r.id)}>
+                      <XCircle size={14} /> Отклонить
+                    </button>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
 
         {data && (
           <div className="flex flex-wrap gap-2 text-sm">

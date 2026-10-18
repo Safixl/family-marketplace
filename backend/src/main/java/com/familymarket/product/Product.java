@@ -45,6 +45,18 @@ public class Product {
     @Column(nullable = false)
     private boolean active;
 
+    /** Эффект товара: NONE / LIMIT_ONCE (на сегодня) / LIMIT_PERMANENT (навсегда). */
+    @Column(name = "effect_type", nullable = false, length = 20)
+    private String effectType = "NONE";
+
+    /** Лимит, на который действует эффект: TV / PC / CONSOLE / PHONE / TABLET / POCKET. */
+    @Column(name = "effect_limit", length = 20)
+    private String effectLimit;
+
+    /** Величина эффекта: минуты (для времени) или рубли (для POCKET). */
+    @Column(name = "effect_value", nullable = false)
+    private int effectValue;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 }

@@ -51,6 +51,11 @@ public class AchievementController {
         achievementService.delete(CurrentUser.parentId(), id);
     }
 
+    @PostMapping("/{id}/add-level")
+    public AchievementDto addLevel(@PathVariable Long id) {
+        return AchievementDto.from(achievementService.addLevel(CurrentUser.parentId(), id));
+    }
+
     @PostMapping("/grant")
     public GrantResult grant(@Valid @RequestBody GrantAchievementRequest request) {
         return achievementService.grant(CurrentUser.parentId(), request);

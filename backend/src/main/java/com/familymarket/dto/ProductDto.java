@@ -5,7 +5,8 @@ import com.familymarket.product.Product;
 import java.math.BigDecimal;
 
 public record ProductDto(Long id, Long storeId, String name, String description, BigDecimal price,
-                         Integer limitPerChild, boolean active) {
+                         Integer limitPerChild, boolean active,
+                         String effectType, String effectLimit, Integer effectValue) {
 
     public static ProductDto from(Product product) {
         return new ProductDto(
@@ -15,6 +16,9 @@ public record ProductDto(Long id, Long storeId, String name, String description,
                 product.getDescription(),
                 product.getPrice(),
                 product.getLimitPerChild(),
-                product.isActive());
+                product.isActive(),
+                product.getEffectType(),
+                product.getEffectLimit(),
+                product.getEffectValue());
     }
 }

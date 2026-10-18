@@ -70,6 +70,11 @@ public class QuestController {
         return questService.listActiveForChild(CurrentUser.childId());
     }
 
+    @PostMapping("/api/child/quests/{id}/accept")
+    public void accept(@PathVariable Long id) {
+        questService.accept(CurrentUser.childId(), id);
+    }
+
     @PostMapping("/api/child/quests/{id}/submit")
     public QuestSubmissionDto submit(@PathVariable Long id, @RequestBody QuestSubmitRequest request) {
         return questService.submit(CurrentUser.childId(), id, request);

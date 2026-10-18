@@ -145,6 +145,8 @@ function DailySkillCard({ skill, answers, busy, onAnswerChange, onSubmitAnswer, 
   const isMath = skill.skill === 'MATH';
   const isLang = skill.skill === 'LANG';
   const isSport = skill.skill === 'SPORT';
+  const isReading = skill.skill === 'READING';
+  const isHouse = skill.skill === 'HOUSE';
 
   const [minutes, setMinutes] = useState(0);
   const [steps, setSteps] = useState(0);
@@ -225,6 +227,48 @@ function DailySkillCard({ skill, answers, busy, onAnswerChange, onSubmitAnswer, 
           <div className="mt-2 text-sm text-stone-400">
             Выучено {learnedCount} из {skill.words.length}. Нажми на карточку, чтобы отметить слово.
           </div>
+        </div>
+      )}
+
+      {/* Чтение: страницы за день */}
+      {isReading && (
+        <div className="mt-3">
+          <div className="mb-1 flex items-center justify-between text-sm">
+            <span className="text-stone-300">Прочитано страниц</span>
+            <span className="font-bold text-amber-300">
+              {skill.pointsEarned} из {skill.pointsTarget}
+            </span>
+          </div>
+          <div className="rpg-progress-track h-3">
+            <div
+              className="rpg-progress-fill"
+              style={{ width: `${skill.pointsTarget > 0 ? Math.min(100, (skill.pointsEarned / skill.pointsTarget) * 100) : 0}%` }}
+            />
+          </div>
+          <p className="mt-2 text-sm text-stone-400">
+            Отмечай текущую страницу в навыке «Чтение» — разница между отметками засчитывается в дейлик.
+          </p>
+        </div>
+      )}
+
+      {/* Дом: проверенная комната / помощь */}
+      {isHouse && (
+        <div className="mt-3">
+          <div className="mb-1 flex items-center justify-between text-sm">
+            <span className="text-stone-300">Комната проверена / помощь</span>
+            <span className="font-bold text-amber-300">
+              {skill.pointsEarned} из {skill.pointsTarget}
+            </span>
+          </div>
+          <div className="rpg-progress-track h-3">
+            <div
+              className="rpg-progress-fill"
+              style={{ width: `${skill.pointsTarget > 0 ? Math.min(100, (skill.pointsEarned / skill.pointsTarget) * 100) : 0}%` }}
+            />
+          </div>
+          <p className="mt-2 text-sm text-stone-400">
+            Попроси родителя проверить комнату на главной или выполни «Помощь по дому» в навыке.
+          </p>
         </div>
       )}
 
