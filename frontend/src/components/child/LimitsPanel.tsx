@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { HandCoins, Pause, Play } from 'lucide-react';
+import { HandCoins, Pause, Play, Snowflake } from 'lucide-react';
 import { api } from '../../api/client';
 import { LimitStateDto, LimitTypeState } from '../../api/types';
 import { errMsg } from '../../lib/format';
@@ -108,22 +108,32 @@ export default function LimitsPanel() {
             <span className="w-6 text-center text-lg">{meta.emoji}</span>
             <div className="min-w-0 flex-1">
               <div className="mb-0.5 flex items-center justify-between text-xs">
-                <span className="font-semibold text-amber-100">{meta.label}</span>
+                <span className={`font-semibold ${l.frozen ? 'text-sky-300' : 'text-amber-100'}`}>
+                  {meta.label}
+                  {l.frozen && <span className="ml-1 text-sky-300">❄️ заморожен</span>}
+                </span>
                 <span className="text-amber-200/70">{fmtDuration(l.remainingSeconds)}</span>
               </div>
               <div className="rpg-progress-track h-2.5">
-                <div className="rpg-progress-fill" style={{ width: `${percent(l)}%` }} />
+                <div
+                  className={l.frozen ? 'rpg-progress-fill !bg-gradient-to-r !from-sky-400 !to-cyan-300' : 'rpg-progress-fill'}
+                  style={{ width: `${percent(l)}%` }}
+                />
               </div>
             </div>
             <button
               className={`rounded-lg p-1.5 transition ${
-                l.running ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'
+                l.frozen
+                  ? 'cursor-not-allowed bg-sky-500/20 text-sky-300'
+                  : l.running
+                    ? 'bg-rose-500/20 text-rose-300'
+                    : 'bg-emerald-500/20 text-emerald-300'
               }`}
-              disabled={busy}
+              disabled={busy || l.frozen}
               onClick={() => void toggle(l)}
-              title={l.running ? 'Пауза' : 'Включить счётчик'}
+              title={l.frozen ? 'Лимит заморожен родителем' : l.running ? 'Пауза' : 'Включить счётчик'}
             >
-              {l.running ? <Pause size={14} /> : <Play size={14} />}
+              {l.frozen ? <Snowflake size={14} /> : l.running ? <Pause size={14} /> : <Play size={14} />}
             </button>
           </div>
         );

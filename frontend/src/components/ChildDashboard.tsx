@@ -14,7 +14,6 @@ import {
   ChildAchievementGroupDto,
   ChildProductDto,
   ChildProfileResponse,
-  ChildPurchaseDto,
   ChildSettingsDto,
   InventoryStackDto,
   LevelDto,
@@ -66,7 +65,6 @@ export default function ChildDashboard() {
   const [profile, setProfile] = useState<ChildProfileResponse | null>(null);
   const [stores, setStores] = useState<StoreDto[]>([]);
   const [products, setProducts] = useState<ChildProductDto[]>([]);
-  const [orders, setOrders] = useState<ChildPurchaseDto[]>([]);
   const [inventory, setInventory] = useState<InventoryStackDto[]>([]);
   const [achievements, setAchievements] = useState<ChildAchievementGroupDto[]>([]);
   const [skills, setSkills] = useState<SkillProgressDto[]>([]);
@@ -77,14 +75,6 @@ export default function ChildDashboard() {
       setProfile(await api.get<ChildProfileResponse>('/child/profile'));
     } catch {
       // профиль обновится позже
-    }
-  }, []);
-
-  const loadOrders = useCallback(async () => {
-    try {
-      setOrders(await api.get<ChildPurchaseDto[]>('/child/purchases'));
-    } catch {
-      // заказы обновятся позже
     }
   }, []);
 
@@ -133,12 +123,11 @@ export default function ChildDashboard() {
 
   useEffect(() => {
     void loadProfile();
-    void loadOrders();
     void loadInventory();
     void loadAchievements();
     void loadSkills();
     void loadSettings();
-  }, [loadProfile, loadOrders, loadInventory, loadAchievements, loadSkills, loadSettings]);
+  }, [loadProfile, loadInventory, loadAchievements, loadSkills, loadSettings]);
 
   useEffect(() => {
     (async () => {
@@ -158,7 +147,6 @@ export default function ChildDashboard() {
   }, [settings.theme]);
 
   const afterPurchase = () => {
-    void loadOrders();
     void loadProfile();
     void loadSkills();
     void loadInventory();
@@ -332,12 +320,9 @@ export default function ChildDashboard() {
       <main className="mx-auto max-w-5xl px-4 pb-12 sm:px-6">
         {tab === 'home' && (
           <ChildHomeTab
-            profile={profile}
             achievements={achievements}
-            orders={orders}
             skills={skills}
             level={level}
-            widgets={settings.homeWidgets}
             homeStoreId={stores.find((s) => s.templateType === 'HOME')?.id ?? null}
             onNavigate={navigate}
             onOpenSkill={openSkill}

@@ -98,8 +98,8 @@ export default function ChildShopsTab({ stores, products, profile, loading, onPu
 
   return (
     <div className="flex flex-col gap-4 lg:flex-row">
-      {/* Вкладки-фильтры слева */}
-      <aside className="shrink-0 lg:w-56">
+      {/* Вкладки-фильтры слева + корзина под ними */}
+      <aside className="shrink-0 lg:w-64">
         <div className="rpg-panel rpg-panel-gold flex gap-1.5 overflow-x-auto p-2 lg:flex-col">
           <button
             onClick={() => setActiveStoreId(null)}
@@ -117,6 +117,43 @@ export default function ChildShopsTab({ stores, products, profile, loading, onPu
             </button>
           ))}
         </div>
+
+        {/* Корзина */}
+        {cartLines.length > 0 && (
+          <div className="rpg-panel rpg-panel-gold mt-3 space-y-3 p-4">
+            <h3 className="flex items-center gap-2 text-base font-bold text-amber-200">
+              <ShoppingCart size={18} className="text-amber-400" /> Корзина
+            </h3>
+            <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+              {cartLines.map((line) => (
+                <div key={line.product.id} className="flex items-center gap-2 rounded-xl bg-stone-900/60 px-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-semibold text-amber-100">
+                      {line.product.name} ×{line.qty}
+                    </div>
+                    <div className="text-xs text-stone-400">
+                      {line.product.currencyIcon} {fmtAmount(line.product.price * line.qty, line.product.currencyName)}
+                    </div>
+                  </div>
+                  <button
+                    className="rounded-lg p-1 text-stone-400 hover:bg-rose-500/20 hover:text-rose-300"
+                    onClick={() => removeFromCart(line.product.id)}
+                    title="Убрать"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center justify-between border-t border-amber-500/20 pt-2 text-sm">
+              <span className="text-stone-300">Итого</span>
+              <span className="font-extrabold text-amber-300">{fmtAmount(cartTotal)}</span>
+            </div>
+            <button className="rpg-btn w-full" onClick={() => setConfirmOpen(true)}>
+              <ShoppingCart size={15} /> Оплатить
+            </button>
+          </div>
+        )}
       </aside>
 
       {/* Товары справа */}
@@ -171,45 +208,6 @@ export default function ChildShopsTab({ stores, products, profile, loading, onPu
           </div>
         )}
       </div>
-
-      {/* Корзина */}
-      {cartLines.length > 0 && (
-        <aside className="shrink-0 lg:w-72">
-          <div className="rpg-panel rpg-panel-gold sticky top-20 space-y-3 p-4">
-            <h3 className="flex items-center gap-2 text-base font-bold text-amber-200">
-              <ShoppingCart size={18} className="text-amber-400" /> Корзина
-            </h3>
-            <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
-              {cartLines.map((line) => (
-                <div key={line.product.id} className="flex items-center gap-2 rounded-xl bg-stone-900/60 px-3 py-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-semibold text-amber-100">
-                      {line.product.name} ×{line.qty}
-                    </div>
-                    <div className="text-xs text-stone-400">
-                      {line.product.currencyIcon} {fmtAmount(line.product.price * line.qty, line.product.currencyName)}
-                    </div>
-                  </div>
-                  <button
-                    className="rounded-lg p-1 text-stone-400 hover:bg-rose-500/20 hover:text-rose-300"
-                    onClick={() => removeFromCart(line.product.id)}
-                    title="Убрать"
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-              ))}
-            </div>
-            <div className="flex items-center justify-between border-t border-amber-500/20 pt-2 text-sm">
-              <span className="text-stone-300">Итого</span>
-              <span className="font-extrabold text-amber-300">{fmtAmount(cartTotal)}</span>
-            </div>
-            <button className="rpg-btn w-full" onClick={() => setConfirmOpen(true)}>
-              <ShoppingCart size={15} /> Оплатить
-            </button>
-          </div>
-        </aside>
-      )}
 
       {/* Подтверждение оплаты */}
       {confirmOpen && (

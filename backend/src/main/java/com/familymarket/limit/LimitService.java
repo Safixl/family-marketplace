@@ -6,6 +6,7 @@ import com.familymarket.common.BadRequestException;
 import com.familymarket.common.NotFoundException;
 import com.familymarket.dto.ChildLimitsDto;
 import com.familymarket.dto.ChildLimitsUpdateRequest;
+import com.familymarket.dto.LimitEventDto;
 import com.familymarket.dto.LimitStateDto;
 import com.familymarket.dto.LimitTypeState;
 import com.familymarket.dto.PocketRequestCreateRequest;
@@ -34,6 +35,8 @@ public class LimitService {
 
     private final ChildLimitRepository childLimitRepository;
     private final LimitUsageRepository limitUsageRepository;
+    private final LimitFreezeRepository limitFreezeRepository;
+    private final LimitEventRepository limitEventRepository;
     private final PocketRequestRepository pocketRequestRepository;
     private final PocketDisbursementRepository pocketDisbursementRepository;
     private final PocketExtensionRepository pocketExtensionRepository;
@@ -41,12 +44,16 @@ public class LimitService {
 
     public LimitService(ChildLimitRepository childLimitRepository,
                         LimitUsageRepository limitUsageRepository,
+                        LimitFreezeRepository limitFreezeRepository,
+                        LimitEventRepository limitEventRepository,
                         PocketRequestRepository pocketRequestRepository,
                         PocketDisbursementRepository pocketDisbursementRepository,
                         PocketExtensionRepository pocketExtensionRepository,
                         ChildRepository childRepository) {
         this.childLimitRepository = childLimitRepository;
         this.limitUsageRepository = limitUsageRepository;
+        this.limitFreezeRepository = limitFreezeRepository;
+        this.limitEventRepository = limitEventRepository;
         this.pocketRequestRepository = pocketRequestRepository;
         this.pocketDisbursementRepository = pocketDisbursementRepository;
         this.pocketExtensionRepository = pocketExtensionRepository;
@@ -158,7 +165,10 @@ public class LimitService {
                 used += (int) Math.max(0, Duration.between(usage.getStartedAt(), now).getSeconds());
             }
             int remaining = Math.max(0, baseMinutes(cl, type) * 60 + usage.getExtendedSeconds() - used);
-            limits.add(new LimitTypeState(type, baseMinutes(cl, type), used, usage.getExtendedSeconds(), remaining, usage.isRunning()));
+            boolean frozen = limitFreezeRepository.findByChildIdAndLimitType(childId, type)
+                    .map(LimitFreeze::isFrozen).orElse(false);
+            limits.add(new LimitTypeState(type, baseMinutes(cl, type), used, usage.getExtendedSeconds(),
+                    remaining, usage.isRunning(), frozen));
         }
         LocalDate weekStart = weekStart(now);
         BigDecimal spent = pocketDisbursementRepository.findByChildIdAndWeekStart(childId, weekStart)
@@ -173,11 +183,16 @@ public class LimitService {
     @Transactional
     public void startTimer(Long childId, String type) {
         String t = normalizeType(type);
+        if (limitFreezeRepository.findByChildIdAndLimitType(childId, t)
+                .map(LimitFreeze::isFrozen).orElse(false)) {
+            throw new BadRequestException("Лимит заморожен родителем");
+        }
         LimitUsage usage = usageFor(childId, t, limitDay(Instant.now()));
         if (!usage.isRunning()) {
             usage.setRunning(true);
             usage.setStartedAt(Instant.now());
             limitUsageRepository.save(usage);
+            recordEvent(childId, t, "START", 0);
         }
     }
 
@@ -186,12 +201,74 @@ public class LimitService {
         String t = normalizeType(type);
         LimitUsage usage = usageFor(childId, t, limitDay(Instant.now()));
         if (usage.isRunning() && usage.getStartedAt() != null) {
-            usage.setUsedSeconds(usage.getUsedSeconds()
-                    + (int) Math.max(0, Duration.between(usage.getStartedAt(), Instant.now()).getSeconds()));
+            int seconds = (int) Math.max(0, Duration.between(usage.getStartedAt(), Instant.now()).getSeconds());
+            usage.setUsedSeconds(usage.getUsedSeconds() + seconds);
             usage.setRunning(false);
             usage.setStartedAt(null);
             limitUsageRepository.save(usage);
+            recordEvent(childId, t, "STOP", seconds);
         }
+    }
+
+    private void recordEvent(Long childId, String type, String action, int seconds) {
+        LimitEvent event = new LimitEvent();
+        event.setChild(childRepository.getReferenceById(childId));
+        event.setLimitType(type);
+        event.setAction(action);
+        event.setSeconds(seconds);
+        event.setCreatedAt(Instant.now());
+        limitEventRepository.save(event);
+    }
+
+    // ---------- Родитель: заморозка, трекер, выдача карманных ----------
+
+    @Transactional
+    public void setFrozen(Long parentId, Long childId, String type, boolean frozen) {
+        childRepository.findByIdAndParentId(childId, parentId)
+                .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
+        String t = normalizeType(type);
+        LimitFreeze freeze = limitFreezeRepository.findByChildIdAndLimitType(childId, t)
+                .orElseGet(() -> {
+                    LimitFreeze f = new LimitFreeze();
+                    f.setChild(childRepository.getReferenceById(childId));
+                    f.setLimitType(t);
+                    return f;
+                });
+        freeze.setFrozen(frozen);
+        freeze.setUpdatedAt(Instant.now());
+        limitFreezeRepository.save(freeze);
+    }
+
+    @Transactional(readOnly = true)
+    public List<LimitEventDto> listEvents(Long parentId, Long childId) {
+        childRepository.findByIdAndParentId(childId, parentId)
+                .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
+        return limitEventRepository.findByChildIdOrderByCreatedAtDesc(childId)
+                .stream().map(LimitEventDto::from).toList();
+    }
+
+    /** «Выдано»: родитель выдал карманные деньги — остаток недели обнуляется. */
+    @Transactional
+    public PocketState payOutPocket(Long parentId, Long childId) {
+        childRepository.findByIdAndParentId(childId, parentId)
+                .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
+        ChildLimit cl = childLimitRepository.findById(childId).orElseGet(ChildLimit::new);
+        Instant now = Instant.now();
+        LocalDate weekStart = weekStart(now);
+        BigDecimal spent = pocketDisbursementRepository.findByChildIdAndWeekStart(childId, weekStart)
+                .stream().map(PocketDisbursement::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal extended = pocketExtensionRepository.findByChildIdAndWeekStart(childId, weekStart)
+                .map(PocketExtension::getAmount).orElse(BigDecimal.ZERO);
+        BigDecimal available = BigDecimal.valueOf(cl.getPocketWeekly()).add(extended).subtract(spent);
+        if (available.signum() > 0) {
+            PocketDisbursement disbursement = new PocketDisbursement();
+            disbursement.setChild(childRepository.getReferenceById(childId));
+            disbursement.setAmount(available);
+            disbursement.setWeekStart(weekStart);
+            disbursement.setCreatedAt(now);
+            pocketDisbursementRepository.save(disbursement);
+        }
+        return new PocketState(cl.getPocketWeekly(), spent.add(available), BigDecimal.ZERO);
     }
 
     // ---------- Эффекты товаров ----------

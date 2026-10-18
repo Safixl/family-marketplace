@@ -101,6 +101,16 @@ CREATE TABLE IF NOT EXISTS child_achievements (
     CONSTRAINT uq_child_achievements UNIQUE (child_id, achievement_id)
 );
 
+-- Достижения, которые ребёнок отслеживает (появляются на главной)
+CREATE TABLE IF NOT EXISTS child_tracked_achievements (
+    id             BIGSERIAL PRIMARY KEY,
+    child_id       BIGINT      NOT NULL REFERENCES children (id) ON DELETE CASCADE,
+    achievement_id BIGINT      NOT NULL REFERENCES achievements (id) ON DELETE CASCADE,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_child_tracked UNIQUE (child_id, achievement_id)
+);
+CREATE INDEX IF NOT EXISTS idx_child_tracked_child ON child_tracked_achievements (child_id);
+
 CREATE TABLE IF NOT EXISTS purchases (
     id           BIGSERIAL PRIMARY KEY,
     child_id     BIGINT        NOT NULL REFERENCES children (id) ON DELETE CASCADE,
@@ -391,6 +401,29 @@ CREATE TABLE IF NOT EXISTS limit_usage (
     CONSTRAINT uq_limit_usage UNIQUE (child_id, limit_type, day)
 );
 CREATE INDEX IF NOT EXISTS idx_limit_usage_child ON limit_usage (child_id);
+
+-- Заморозка лимита родителем: ребёнок не может запустить счётчик (кнопка «обледенела»)
+CREATE TABLE IF NOT EXISTS limit_freeze (
+    id         BIGSERIAL   PRIMARY KEY,
+    child_id   BIGINT      NOT NULL REFERENCES children (id) ON DELETE CASCADE,
+    limit_type VARCHAR(20) NOT NULL,
+    frozen     BOOLEAN     NOT NULL DEFAULT FALSE,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_limit_freeze UNIQUE (child_id, limit_type)
+);
+-- для уже созданной таблицы без id (миграция)
+ALTER TABLE limit_freeze ADD COLUMN IF NOT EXISTS id BIGSERIAL;
+
+-- Трекер тарификации: журнал запусков/остановок счётчиков для контроля родителя
+CREATE TABLE IF NOT EXISTS limit_events (
+    id         BIGSERIAL PRIMARY KEY,
+    child_id   BIGINT      NOT NULL REFERENCES children (id) ON DELETE CASCADE,
+    limit_type VARCHAR(20) NOT NULL,
+    action     VARCHAR(20) NOT NULL,   -- START / STOP
+    seconds    INT         NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_limit_events_child ON limit_events (child_id);
 
 -- Эффекты товаров: увеличение лимита (одноразовое на день / постоянное)
 ALTER TABLE products ADD COLUMN IF NOT EXISTS effect_type VARCHAR(20) NOT NULL DEFAULT 'NONE';

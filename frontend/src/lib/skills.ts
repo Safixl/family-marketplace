@@ -23,6 +23,8 @@ export interface SkillArchiveRow {
   genre?: string;
   series?: string;
   pages?: number;
+  /** Текущая страница (для «Читаю сейчас») */
+  currentPage?: number;
   points: number;
   status: 'DONE' | 'IN_PROGRESS' | 'PENDING';
   date?: string;
@@ -90,6 +92,7 @@ function readingToArchive(books: ChildBookDto[]): SkillArchiveRow[] {
     genre: b.genre ?? undefined,
     series: b.series ?? undefined,
     pages: b.pages,
+    currentPage: b.currentPage ?? undefined,
     points: Math.round(b.pages * b.multiplier),
     status: b.status === 'APPROVED' ? 'DONE' : b.status === 'PENDING' ? 'PENDING' : 'IN_PROGRESS',
   }));

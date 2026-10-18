@@ -1,19 +1,5 @@
-import { CalendarDays, Coins, Package, ShoppingBag, Sparkles, Swords, Trophy } from 'lucide-react';
-import {
-  ChildAchievementGroupDto,
-  ChildProfileResponse,
-  ChildPurchaseDto,
-  SkillId,
-  SkillProgressDto,
-} from '../../api/types';
-import { fmtAmount, fmtDate } from '../../lib/format';
-import { rankTier, tierForLevel } from '../../lib/achievementTiers';
-import { RANKS, RpgLevel } from '../../lib/rpg';
-import { EmptyState, StatCard } from '../ui';
-import ChildHouseView from './ChildHouseView';
-import LevelBar from './rpg/LevelBar';
-import SkillHexagon from './rpg/SkillHexagon';
-import LimitsPanel from './LimitsPanel';
+import { useCallback, useEffect, useState } from 'react';
+import { BookOpen, CalendarDays, CheckCircle2, Sparkles, Swords, Trophy } from 'lucide-react';
 
 export type HomeWidgetId = 'balances' | 'stats' | 'achievements' | 'orders';
 
@@ -23,43 +9,113 @@ export const HOME_WIDGETS: Array<{ id: HomeWidgetId; label: string; emoji: strin
   { id: 'achievements', label: 'Достижения', emoji: '🏆' },
   { id: 'orders', label: 'Последние заказы', emoji: '📦' },
 ];
+import {
+  ChildAchievementGroupDto,
+  ChildBookDto,
+  ChildReadingResponse,
+  SkillId,
+  SkillProgressDto,
+} from '../../api/types';
+import { api } from '../../api/client';
+import { errMsg } from '../../lib/format';
+import { rankTier, tierForLevel } from '../../lib/achievementTiers';
+import { RANKS, RpgLevel } from '../../lib/rpg';
+import { EmptyState } from '../ui';
+import ChildHouseView from './ChildHouseView';
+import LevelBar from './rpg/LevelBar';
+import SkillHexagon from './rpg/SkillHexagon';
+import LimitsPanel from './LimitsPanel';
 
 interface Props {
-  profile: ChildProfileResponse | null;
   achievements: ChildAchievementGroupDto[];
-  orders: ChildPurchaseDto[];
   skills: SkillProgressDto[];
   level: RpgLevel;
-  widgets: string[];
   homeStoreId: number | null;
   onNavigate: (tab: string) => void;
   onOpenSkill: (skill: SkillId) => void;
 }
 
 export default function ChildHomeTab({
-  profile,
   achievements,
-  orders,
   skills,
   level,
-  widgets,
   homeStoreId,
   onNavigate,
   onOpenSkill,
 }: Props) {
-  const show = (id: HomeWidgetId) => widgets.includes(id);
-
   const currentRank = RANKS.filter((r) => r.min <= level.level).pop() ?? RANKS[0];
 
-  const unlockedCount = achievements.filter((a) => a.unlocked).length;
-  const nextAchievements = achievements
-    .filter((a) => !a.unlocked && a.targetType && a.targetType !== 'NONE')
-    .sort((a, b) => {
-      const pa = a.targetValue > 0 ? a.progress / a.targetValue : 1;
-      const pb = b.targetValue > 0 ? b.progress / b.targetValue : 1;
-      return pb - pa;
-    })
-    .slice(0, 3);
+  // Книги «Читаю сейчас»
+  const [reading, setReading] = useState<ChildReadingResponse | null>(null);
+  const [pageInput, setPageInput] = useState<Record<number, string>>({});
+  const [busy, setBusy] = useState(false);
+
+  // Отслеживаемые достижения
+  const [trackedIds, setTrackedIds] = useState<Set<number>>(new Set());
+
+  const loadReading = useCallback(async () => {
+    try {
+      setReading(await api.get<ChildReadingResponse>('/child/reading'));
+    } catch {
+      setReading(null);
+    }
+  }, []);
+
+  const loadTracked = useCallback(async () => {
+    try {
+      const ids = await api.get<number[]>('/child/achievements/tracked');
+      setTrackedIds(new Set(ids));
+    } catch {
+      setTrackedIds(new Set());
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadReading();
+    void loadTracked();
+  }, [loadReading, loadTracked]);
+
+  const readingBooks = (reading?.books ?? []).filter((b) => b.currentPage != null && b.status !== 'APPROVED');
+
+  const savePage = async (book: ChildBookDto) => {
+    const page = Number(pageInput[book.id]);
+    if (!page || page <= 0) {
+      alert('Укажите страницу');
+      return;
+    }
+    if (page < (book.currentPage ?? 0)) {
+      alert('Страница не может быть меньше текущей');
+      return;
+    }
+    if (book.pages > 0 && page > book.pages) {
+      alert(`В книге всего ${book.pages} страниц`);
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.post(`/child/books/${book.id}/bookmark`, { page });
+      setPageInput((prev) => ({ ...prev, [book.id]: '' }));
+      await loadReading();
+    } catch (e) {
+      alert(errMsg(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const markRead = async (book: ChildBookDto) => {
+    setBusy(true);
+    try {
+      await api.post(`/child/books/${book.id}/read`);
+      await loadReading();
+    } catch (e) {
+      alert(errMsg(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const trackedAchievements = achievements.filter((a) => trackedIds.has(a.achievementId));
 
   return (
     <div className="space-y-6">
@@ -93,8 +149,7 @@ export default function ChildHomeTab({
             </div>
           </div>
           <p className="mb-3 text-sm text-stone-400">
-            Нажми на вершину шестиугольника, чтобы открыть модуль навыка. Навыки растут от центра к
-            краям по мере выполнения заданий и получения ачивок.
+            Нажми на вершину шестиугольника, чтобы открыть модуль навыка.
           </p>
           <SkillHexagon skills={skills} onSelect={onOpenSkill} />
         </section>
@@ -110,22 +165,45 @@ export default function ChildHomeTab({
         </section>
       )}
 
-      {show('balances') && profile && profile.balances.length > 0 && (
-        <section>
+      {/* Читаю сейчас */}
+      {readingBooks.length > 0 && (
+        <section className="rpg-panel rpg-panel-gold p-4 sm:p-6">
           <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-amber-200">
-            <Coins size={20} className="text-amber-400" /> Мои баллы
+            <BookOpen size={20} className="text-amber-400" /> Читаю сейчас
           </h2>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {profile.balances.map((b) => (
-              <div key={b.storeId} className="rpg-panel flex items-center gap-3 p-4">
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-500/10 text-xl">
-                  {b.currencyIcon}
-                </span>
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-stone-300">{b.storeName}</div>
-                  <div className="text-lg font-extrabold text-amber-300">
-                    {fmtAmount(b.amount, b.currencyName)}
+          <div className="space-y-3">
+            {readingBooks.map((book) => (
+              <div key={book.id} className="flex flex-wrap items-center gap-3 rounded-xl bg-stone-900/60 px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-semibold text-amber-100">{book.name}</div>
+                  <div className="text-sm text-sky-300">
+                    Стр. {book.currentPage}/{book.pages}
                   </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={book.currentPage ?? 1}
+                    max={book.pages || undefined}
+                    className="rpg-input w-24"
+                    placeholder="стр."
+                    value={pageInput[book.id] ?? ''}
+                    onChange={(e) => setPageInput((prev) => ({ ...prev, [book.id]: e.target.value }))}
+                  />
+                  <button
+                    className="rpg-btn !px-3 !py-1.5 text-xs"
+                    disabled={busy || !pageInput[book.id]}
+                    onClick={() => void savePage(book)}
+                  >
+                    Дочитал до
+                  </button>
+                  <button
+                    className="rpg-btn !px-3 !py-1.5 text-xs"
+                    disabled={busy}
+                    onClick={() => void markRead(book)}
+                  >
+                    <CheckCircle2 size={14} /> Прочитал
+                  </button>
                 </div>
               </div>
             ))}
@@ -133,39 +211,12 @@ export default function ChildHomeTab({
         </section>
       )}
 
-      {show('stats') && profile && (
-        <section>
-          <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-amber-200">
-            <Sparkles size={20} className="text-amber-400" /> Моя статистика
-          </h2>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <StatCard
-              label="Оплаченных покупок"
-              value={profile.stats.paidCount}
-              icon={<ShoppingBag size={22} />}
-              accent="bg-gradient-to-br from-amber-500 to-orange-600"
-            />
-            <StatCard
-              label="Потрачено всего"
-              value={fmtAmount(profile.stats.paidTotal)}
-              icon={<Coins size={22} />}
-              accent="bg-gradient-to-br from-emerald-500 to-teal-600"
-            />
-            <StatCard
-              label="Достижений получено"
-              value={unlockedCount}
-              icon={<Trophy size={22} />}
-              accent="bg-gradient-to-br from-sky-500 to-indigo-600"
-            />
-          </div>
-        </section>
-      )}
-
-      {show('achievements') && nextAchievements.length > 0 && (
+      {/* Отслеживаемые достижения */}
+      {trackedAchievements.length > 0 && (
         <section>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="flex items-center gap-2 text-lg font-bold text-amber-200">
-              <Trophy size={20} className="text-amber-400" /> Ближайшие достижения
+              <Trophy size={20} className="text-amber-400" /> Мои цели
             </h2>
             <button
               onClick={() => onNavigate('achievements')}
@@ -175,7 +226,7 @@ export default function ChildHomeTab({
             </button>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {nextAchievements.map((a) => {
+            {trackedAchievements.map((a) => {
               const tier = tierForLevel(a.level);
               const percent = a.targetValue > 0 ? Math.min(100, Math.round((a.progress / a.targetValue) * 100)) : 0;
               return (
@@ -201,41 +252,10 @@ export default function ChildHomeTab({
         </section>
       )}
 
-      {show('orders') && orders.length > 0 && (
-        <section>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-lg font-bold text-amber-200">
-              <Package size={20} className="text-amber-400" /> Последние заказы
-            </h2>
-            <button
-              onClick={() => onNavigate('orders')}
-              className="rpg-btn rpg-btn-ghost !px-3 !py-1.5 text-xs"
-            >
-              Все заказы
-            </button>
-          </div>
-          <div className="space-y-2">
-            {orders.slice(0, 3).map((order) => (
-              <div key={order.id} className="rpg-panel flex items-center gap-3 px-4 py-2.5">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-semibold text-amber-100">{order.productName}</div>
-                  <div className="text-xs text-stone-400">
-                    {order.storeName} · {fmtDate(order.createdAt)}
-                  </div>
-                </div>
-                <div className="text-sm font-bold text-amber-300">
-                  {order.currencyIcon} {fmtAmount(order.amount, order.currencyName)}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {!show('balances') && !show('stats') && !show('achievements') && !show('orders') && (
+      {trackedAchievements.length === 0 && readingBooks.length === 0 && (
         <EmptyState
           title="Главная пуста"
-          hint="Открой настройки и выбери, что показывать на главной"
+          hint="Отметь достижения галочкой «отслеживать» — они появятся здесь"
         />
       )}
     </div>

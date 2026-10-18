@@ -220,6 +220,15 @@ export interface LimitTypeState {
   extendedSeconds: number;
   remainingSeconds: number;
   running: boolean;
+  frozen: boolean;
+}
+
+export interface LimitEventDto {
+  id: number;
+  limitType: string;
+  action: 'START' | 'STOP';
+  seconds: number;
+  createdAt: string;
 }
 
 export interface PocketState {
@@ -304,6 +313,7 @@ export interface ChildBookDto {
   pages: number;
   multiplier: number;
   status: ReadingLogStatus | null;
+  currentPage: number | null;
 }
 
 export interface ChildReadingResponse {

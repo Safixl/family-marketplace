@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Search } from 'lucide-react';
+import { Pencil, Search } from 'lucide-react';
+import { api } from '../../../../api/client';
 import { SkillArchiveRow, SkillConfig } from '../../../../lib/skills';
+import { errMsg } from '../../../../lib/format';
 import { EmptyState } from '../../../ui';
 
 interface Props {
@@ -17,6 +19,32 @@ const STATUS_META: Record<SkillArchiveRow['status'], { label: string; cls: strin
 export default function ArchiveTab({ config, rows }: Props) {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<'ALL' | SkillArchiveRow['status']>('ALL');
+  const [editId, setEditId] = useState<number | null>(null);
+  const [editPage, setEditPage] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const savePage = async (row: SkillArchiveRow) => {
+    const page = Number(editPage);
+    if (!page || page <= 0) {
+      alert('Укажите страницу');
+      return;
+    }
+    if (row.pages && page > row.pages) {
+      alert(`В книге всего ${row.pages} страниц`);
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.post(`/child/books/${row.id}/bookmark`, { page });
+      setEditId(null);
+      setEditPage('');
+      window.location.reload();
+    } catch (e) {
+      alert(errMsg(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -73,13 +101,59 @@ export default function ArchiveTab({ config, rows }: Props) {
             <tbody>
               {filtered.map((row) => {
                 const meta = STATUS_META[row.status];
+                const isReading = row.currentPage != null;
                 return (
                   <tr key={row.id}>
                     <td className="font-semibold text-amber-100">{row.title}</td>
                     <td className="text-stone-300">{row.author ?? '—'}</td>
                     <td className="text-stone-300">{row.genre ?? '—'}</td>
                     <td className="text-stone-300">{row.series ?? '—'}</td>
-                    <td className="text-right text-stone-300">{row.pages ?? '—'}</td>
+                    <td className="text-right">
+                      {isReading ? (
+                        <div className="flex items-center justify-end gap-1.5">
+                          {editId === row.id ? (
+                            <>
+                              <input
+                                type="number"
+                                min={1}
+                                max={row.pages}
+                                className="rpg-input w-20"
+                                value={editPage}
+                                onChange={(e) => setEditPage(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') void savePage(row);
+                                }}
+                              />
+                              <button
+                                className="rpg-btn !px-2 !py-1 text-xs"
+                                disabled={busy}
+                                onClick={() => void savePage(row)}
+                              >
+                                ОК
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <span className="font-bold text-sky-300">
+                                {row.currentPage}/{row.pages}
+                              </span>
+                              <button
+                                className="rounded-lg p-1 text-sky-300 hover:bg-sky-500/20"
+                                onClick={() => {
+                                  setEditId(row.id);
+                                  setEditPage(String(row.currentPage ?? ''));
+                                }}
+                                title="Изменить страницу"
+                              >
+                                <Pencil size={13} />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-stone-300">{row.pages ?? '—'}</span>
+                      )}
+                    </td>
                     <td className="text-right font-bold text-amber-300">+{row.points}</td>
                     <td>
                       <span className={`rpg-badge border ${meta.cls}`}>{meta.label}</span>

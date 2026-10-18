@@ -40,6 +40,7 @@ public class AchievementService {
     private final ChildRepository childRepository;
     private final StoreRepository storeRepository;
     private final ChildAchievementRepository childAchievementRepository;
+    private final ChildTrackedAchievementRepository trackedRepository;
     private final BalanceRepository balanceRepository;
     private final UserRepository userRepository;
     private final ReadingLogRepository readingLogRepository;
@@ -53,6 +54,7 @@ public class AchievementService {
                               ChildRepository childRepository,
                               StoreRepository storeRepository,
                               ChildAchievementRepository childAchievementRepository,
+                              ChildTrackedAchievementRepository trackedRepository,
                               BalanceRepository balanceRepository,
                               UserRepository userRepository,
                               ReadingLogRepository readingLogRepository,
@@ -65,6 +67,7 @@ public class AchievementService {
         this.childRepository = childRepository;
         this.storeRepository = storeRepository;
         this.childAchievementRepository = childAchievementRepository;
+        this.trackedRepository = trackedRepository;
         this.balanceRepository = balanceRepository;
         this.userRepository = userRepository;
         this.readingLogRepository = readingLogRepository;
@@ -310,6 +313,35 @@ public class AchievementService {
                     completed));
         }
         return result;
+    }
+
+    // ---------- Отслеживаемые достижения (главная ребёнка) ----------
+
+    @Transactional(readOnly = true)
+    public List<Long> trackedIds(Long childId) {
+        return trackedRepository.findByChildId(childId).stream()
+                .map(t -> t.getAchievement().getId())
+                .toList();
+    }
+
+    /** Переключить отслеживание достижения. */
+    @Transactional
+    public boolean track(Long childId, Long achievementId) {
+        return trackedRepository.findByChildIdAndAchievementId(childId, achievementId)
+                .map(existing -> {
+                    trackedRepository.delete(existing);
+                    return false;
+                })
+                .orElseGet(() -> {
+                    ChildTrackedAchievement tracked = new ChildTrackedAchievement();
+                    tracked.setChild(childRepository.findById(childId)
+                            .orElseThrow(() -> new NotFoundException("Ребенок не найден")));
+                    tracked.setAchievement(getOwned(childRepository.findParentIdById(childId)
+                            .orElseThrow(() -> new NotFoundException("Ребенок не найден")), achievementId));
+                    tracked.setCreatedAt(Instant.now());
+                    trackedRepository.save(tracked);
+                    return true;
+                });
     }
 
     private List<List<Achievement>> groupByLevel(List<Achievement> achievements) {

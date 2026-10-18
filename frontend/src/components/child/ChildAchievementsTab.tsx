@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Eye, EyeOff, Gift, Lock, Trophy } from 'lucide-react';
+import { CheckCircle2, Eye, EyeOff, Gift, Lock, Pin, Trophy } from 'lucide-react';
 import { api } from '../../api/client';
 import { ChildAchievementGroupDto, SkillId } from '../../api/types';
 import { errMsg, fmtAmount } from '../../lib/format';
@@ -25,6 +25,7 @@ export default function ChildAchievementsTab() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('ALL');
   const [hideIncomplete, setHideIncomplete] = useState(false);
+  const [trackedIds, setTrackedIds] = useState<Set<number>>(new Set());
 
   const load = useCallback(async () => {
     try {
@@ -35,9 +36,33 @@ export default function ChildAchievementsTab() {
     }
   }, []);
 
+  const loadTracked = useCallback(async () => {
+    try {
+      const ids = await api.get<number[]>('/child/achievements/tracked');
+      setTrackedIds(new Set(ids));
+    } catch {
+      setTrackedIds(new Set());
+    }
+  }, []);
+
   useEffect(() => {
     void load();
-  }, [load]);
+    void loadTracked();
+  }, [load, loadTracked]);
+
+  const toggleTrack = async (achievementId: number) => {
+    try {
+      const tracked = await api.post<boolean>(`/child/achievements/${achievementId}/track`);
+      setTrackedIds((prev) => {
+        const next = new Set(prev);
+        if (tracked) next.add(achievementId);
+        else next.delete(achievementId);
+        return next;
+      });
+    } catch (e) {
+      alert(errMsg(e));
+    }
+  };
 
   const filtered = useMemo(() => {
     if (!achievements) return [];
@@ -174,11 +199,24 @@ export default function ChildAchievementsTab() {
                       )}
                     </div>
                   </div>
-                  {achievement.unlocked && (
-                    <span className="rpg-badge border border-emerald-500/30 bg-emerald-500/15 text-emerald-300">
-                      <CheckCircle2 size={13} /> получено
-                    </span>
-                  )}
+                  <div className="flex flex-col items-end gap-1">
+                    {achievement.unlocked && (
+                      <span className="rpg-badge border border-emerald-500/30 bg-emerald-500/15 text-emerald-300">
+                        <CheckCircle2 size={13} /> получено
+                      </span>
+                    )}
+                    <button
+                      onClick={() => void toggleTrack(achievement.achievementId)}
+                      className={`flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold transition ${
+                        trackedIds.has(achievement.achievementId)
+                          ? 'bg-amber-500/20 text-amber-300'
+                          : 'bg-stone-800 text-stone-400 hover:text-amber-200'
+                      }`}
+                      title={trackedIds.has(achievement.achievementId) ? 'Убрать с главной' : 'Отслеживать на главной'}
+                    >
+                      <Pin size={12} /> {trackedIds.has(achievement.achievementId) ? 'Отслеживаю' : 'Отслеживать'}
+                    </button>
+                  </div>
                 </div>
 
                 {achievement.description && (

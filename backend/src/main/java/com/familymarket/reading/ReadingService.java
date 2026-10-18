@@ -407,8 +407,10 @@ public class ReadingService {
         } else if (logRepository.existsByChildIdAndBookIdAndStatus(book.getChild().getId(), book.getId(), "PENDING")) {
             status = "PENDING";
         }
+        Integer currentPage = bookmarkRepository.findByChildIdAndBookId(book.getChild().getId(), book.getId())
+                .map(ReadingBookmark::getPage).orElse(null);
         return new ChildBookDto(book.getId(), book.getName(), book.getAuthor(), book.getSeries(),
-                book.getGenre(), book.getPages(), book.getMultiplier(), status);
+                book.getGenre(), book.getPages(), book.getMultiplier(), status, currentPage);
     }
 
     private ReadingStatsDto buildStats(Long childId) {

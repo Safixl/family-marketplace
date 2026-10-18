@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, Coins, XCircle } from 'lucide-react';
+import { CheckCircle2, Coins, Snowflake, XCircle } from 'lucide-react';
 import { api } from '../../api/client';
-import { ChildDto, ChildLimitsDto, PocketRequestDto } from '../../api/types';
+import { ChildDto, ChildLimitsDto, LimitEventDto, LimitStateDto, PocketRequestDto } from '../../api/types';
 import { errMsg, fmtAmount } from '../../lib/format';
 import Modal from '../Modal';
 import { Spinner } from '../ui';
@@ -25,21 +25,52 @@ const LIMIT_FIELDS: Array<{ key: keyof ChildLimitsDto; label: string; emoji: str
  */
 export default function LimitsManager({ child, onClose }: Props) {
   const [limits, setLimits] = useState<ChildLimitsDto | null>(null);
+  const [state, setState] = useState<LimitStateDto | null>(null);
+  const [events, setEvents] = useState<LimitEventDto[]>([]);
   const [requests, setRequests] = useState<PocketRequestDto[]>([]);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const [l, r] = await Promise.all([
+      const [l, s, e, r] = await Promise.all([
         api.get<ChildLimitsDto>(`/parent/children/${child.id}/limits`),
+        api.get<LimitStateDto>(`/parent/children/${child.id}/limits/state`),
+        api.get<LimitEventDto[]>(`/parent/children/${child.id}/limit-events`),
         api.get<PocketRequestDto[]>('/parent/pocket-requests'),
       ]);
       setLimits(l);
+      setState(s);
+      setEvents(e);
       setRequests(r.filter((x) => x.childId === child.id));
     } catch (e) {
       alert(errMsg(e));
     }
   }, [child.id]);
+
+  const freeze = async (type: string, frozen: boolean) => {
+    setBusy(true);
+    try {
+      await api.post(`/parent/children/${child.id}/limits/${type}/freeze`, { frozen });
+      await load();
+    } catch (e) {
+      alert(errMsg(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const payOut = async () => {
+    if (!window.confirm('Выдать карманные деньги? Остаток недели обнулится.')) return;
+    setBusy(true);
+    try {
+      await api.post(`/parent/children/${child.id}/pocket/pay-out`);
+      await load();
+    } catch (e) {
+      alert(errMsg(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   useEffect(() => {
     void load();
@@ -134,6 +165,74 @@ export default function LimitsManager({ child, onClose }: Props) {
             Сохранить лимиты
           </button>
         </div>
+
+        {/* Остатки и заморозка */}
+        {state && (
+          <div>
+            <h3 className="mb-2 text-sm font-bold text-slate-600">Остатки и заморозка</h3>
+            <div className="space-y-2">
+              {state.limits.map((l) => {
+                const meta = LIMIT_FIELDS.find((f) => f.key === `${l.type.toLowerCase()}Minutes`);
+                const label = meta?.label ?? l.type;
+                const emoji = meta?.emoji ?? '⏱';
+                const h = Math.floor(l.remainingSeconds / 3600);
+                const m = Math.floor((l.remainingSeconds % 3600) / 60);
+                return (
+                  <div key={l.type} className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                    <span className="text-lg">{emoji}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold text-slate-700">{label}</div>
+                      <div className="text-xs text-slate-500">
+                        осталось: {h > 0 ? `${h} ч ` : ''}{m} мин
+                        {l.running && ' · ⏱ идёт'}
+                        {l.frozen && ' · ❄️ заморожен'}
+                      </div>
+                    </div>
+                    <button
+                      className={`rounded-lg p-1.5 ${l.frozen ? 'bg-sky-100 text-sky-700' : 'text-slate-400 hover:bg-slate-200'}`}
+                      disabled={busy}
+                      onClick={() => void freeze(l.type, !l.frozen)}
+                      title={l.frozen ? 'Разморозить' : 'Заморозить'}
+                    >
+                      <Snowflake size={15} />
+                    </button>
+                  </div>
+                );
+              })}
+              <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                <span className="text-lg">💰</span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold text-slate-700">Карманные деньги</div>
+                  <div className="text-xs text-slate-500">
+                    остаток недели: {state.pocket.remaining} ₽ из {state.pocket.weeklyLimit} ₽
+                  </div>
+                </div>
+                <button className="btn-primary !px-3 !py-1.5 text-xs" disabled={busy} onClick={() => void payOut()}>
+                  Выдано
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Трекер тарификации */}
+        {events.length > 0 && (
+          <div>
+            <h3 className="mb-2 text-sm font-bold text-slate-600">Трекер тарификации</h3>
+            <div className="max-h-48 space-y-1 overflow-y-auto pr-1">
+              {events.slice(0, 30).map((e) => (
+                <div key={e.id} className="flex items-center gap-2 rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs">
+                  <span className="font-semibold text-slate-600">{e.limitType}</span>
+                  <span className={e.action === 'START' ? 'text-emerald-600' : 'text-rose-600'}>
+                    {e.action === 'START' ? '▶ запуск' : '⏹ стоп'}
+                  </span>
+                  {e.action === 'STOP' && <span className="text-slate-500">· {Math.floor(e.seconds / 60)} мин</span>}
+                  <span className="ml-auto text-slate-400">{new Date(e.createdAt).toLocaleString('ru-RU')}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div>
           <h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-600">
