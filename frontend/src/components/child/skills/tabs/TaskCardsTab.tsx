@@ -70,7 +70,8 @@ export default function TaskCardsTab({ skill }: Props) {
     setBusy(true);
     try {
       const list = card.tasks.map((_, i) => answers[`${card.id}-${i}`] ?? '');
-      await api.post(`/child/task-cards/${card.id}/submit`, { answers: list });
+      if (card.childCardId == null) return;
+      await api.post(`/child/task-cards/${card.childCardId}/submit`, { answers: list });
       await load();
     } catch (e) {
       alert(errMsg(e));

@@ -175,7 +175,8 @@ export default function TaskCardsManager({ store, skill, onClose }: Props) {
     }
   };
 
-  const approve = async (id: number) => {
+  const approve = async (id: number | null) => {
+    if (id == null) return;
     setBusy(true);
     try {
       await api.post(`/parent/task-card-requests/${id}/approve`);
@@ -187,7 +188,8 @@ export default function TaskCardsManager({ store, skill, onClose }: Props) {
     }
   };
 
-  const reject = async (id: number) => {
+  const reject = async (id: number | null) => {
+    if (id == null) return;
     setBusy(true);
     try {
       await api.post(`/parent/task-card-requests/${id}/reject`);
@@ -229,10 +231,10 @@ export default function TaskCardsManager({ store, skill, onClose }: Props) {
                         : 'запрос на раскрытие карточки'}
                     </div>
                   </div>
-                  <button className="btn-primary !px-3 !py-1.5 text-xs" disabled={busy} onClick={() => void approve(r.id)}>
+                  <button className="btn-primary !px-3 !py-1.5 text-xs" disabled={busy} onClick={() => void approve(r.childCardId)}>
                     <CheckCircle2 size={14} /> {skill === 'HOUSE' ? 'Принять помощь' : 'Раскрыть'}
                   </button>
-                  <button className="btn-secondary !px-3 !py-1.5 text-xs" disabled={busy} onClick={() => void reject(r.id)}>
+                  <button className="btn-secondary !px-3 !py-1.5 text-xs" disabled={busy} onClick={() => void reject(r.childCardId)}>
                     <XCircle size={14} /> Отклонить
                   </button>
                 </div>

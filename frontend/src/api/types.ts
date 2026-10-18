@@ -353,6 +353,8 @@ export interface TaskItem {
 
 export interface TaskCardDto {
   id: number;
+  /** id записи child_task_cards (для взятой ребёнком карточки) */
+  childCardId: number | null;
   skill: string;
   title: string;
   description: string | null;

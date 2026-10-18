@@ -339,6 +339,7 @@ public class TaskCardService {
     private TaskCardDto toDto(TaskCard card, ChildTaskCard taken) {
         return new TaskCardDto(
                 card.getId(),
+                taken == null ? null : taken.getId(),
                 card.getSkill(),
                 card.getTitle(),
                 card.getDescription(),

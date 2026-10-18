@@ -6,6 +6,7 @@ import java.util.List;
 
 public record TaskCardDto(
         Long id,
+        Long childCardId,
         String skill,
         String title,
         String description,
