@@ -241,7 +241,8 @@ export default function AchievementsTab() {
   });
 
   /** Дефолтное (системное) достижение: нельзя удалять и менять параметры — только награду. */
-  const isDefaultAchievement = (a: AchievementDto) => a.skill === 'READING' && a.groupKey != null;
+  const isDefaultAchievement = (a: AchievementDto) =>
+    (a.skill === 'READING' || a.skill === 'MATH') && a.groupKey != null;
 
   const defaultLocked = editing != null && isDefaultAchievement(editing);
 

@@ -157,6 +157,111 @@ public final class AchievementDefaults {
         return out;
     }
 
+    /** Стартовый комплект достижений навыка «Математика». */
+    public static List<Achievement> math(User parent) {
+        List<Achievement> out = new ArrayList<>();
+
+        // ---------- Общие многоуровневые (11 ступеней) ----------
+
+        addLevelsMath(out, parent, "Вычислительная машина",
+                "Всего решено примеров и уравнений. Считаются любые числовые выражения, включая карточки, дроби и алгебру.",
+                "🔢", "MATH_TASKS", "MATH_EXAMPLES",
+                new int[]{100, 500, 1500, 3000, 5000, 10000, 20000, 35000, 50000, 65000, 80000},
+                new String[]{"Цифровой первоклашка", "Калькулятор на батарейках", "Счетные счеты", "Властелин плюсов и минусов",
+                        "Умножающий разум", "Процессор Core i3", "Мастер алгоритмов", "Цифровой гроссмейстер",
+                        "Квантовый компьютер", "Укротитель бесконечности", "Абсолютный Вычислитель"},
+                "примеров");
+
+        addLevelsMath(out, parent, "Главный архитектор",
+                "Решено текстовых задач: логика, движение, работа, проценты, геометрические построения. Выдаётся родителем.",
+                "🧩", "NONE", "MATH_WORD",
+                new int[]{5, 15, 40, 80, 150, 250, 400, 600, 850, 1100, 1400},
+                new String[]{"Искатель условий", "Распутыватель клубков", "Логический детектив", "Инженер смыслов",
+                        "Мастер чертежей", "Взломщик теорем", "Конструктор решений", "Проектировщик матриц",
+                        "Профессор логики", "Архитектор гипотез", "Повелитель Математических Миров"},
+                "задач");
+
+        addLevelsMath(out, parent, "Испытатель тестов",
+                "Успешно сданные тесты, контрольные и карточки на «4» и «5».",
+                "📝", "MATH_CARDS", "MATH_TESTS",
+                new int[]{5, 15, 30, 50, 80, 120, 170, 230, 300, 380, 450},
+                new String[]{"Тестовый дебютант", "Уверенный отличник", "Охотник за пятерками", "Критик ошибок",
+                        "Гроза контрольных", "Тестовый эксперт", "Несокрушимый разум", "Магистр экзаменов",
+                        "Железный отличник", "Провидец ответов", "Абсолютный Цензор"},
+                "работ");
+
+        // ---------- Категории заданий (10 × 11 званий) ----------
+
+        addMathCategory(out, parent, "MATH_CAT_EQUATIONS", "⚖️", "Укротитель Иксов",
+                "Уравнения: от простых x + 2 = 4 до систем уравнений и квадратных корней.");
+        addMathCategory(out, parent, "MATH_CAT_ARITHMETIC", "⚡", "Арифметика в уме",
+                "Простые цифры наподобие 2+2=? и 7×8: быстрый счёт без черновика.");
+        addMathCategory(out, parent, "MATH_CAT_MULTDIV", "✖️", "Король Пропорций",
+                "Умножение и деление: в столбик, многозначные числа, сокращение дробей.");
+        addMathCategory(out, parent, "MATH_CAT_POWER", "🔝", "Сила в Кубе",
+                "Возведение в квадрат и степень: прокачка работы со степенями чисел.");
+        addMathCategory(out, parent, "MATH_CAT_ROOT", "🌱", "Извлекатель Корней",
+                "Квадратные корни: магия высвобождения чисел из-под знака корня.");
+        addMathCategory(out, parent, "MATH_CAT_FRACTIONS", "🍕", "Повелитель Долей",
+                "Дроби и проценты: обыкновенные, десятичные дроби, задачи на проценты (5–6 класс).");
+        addMathCategory(out, parent, "MATH_CAT_GEOMETRY", "📐", "Геометрический Гений",
+                "Геометрия: площади, периметры, углы и работа с фигурами (7–8 класс).");
+        addMathCategory(out, parent, "MATH_CAT_CARD_EASY", "🃏", "Легкая прогулка",
+                "Карточки с заданиями: лёгкий уровень.");
+        addMathCategory(out, parent, "MATH_CAT_CARD_MEDIUM", "⚔️", "Крепкий орешек",
+                "Карточки с заданиями: средний уровень.");
+        addMathCategory(out, parent, "MATH_CAT_CARD_HARD", "🔥", "Зона хардкора",
+                "Карточки с заданиями: сложный уровень.");
+
+        // ---------- Большие математические квесты ----------
+
+        singleMath(out, parent, "🛡️", "Главный босс школы",
+                "Покоритель ВПР — сдать Всероссийские проверочные работы по математике на максимальный балл:\n"
+                        + "ВПР за 4 класс (базовая арифметика и логика)\nВПР за 5 класс (дроби и основы геометрии)\n"
+                        + "ВПР за 6 класс (отрицательные числа, пропорции)\nВПР за 7 класс (начало алгебры и геометрии)\n"
+                        + "ВПР за 8 класс (функции, системы, теоремы)",
+                "MATH_QUEST_VPR");
+        singleMath(out, parent, "🎪", "Олимпийский резерв",
+                "Успешно поучаствовать в школьных или онлайн-олимпиадах:\n"
+                        + "Школьный этап Всероссийской олимпиады\nОлимпиада «Кенгуру» (или аналогичная)\n"
+                        + "Набрать более 80% правильных ответов в любом олимпиадном туре",
+                "MATH_QUEST_OLYMP");
+        singleMath(out, parent, "⭐", "Звездная Карта",
+                "Карточки особого уровня — решить 5 уникальных нестандартных задач повышенной сложности:\n"
+                        + "Особая карточка №1\nОсобая карточка №2\nОсобая карточка №3\nОсобая карточка №4\nОсобая карточка №5",
+                "MATH_QUEST_STAR");
+
+        // ---------- Особые одиночные испытания ----------
+
+        singleMath(out, parent, "🔮", "Математический универсал",
+                "Правильно решить за один день хотя бы по одному заданию из 6 разных тем (уравнение, текстовая задача, "
+                        + "пример на скорость, дробь, геометрия, степень).",
+                "MATH_UNIVERSAL");
+        singleMath(out, parent, "🦖", "Убийца гигантов",
+                "Безошибочно решить пример, в котором больше 10 действий (со скобками, умножением и делением).",
+                "MATH_GIANT");
+        singleMath(out, parent, "⏱️", "Быстрее калькулятора",
+                "Решить 20 простых примеров на умножение/деление в уме меньше чем за 1 минуту.",
+                "MATH_FAST");
+        singleMath(out, parent, "👨‍🏫", "Юный профессор",
+                "Объяснить родителю или другу, как решается сложное уравнение или задача, так, чтобы они всё поняли.",
+                "MATH_PROF");
+        singleMathWithTarget(out, parent, "🔥", "Вычислительный стрик",
+                "Заниматься математикой и решать не менее 15 примеров каждый день в течение 21 дня без перерывов.",
+                "MATH_STREAK", "MATH_STREAK", 21);
+        singleMath(out, parent, "🔎", "Детектив ошибок",
+                "Найти ошибку в чужом решении (или специально допущенную родителем ошибку в примере) и исправить её.",
+                "MATH_ERR_DETECT");
+        singleMath(out, parent, "📓", "Идеальный черновик",
+                "Исписать целую тетрадь в клетку аккуратными вычислениями без единой вырванной страницы.",
+                "MATH_NOTEBOOK");
+        singleMath(out, parent, "📐", "Циркуль-мастер",
+                "Построить идеальный геометрический чертёж с помощью линейки и циркуля без помарок с первой попытки.",
+                "MATH_COMPASS");
+
+        return out;
+    }
+
     // ---------- Сборка ----------
 
     private static void addLevels(List<Achievement> out, User parent, String name, String description, String icon,
@@ -171,6 +276,26 @@ public final class AchievementDefaults {
             a.setTargetValue(values[i]);
             a.setGroupKey(groupKey);
             a.setSkill("READING");
+            a.setLevel(i + 1);
+            a.setHiddenReward(false);
+            a.setCreatedAt(Instant.now());
+            out.add(a);
+        }
+    }
+
+    /** Вариант addLevels для навыка «Математика». */
+    private static void addLevelsMath(List<Achievement> out, User parent, String name, String description, String icon,
+                                      String targetType, String groupKey, int[] values, String[] stepNames, String unit) {
+        for (int i = 0; i < values.length; i++) {
+            Achievement a = new Achievement();
+            a.setParent(parent);
+            a.setName(name);
+            a.setDescription(stepNames[i] + " — " + values[i] + " " + unit + ".\n" + description);
+            a.setIcon(icon);
+            a.setTargetType(targetType);
+            a.setTargetValue(values[i]);
+            a.setGroupKey(groupKey);
+            a.setSkill("MATH");
             a.setLevel(i + 1);
             a.setHiddenReward(false);
             a.setCreatedAt(Instant.now());
@@ -197,9 +322,54 @@ public final class AchievementDefaults {
         }
     }
 
+    /** Категория заданий математики: общая шкала 10→20 000, звания Стажер→Математический Титан. */
+    private static void addMathCategory(List<Achievement> out, User parent, String groupKey, String icon,
+                                        String name, String hint) {
+        String[] ranks = {"Стажер", "Новичок", "Практик", "Специалист", "Аналитик", "Эксперт",
+                "Мастер", "Гроссмейстер", "Магистр", "Легенда", "Математический Титан"};
+        int[] counts = {10, 50, 150, 400, 1000, 2500, 5000, 8000, 12000, 16000, 20000};
+        for (int i = 0; i < ranks.length; i++) {
+            Achievement a = new Achievement();
+            a.setParent(parent);
+            a.setName(name);
+            a.setDescription(ranks[i] + " — " + counts[i] + " заданий · " + name + ". " + hint);
+            a.setIcon(icon);
+            a.setTargetType("NONE");
+            a.setTargetValue(counts[i]);
+            a.setGroupKey(groupKey);
+            a.setSkill("MATH");
+            a.setLevel(i + 1);
+            a.setHiddenReward(false);
+            a.setCreatedAt(Instant.now());
+            out.add(a);
+        }
+    }
+
     private static void single(List<Achievement> out, User parent, String icon, String name, String description,
                                String groupKey) {
         singleWithTarget(out, parent, icon, name, description, groupKey, "NONE", 0);
+    }
+
+    private static void singleMath(List<Achievement> out, User parent, String icon, String name, String description,
+                                   String groupKey) {
+        singleMathWithTarget(out, parent, icon, name, description, groupKey, "NONE", 0);
+    }
+
+    private static void singleMathWithTarget(List<Achievement> out, User parent, String icon, String name,
+                                             String description, String groupKey, String targetType, int targetValue) {
+        Achievement a = new Achievement();
+        a.setParent(parent);
+        a.setName(name);
+        a.setDescription(description);
+        a.setIcon(icon);
+        a.setTargetType(targetType);
+        a.setTargetValue(targetValue);
+        a.setGroupKey(groupKey);
+        a.setSkill("MATH");
+        a.setLevel(0);
+        a.setHiddenReward(false);
+        a.setCreatedAt(Instant.now());
+        out.add(a);
     }
 
     private static void singleWithTarget(List<Achievement> out, User parent, String icon, String name,

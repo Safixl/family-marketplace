@@ -13,6 +13,7 @@ const TARGET_UNITS: Record<string, string> = {
   READING_GENRES: 'жанров',
   READING_SERIES: 'серий',
   READING_HEAVY_BOOKS: 'книг > 600 стр',
+  MATH_CARDS: 'работ',
   MATH_TASKS: 'задач',
   POINTS_EARNED: 'баллов',
   MATH_STREAK: 'дней подряд',

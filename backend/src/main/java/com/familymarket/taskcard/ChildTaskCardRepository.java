@@ -1,6 +1,8 @@
 package com.familymarket.taskcard;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -17,4 +19,8 @@ public interface ChildTaskCardRepository extends JpaRepository<ChildTaskCard, Lo
     Optional<ChildTaskCard> findByIdAndChildId(Long id, Long childId);
 
     List<ChildTaskCard> findByCard_ParentIdAndStatus(Long parentId, String status);
+
+    /** Успешно завершённые карточки математики (для достижений «Испытатель тестов»). */
+    @Query("select count(c) from ChildTaskCard c where c.child.id = :childId and c.status = 'DONE' and c.card.skill = 'MATH'")
+    long countDoneMathByChildId(@Param("childId") Long childId);
 }

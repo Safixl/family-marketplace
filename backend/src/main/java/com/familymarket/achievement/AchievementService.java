@@ -20,6 +20,7 @@ import com.familymarket.reading.ReadingBook;
 import com.familymarket.reading.ReadingBookCatalog;
 import com.familymarket.reading.ReadingLogRepository;
 import com.familymarket.store.Store;
+import com.familymarket.taskcard.ChildTaskCardRepository;
 import com.familymarket.store.StoreRepository;
 import com.familymarket.user.User;
 import com.familymarket.user.UserRepository;
@@ -68,6 +69,7 @@ public class AchievementService {
     private final HouseDayRepository houseDayRepository;
     private final PurchaseRepository purchaseRepository;
     private final DailyLogRepository dailyLogRepository;
+    private final ChildTaskCardRepository childTaskCardRepository;
     private final BalanceService balanceService;
 
     public AchievementService(AchievementRepository achievementRepository,
@@ -82,6 +84,7 @@ public class AchievementService {
                               HouseDayRepository houseDayRepository,
                               PurchaseRepository purchaseRepository,
                               DailyLogRepository dailyLogRepository,
+                              ChildTaskCardRepository childTaskCardRepository,
                               BalanceService balanceService) {
         this.achievementRepository = achievementRepository;
         this.childRepository = childRepository;
@@ -95,6 +98,7 @@ public class AchievementService {
         this.houseDayRepository = houseDayRepository;
         this.purchaseRepository = purchaseRepository;
         this.dailyLogRepository = dailyLogRepository;
+        this.childTaskCardRepository = childTaskCardRepository;
         this.balanceService = balanceService;
     }
 
@@ -106,17 +110,19 @@ public class AchievementService {
     }
 
     /**
-     * Автогенерация стартового комплекта достижений чтения (вызывается при первом
-     * обращении родителя/ребёнка, пока у родителя нет ни одного READING-достижения).
+     * Автогенерация стартовых комплектов достижений чтения и математики
+     * (вызывается при первом обращении родителя/ребёнка, пока их нет).
      */
     @Transactional
     public void ensureDefaultAchievements(Long parentId) {
-        if (achievementRepository.countByParentIdAndSkill(parentId, "READING") > 0) {
-            return;
-        }
         User parent = userRepository.findById(parentId)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
-        achievementRepository.saveAll(AchievementDefaults.reading(parent));
+        if (achievementRepository.countByParentIdAndSkill(parentId, "READING") == 0) {
+            achievementRepository.saveAll(AchievementDefaults.reading(parent));
+        }
+        if (achievementRepository.countByParentIdAndSkill(parentId, "MATH") == 0) {
+            achievementRepository.saveAll(AchievementDefaults.math(parent));
+        }
     }
 
     @Transactional
@@ -335,11 +341,11 @@ public class AchievementService {
 
     /** Дефолтное (системное) достижение — нельзя удалять и менять параметры, только награду. */
     private boolean isDefault(Achievement achievement) {
-        return "READING".equals(achievement.getSkill()) && achievement.getGroupKey() != null;
+        return List.of("READING", "MATH").contains(achievement.getSkill()) && achievement.getGroupKey() != null;
     }
 
     /** Сколько ступеней достижений есть и получено по каждому навыку (полоска прогресса). */
-    @Transactional(readOnly = true)
+    @Transactional
     public List<SkillTotalDto> totals(Long childId) {
         Long parentId = childRepository.findParentIdById(childId)
                 .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
@@ -489,6 +495,7 @@ public class AchievementService {
                     readingLogRepository.findApprovedBooksByChildId(childId).stream()
                             .filter(b -> achievement.getTargetType().equals(genreCodeOf(b))).count();
             case "MATH_TASKS" -> mathAttemptRepository.countCorrectByChildId(childId);
+            case "MATH_CARDS" -> childTaskCardRepository.countDoneMathByChildId(childId);
             case "POINTS_EARNED" -> balanceRepository.sumByChildId(childId).longValue();
             case "MATH_STREAK" -> streak(mathAttemptRepository.findDistinctCorrectDates(childId));
             case "HOUSE_CLEAN_STREAK" -> streak(houseDayRepository.findCleanRoomDays(childId));
@@ -565,7 +572,7 @@ public class AchievementService {
                     "READING_GENRE_HISTORY", "READING_GENRE_HORROR", "READING_GENRE_SCIENCE",
                     "READING_GENRE_FAIRYTALE", "READING_GENRE_POETRY", "READING_GENRE_COMICS",
                     "READING_GENRE_HUMOR",
-                    "MATH_TASKS", "POINTS_EARNED",
+                    "MATH_TASKS", "MATH_CARDS", "POINTS_EARNED",
                     "MATH_STREAK", "HOUSE_CLEAN_STREAK", "HOUSE_HELP_STREAK", "HOME_PURCHASES",
                     "LOGIC_TASKS", "LANG_WORDS", "SPORT_DAYS",
                     "READING_STREAK", "LOGIC_STREAK", "LANG_STREAK", "SPORT_STREAK" -> normalized;
