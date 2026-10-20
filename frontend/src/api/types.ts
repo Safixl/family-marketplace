@@ -150,6 +150,13 @@ export interface ChildAchievementGroupDto {
   questRead: boolean[] | null;
 }
 
+/** Сколько ступеней достижений есть и получено по навыку (полоска прогресса). */
+export interface SkillTotalDto {
+  skill: string;
+  total: number;
+  unlocked: number;
+}
+
 export interface PurchasedItemDto {
   productId: number;
   productName: string;

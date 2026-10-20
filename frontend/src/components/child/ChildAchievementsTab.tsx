@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Eye, EyeOff, Gift, Lock, Pin, Trophy } from 'lucide-react';
 import { api } from '../../api/client';
-import { ChildAchievementGroupDto, SkillId } from '../../api/types';
+import { ChildAchievementGroupDto, SkillId, SkillTotalDto } from '../../api/types';
 import { errMsg, fmtAmount } from '../../lib/format';
 import { tierForLevel } from '../../lib/achievementTiers';
 import { SKILLS } from '../../lib/skills';
@@ -25,6 +25,7 @@ type Filter = 'ALL' | SkillId | 'NONE';
 
 export default function ChildAchievementsTab() {
   const [achievements, setAchievements] = useState<ChildAchievementGroupDto[] | null>(null);
+  const [totals, setTotals] = useState<SkillTotalDto[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('ALL');
   const [hideIncomplete, setHideIncomplete] = useState(false);
@@ -32,7 +33,12 @@ export default function ChildAchievementsTab() {
 
   const load = useCallback(async () => {
     try {
-      setAchievements(await api.get<ChildAchievementGroupDto[]>('/child/achievements'));
+      const [list, totalsList] = await Promise.all([
+        api.get<ChildAchievementGroupDto[]>('/child/achievements'),
+        api.get<SkillTotalDto[]>('/child/achievements/totals').catch(() => [] as SkillTotalDto[]),
+      ]);
+      setAchievements(list);
+      setTotals(totalsList);
     } catch (e) {
       setError(errMsg(e));
       setAchievements([]);
@@ -100,6 +106,31 @@ export default function ChildAchievementsTab() {
         </span>
       </div>
 
+      {/* Полоска прогресса: каждая ступень — отдельное достижение */}
+      {(() => {
+        const prog =
+          filter === 'ALL'
+            ? totals.reduce((acc, t) => ({ total: acc.total + t.total, unlocked: acc.unlocked + t.unlocked }), { total: 0, unlocked: 0 })
+            : totals.find((t) => t.skill === filter) ?? { total: 0, unlocked: 0 };
+        const pct = prog.total > 0 ? Math.min(100, Math.round((prog.unlocked / prog.total) * 100)) : 0;
+        return (
+          <div className="rpg-panel p-3">
+            <div className="mb-1 flex items-center justify-between text-xs text-stone-400">
+              <span>
+                🏆 Получено {prog.unlocked} из {prog.total} ступеней
+              </span>
+              <span className={pct === 100 ? 'font-bold text-emerald-300' : ''}>{pct}%</span>
+            </div>
+            <div className="rpg-progress-track h-2.5">
+              <div
+                className={pct === 100 ? 'rpg-progress-fill !bg-emerald-400' : 'rpg-progress-fill'}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Фильтры по направлениям */}
       <div className="flex gap-1.5 overflow-x-auto pb-1">
         <button
@@ -137,7 +168,7 @@ export default function ChildAchievementsTab() {
       {filtered.length === 0 ? (
         <EmptyState title="Ничего не найдено" hint="Попробуйте изменить фильтр" />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           {filtered.map((achievement) => {
             const tier = tierForLevel(achievement.level);
             const hasTarget = achievement.targetType && achievement.targetType !== 'NONE';
@@ -224,6 +255,33 @@ export default function ChildAchievementsTab() {
 
                 {achievement.description && (
                   <p className="text-sm text-stone-400">{achievement.description}</p>
+                )}
+
+                {/* Чек-лист серийного книжного квеста (зелёный — прочитана) */}
+                {achievement.questBooks && achievement.questRead && (
+                  <div className="rounded-xl bg-stone-900/70 p-2">
+                    <div className="mb-1 text-[11px] font-semibold text-stone-400">
+                      📋 Книги серии: {achievement.questRead.filter(Boolean).length}/{achievement.questBooks.length} прочитано
+                    </div>
+                    <ul className="space-y-1">
+                      {achievement.questBooks.map((title, i) => {
+                        const done = achievement.questRead?.[i] ?? false;
+                        return (
+                          <li
+                            key={`${achievement.achievementId}-${i}`}
+                            className={`flex items-center gap-1.5 text-xs ${done ? 'text-emerald-300' : 'text-stone-500'}`}
+                          >
+                            {done ? (
+                              <CheckCircle2 size={13} className="shrink-0 text-emerald-400" />
+                            ) : (
+                              <span className="inline-block h-3 w-3 shrink-0 rounded-sm border border-stone-600" />
+                            )}
+                            <span className={done ? 'opacity-80' : ''}>{title}</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
                 )}
 
                 {hasTarget && (

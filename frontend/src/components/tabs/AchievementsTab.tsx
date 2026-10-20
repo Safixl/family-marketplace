@@ -220,6 +220,11 @@ export default function AchievementsTab() {
     (grouped[key] = grouped[key] ?? []).push(a);
   });
 
+  /** Дефолтное (системное) достижение: нельзя удалять и менять параметры — только награду. */
+  const isDefaultAchievement = (a: AchievementDto) => a.skill === 'READING' && a.groupKey != null;
+
+  const defaultLocked = editing != null && isDefaultAchievement(editing);
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -267,6 +272,7 @@ export default function AchievementsTab() {
                     const unit = TARGET_OPTIONS.find((o) => o.value === achievement.targetType)?.unit ?? '';
                     const store = stores.find((s) => s.id === achievement.rewardStoreId);
                     const tier = tierForLevel(achievement.level);
+                    const def = isDefaultAchievement(achievement);
                     return (
                       <div
                         key={achievement.id}
@@ -292,30 +298,35 @@ export default function AchievementsTab() {
                             {store
                               ? `${fmtAmount(achievement.rewardAmount)} в «${store.name}»`
                               : fmtAmount(achievement.rewardAmount)}
+                            {def && <span className="badge ml-1 bg-slate-200 text-slate-500">дефолтное</span>}
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => void addLevel(achievement)}
-                            className="rounded-lg p-1.5 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600"
-                            title="Добавить следующий уровень"
-                          >
-                            <Plus size={15} />
-                          </button>
+                          {!def && (
+                            <button
+                              onClick={() => void addLevel(achievement)}
+                              className="rounded-lg p-1.5 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600"
+                              title="Добавить следующий уровень"
+                            >
+                              <Plus size={15} />
+                            </button>
+                          )}
                           <button
                             onClick={() => openEdit(achievement)}
                             className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-200"
-                            title="Редактировать"
+                            title={def ? 'Изменить награду' : 'Редактировать'}
                           >
                             <Pencil size={15} />
                           </button>
-                          <button
-                            onClick={() => void remove(achievement)}
-                            className="rounded-lg p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600"
-                            title="Удалить"
-                          >
-                            <Trash2 size={15} />
-                          </button>
+                          {!def && (
+                            <button
+                              onClick={() => void remove(achievement)}
+                              className="rounded-lg p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600"
+                              title="Удалить"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          )}
                           {achievement.targetType === 'NONE' && (
                             <button
                               onClick={() => openGrant(achievement)}
@@ -344,12 +355,18 @@ export default function AchievementsTab() {
           wide
         >
           <div className="space-y-4">
+            {defaultLocked && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                🔒 Дефолтное достижение — изменить можно только награду (сумму, магазин, скрытую награду).
+              </div>
+            )}
             <div className="grid grid-cols-[64px_1fr] gap-3">
               <div>
                 <label className="label">Иконка</label>
                 <input
                   className="input text-center text-xl"
                   value={form.icon}
+                  disabled={defaultLocked}
                   onChange={(e) => setForm({ ...form, icon: e.target.value })}
                 />
               </div>
@@ -358,9 +375,10 @@ export default function AchievementsTab() {
                 <input
                   className="input"
                   value={form.name}
+                  disabled={defaultLocked}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   placeholder="Например, Железо"
-                  autoFocus
+                  autoFocus={!defaultLocked}
                 />
               </div>
             </div>
@@ -369,6 +387,7 @@ export default function AchievementsTab() {
               <textarea
                 className="input min-h-[60px] resize-y"
                 value={form.description}
+                disabled={defaultLocked}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 placeholder="За что выдаём?"
               />
@@ -379,6 +398,7 @@ export default function AchievementsTab() {
                 <select
                   className="input"
                   value={form.skill}
+                  disabled={defaultLocked}
                   onChange={(e) => setForm({ ...form, skill: e.target.value })}
                 >
                   {SKILL_OPTIONS.map((o) => (
@@ -393,6 +413,7 @@ export default function AchievementsTab() {
                 <select
                   className="input"
                   value={form.targetType}
+                  disabled={defaultLocked}
                   onChange={(e) => setForm({ ...form, targetType: e.target.value })}
                 >
                   {TARGET_OPTIONS.map((o) => (
@@ -412,6 +433,7 @@ export default function AchievementsTab() {
                     type="number"
                     min="1"
                     value={form.targetValue}
+                    disabled={defaultLocked}
                     onChange={(e) => setForm({ ...form, targetValue: e.target.value })}
                   />
                 </div>

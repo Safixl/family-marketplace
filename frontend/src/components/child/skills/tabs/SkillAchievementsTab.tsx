@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { CheckCircle2, Eye, EyeOff, Lock, Pin, Trophy } from 'lucide-react';
 import { api } from '../../../../api/client';
-import { ChildAchievementGroupDto, SkillId } from '../../../../api/types';
+import { ChildAchievementGroupDto, SkillId, SkillTotalDto } from '../../../../api/types';
 import { errMsg } from '../../../../lib/format';
 import { tierForLevel } from '../../../../lib/achievementTiers';
 import { EmptyState, Spinner } from '../../../ui';
@@ -23,6 +23,7 @@ function unitFor(targetType: string): string {
 /** Достижения конкретного навыка ребёнка (вкладка внутри модуля навыка). */
 export default function SkillAchievementsTab({ skill }: { skill: SkillId }) {
   const [groups, setGroups] = useState<ChildAchievementGroupDto[] | null>(null);
+  const [totals, setTotals] = useState<SkillTotalDto[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [hideIncomplete, setHideIncomplete] = useState(false);
   const [trackedIds, setTrackedIds] = useState<Set<number>>(new Set());
@@ -46,10 +47,19 @@ export default function SkillAchievementsTab({ skill }: { skill: SkillId }) {
     }
   }, []);
 
+  const loadTotals = useCallback(async () => {
+    try {
+      setTotals(await api.get<SkillTotalDto[]>('/child/achievements/totals'));
+    } catch {
+      setTotals([]);
+    }
+  }, []);
+
   useEffect(() => {
     void load();
     void loadTracked();
-  }, [load, loadTracked]);
+    void loadTotals();
+  }, [load, loadTracked, loadTotals]);
 
   const toggleTrack = async (achievementId: number) => {
     try {
@@ -81,12 +91,29 @@ export default function SkillAchievementsTab({ skill }: { skill: SkillId }) {
 
   const visible = groups.filter((a) => !hideIncomplete || a.unlocked);
   const unlockedCount = groups.filter((a) => a.unlocked).length;
+  const skillTotal = totals.find((t) => t.skill === skill) ?? { total: 0, unlocked: 0 };
+  const progressPct = skillTotal.total > 0 ? Math.min(100, Math.round((skillTotal.unlocked / skillTotal.total) * 100)) : 0;
 
   return (
     <div className="space-y-3">
+      {/* Полоска прогресса по навыку: каждая ступень — отдельное достижение */}
+      {skillTotal.total > 0 && (
+        <div className="rpg-panel p-3">
+          <div className="mb-1 flex items-center justify-between text-xs text-stone-400">
+            <span>🏆 Получено {skillTotal.unlocked} из {skillTotal.total} ступеней</span>
+            <span className={progressPct === 100 ? 'font-bold text-emerald-300' : ''}>{progressPct}%</span>
+          </div>
+          <div className="rpg-progress-track h-2.5">
+            <div
+              className={progressPct === 100 ? 'rpg-progress-fill !bg-emerald-400' : 'rpg-progress-fill'}
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-sm text-stone-400">
-          {unlockedCount} из {groups.length} получено
+          {unlockedCount} из {groups.length} групп в этом навыке
         </span>
         <button
           onClick={() => setHideIncomplete((v) => !v)}

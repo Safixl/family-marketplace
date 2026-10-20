@@ -4,6 +4,7 @@ import com.familymarket.balance.BalanceService;
 import com.familymarket.balance.BalanceRepository;
 import com.familymarket.child.Child;
 import com.familymarket.child.ChildRepository;
+import com.familymarket.common.BadRequestException;
 import com.familymarket.common.NotFoundException;
 import com.familymarket.daily.DailyLogRepository;
 import com.familymarket.dto.AchievementDto;
@@ -11,6 +12,7 @@ import com.familymarket.dto.AchievementUpsertRequest;
 import com.familymarket.dto.ChildAchievementGroupDto;
 import com.familymarket.dto.GrantAchievementRequest;
 import com.familymarket.dto.GrantResult;
+import com.familymarket.dto.SkillTotalDto;
 import com.familymarket.house.HouseDayRepository;
 import com.familymarket.math.MathAttemptRepository;
 import com.familymarket.purchase.PurchaseRepository;
@@ -146,6 +148,22 @@ public class AchievementService {
     @Transactional
     public Achievement update(Long parentId, Long id, AchievementUpsertRequest request) {
         Achievement achievement = getOwned(parentId, id);
+        // Дефолтные достижения меняются только в части награды
+        if (isDefault(achievement)) {
+            if (request.rewardAmount() != null) {
+                achievement.setRewardAmount(request.rewardAmount());
+            }
+            achievement.setRewardStore(request.rewardStoreId() == null ? null
+                    : storeRepository.findById(request.rewardStoreId())
+                    .orElseThrow(() -> new NotFoundException("Магазин не найден")));
+            if (request.xpReward() != null) {
+                achievement.setXpReward(request.xpReward());
+            }
+            if (request.hiddenReward() != null) {
+                achievement.setHiddenReward(request.hiddenReward());
+            }
+            return achievementRepository.save(achievement);
+        }
         achievement.setName(request.name().trim());
         achievement.setDescription(request.description());
         if (request.icon() != null && !request.icon().isBlank()) {
@@ -189,7 +207,11 @@ public class AchievementService {
 
     @Transactional
     public void delete(Long parentId, Long id) {
-        achievementRepository.delete(getOwned(parentId, id));
+        Achievement achievement = getOwned(parentId, id);
+        if (isDefault(achievement)) {
+            throw new BadRequestException("Дефолтное достижение нельзя удалить — можно только изменить награду");
+        }
+        achievementRepository.delete(achievement);
     }
 
     /**
@@ -200,6 +222,9 @@ public class AchievementService {
     @Transactional
     public Achievement addLevel(Long parentId, Long achievementId) {
         Achievement base = getOwned(parentId, achievementId);
+        if (isDefault(base)) {
+            throw new BadRequestException("Добавлять уровни дефолтным достижениям нельзя");
+        }
         final String groupKey = base.getGroupKey() != null
                 ? base.getGroupKey()
                 : "g-" + base.getId() + "-" + System.currentTimeMillis();
@@ -264,6 +289,21 @@ public class AchievementService {
                 .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
         List<Achievement> achievements = achievementRepository.findByParentIdOrderByCreatedAtAsc(parentId);
         for (List<Achievement> group : groupByLevel(achievements)) {
+            // Серийные книжные квесты: авто-выдача, когда прочитаны ВСЕ книги чек-листа
+            String groupKey = group.get(0).getGroupKey();
+            if (groupKey != null && groupKey.startsWith("READING_QUEST_")) {
+                List<ReadingBookCatalog.CatalogBook> questBooks = ReadingBookCatalog.byQuest(groupKey);
+                boolean allRead = !questBooks.isEmpty() && questBooks.stream()
+                        .allMatch(b -> readingLogRepository.countApprovedByName(childId, b.name()) > 0);
+                if (allRead) {
+                    for (Achievement achievement : group) {
+                        if (childAchievementRepository.findByChildIdAndAchievementId(childId, achievement.getId()).isEmpty()) {
+                            unlockAchievement(childId, achievement);
+                        }
+                    }
+                }
+                continue;
+            }
             for (Achievement achievement : group) {
                 if (achievement.getTargetValue() <= 0) {
                     break; // без цели уровни не автоначисляются
@@ -290,6 +330,32 @@ public class AchievementService {
         if (achievement.getRewardStore() != null && achievement.getRewardAmount().signum() > 0) {
             balanceService.credit(childId, achievement.getRewardStore().getId(), achievement.getRewardAmount());
         }
+    }
+
+    /** Дефолтное (системное) достижение — нельзя удалять и менять параметры, только награду. */
+    private boolean isDefault(Achievement achievement) {
+        return "READING".equals(achievement.getSkill()) && achievement.getGroupKey() != null;
+    }
+
+    /** Сколько ступеней достижений есть и получено по каждому навыку (полоска прогресса). */
+    @Transactional(readOnly = true)
+    public List<SkillTotalDto> totals(Long childId) {
+        Long parentId = childRepository.findParentIdById(childId)
+                .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
+        ensureDefaultAchievements(parentId);
+        List<Achievement> achievements = achievementRepository.findByParentIdOrderByCreatedAtAsc(parentId);
+        Map<String, List<Achievement>> bySkill = new LinkedHashMap<>();
+        for (Achievement achievement : achievements) {
+            String key = achievement.getSkill() == null ? "NONE" : achievement.getSkill();
+            bySkill.computeIfAbsent(key, k -> new ArrayList<>()).add(achievement);
+        }
+        List<SkillTotalDto> result = new ArrayList<>();
+        for (Map.Entry<String, List<Achievement>> entry : bySkill.entrySet()) {
+            List<Long> ids = entry.getValue().stream().map(Achievement::getId).toList();
+            result.add(new SkillTotalDto(entry.getKey(), ids.size(),
+                    childAchievementRepository.countByChildIdAndAchievementIdIn(childId, ids)));
+        }
+        return result;
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.familymarket.achievement;
 
 import com.familymarket.common.CurrentUser;
+import com.familymarket.dto.SkillTotalDto;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,5 +27,11 @@ public class ChildAchievementController {
     @PostMapping("/api/child/achievements/{id}/track")
     public boolean track(@PathVariable Long id) {
         return achievementService.track(CurrentUser.childId(), id);
+    }
+
+    /** Сколько ступеней достижений есть и получено по каждому навыку. */
+    @GetMapping("/api/child/achievements/totals")
+    public List<SkillTotalDto> totals() {
+        return achievementService.totals(CurrentUser.childId());
     }
 }
