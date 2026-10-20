@@ -154,9 +154,11 @@ export default function SkillAchievementsTab({ skill }: { skill: SkillId }) {
                         {a.level === 0 ? 'Одиночное' : `Ур. ${a.level}`} · {tier.name}
                       </span>
                     </div>
-                    <p className="mt-0.5 whitespace-pre-line text-xs leading-relaxed text-stone-400">
-                      {a.description}
-                    </p>
+                    {!a.questBooks && (
+                      <p className="mt-0.5 whitespace-pre-line text-xs leading-relaxed text-stone-400">
+                        {a.description}
+                      </p>
+                    )}
 
                     {/* Чек-лист серийного книжного квеста (зелёный — прочитана) */}
                     {a.questBooks && a.questRead && (

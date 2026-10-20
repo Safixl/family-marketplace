@@ -287,6 +287,7 @@ public class AchievementService {
     public void checkProgress(Long childId) {
         Long parentId = childRepository.findParentIdById(childId)
                 .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
+        ensureDefaultAchievements(parentId);
         List<Achievement> achievements = achievementRepository.findByParentIdOrderByCreatedAtAsc(parentId);
         for (List<Achievement> group : groupByLevel(achievements)) {
             // Серийные книжные квесты: авто-выдача, когда прочитаны ВСЕ книги чек-листа

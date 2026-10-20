@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Award, Layers, Pencil, Plus, Trash2 } from 'lucide-react';
 import { api } from '../../api/client';
-import { AchievementDto, ChildDto, StoreDto } from '../../api/types';
+import { AchievementDto, ChildDto, ReadingCatalogBookDto, StoreDto } from '../../api/types';
 import { errMsg, fmtAmount } from '../../lib/format';
 import { tierForLevel } from '../../lib/achievementTiers';
 import Modal from '../Modal';
@@ -75,6 +75,21 @@ export default function AchievementsTab() {
   const [grantFor, setGrantFor] = useState<AchievementDto | null>(null);
   const [grantChildId, setGrantChildId] = useState('');
 
+  /** Ребёнок, для которого показывается прогресс прочтения книг серий. */
+  const [questChildId, setQuestChildId] = useState('');
+  /** Каталог прочитанных книг по ребёнку: childId → книги с read-статусом. */
+  const [catalogByChild, setCatalogByChild] = useState<Record<string, ReadingCatalogBookDto[]>>({});
+
+  const loadCatalog = useCallback(async (childId: string) => {
+    if (!childId) return;
+    try {
+      const list = await api.get<ReadingCatalogBookDto[]>(`/parent/children/${childId}/reading-book-catalog`);
+      setCatalogByChild((prev) => ({ ...prev, [childId]: list }));
+    } catch {
+      setCatalogByChild((prev) => ({ ...prev, [childId]: [] }));
+    }
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -87,6 +102,11 @@ export default function AchievementsTab() {
       setAchievements(a);
       setChildren(c);
       setStores(s);
+      const firstChild = c.find((ch) => ch.active);
+      if (firstChild && !questChildId) {
+        setQuestChildId(String(firstChild.id));
+        void loadCatalog(String(firstChild.id));
+      }
     } catch (e) {
       setError(errMsg(e));
     } finally {
@@ -246,6 +266,7 @@ export default function AchievementsTab() {
         <div className="space-y-4">
           {Object.entries(grouped).map(([key, group]) => {
             const sorted = [...group].sort((a, b) => a.level - b.level);
+            const isQuest = sorted[0].groupKey != null && sorted[0].groupKey.startsWith('READING_QUEST_');
             return (
               <div key={key} className="card space-y-3">
                 <div className="flex items-start gap-3">
@@ -260,8 +281,13 @@ export default function AchievementsTab() {
                           {sorted.length} ступеней
                         </span>
                       )}
+                      {isQuest && (
+                        <span className="badge ml-2 bg-emerald-50 text-emerald-700">
+                          ✨ авто-выдача при полном чек-листе
+                        </span>
+                      )}
                     </div>
-                    {sorted[0].description && (
+                    {!isQuest && sorted[0].description && (
                       <p className="text-sm text-slate-500">{sorted[0].description}</p>
                     )}
                   </div>
@@ -341,6 +367,20 @@ export default function AchievementsTab() {
                     );
                   })}
                 </div>
+
+                {/* Чек-лист серийных квестов: какие книги уже прочитаны ребёнком */}
+                {isQuest && (
+                  <QuestReadChecklist
+                    groupKey={sorted[0].groupKey ?? ''}
+                    questChildId={questChildId}
+                    setQuestChildId={(id) => {
+                      setQuestChildId(id);
+                      void loadCatalog(id);
+                    }}
+                    children={children}
+                    catalog={catalogByChild[questChildId] ?? []}
+                  />
+                )}
               </div>
             );
           })}
@@ -523,6 +563,77 @@ export default function AchievementsTab() {
             </div>
           </div>
         </Modal>
+      )}
+    </div>
+  );
+}
+
+/** Чек-лист серийного квеста: какие книги серии уже прочитаны выбранным ребёнком. */
+function QuestReadChecklist({
+  groupKey,
+  questChildId,
+  setQuestChildId,
+  children,
+  catalog,
+}: {
+  groupKey: string;
+  questChildId: string;
+  setQuestChildId: (id: string) => void;
+  children: ChildDto[];
+  catalog: ReadingCatalogBookDto[];
+}) {
+  const books = catalog.filter((b) => b.quest === groupKey);
+  const readCount = books.filter((b) => b.read).length;
+  const complete = books.length > 0 && readCount === books.length;
+  return (
+    <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs font-semibold text-slate-500">
+          📋 Прочитанные книги серии
+          {complete ? (
+            <span className="ml-1 font-bold text-emerald-600">— серия завершена! ✅</span>
+          ) : (
+            <span className="ml-1">
+              · {readCount}/{books.length}
+            </span>
+          )}
+        </span>
+        <select
+          className="input !w-auto !py-1 text-xs"
+          value={questChildId}
+          onChange={(e) => setQuestChildId(e.target.value)}
+        >
+          {children
+            .filter((c) => c.active)
+            .map((c) => (
+              <option key={c.id} value={String(c.id)}>
+                {c.avatarEmoji} {c.name}
+              </option>
+            ))}
+        </select>
+      </div>
+      {books.length === 0 ? (
+        <p className="text-xs text-slate-400">Выберите ребёнка, чтобы увидеть чек-лист</p>
+      ) : (
+        <ul className="grid gap-1 sm:grid-cols-2">
+          {books.map((b) => (
+            <li
+              key={b.id}
+              className={`flex items-center gap-2 text-xs ${b.read ? 'text-emerald-700' : 'text-slate-500'}`}
+            >
+              <span
+                className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px] ${
+                  b.read
+                    ? 'border-emerald-400 bg-emerald-100 text-emerald-600'
+                    : 'border-slate-300 bg-white text-transparent'
+                }`}
+              >
+                ✓
+              </span>
+              <span className={b.read ? 'font-medium' : ''}>{b.name}</span>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );

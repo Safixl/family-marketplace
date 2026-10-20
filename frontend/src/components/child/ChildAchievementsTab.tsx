@@ -253,7 +253,7 @@ export default function ChildAchievementsTab() {
                   </div>
                 </div>
 
-                {achievement.description && (
+                {!achievement.questBooks && achievement.description && (
                   <p className="text-sm text-stone-400">{achievement.description}</p>
                 )}
 
