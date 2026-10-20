@@ -5,6 +5,7 @@ import {
   History,
   Package,
   Send,
+  Trophy,
 } from 'lucide-react';
 import { api } from '../../../api/client';
 import {
@@ -21,14 +22,16 @@ import ArchiveTab from './tabs/ArchiveTab';
 import InventoryTab from './tabs/InventoryTab';
 import PurchaseHistoryTab from './tabs/PurchaseHistoryTab';
 import RequestsTab from './tabs/RequestsTab';
+import SkillAchievementsTab from './tabs/SkillAchievementsTab';
 import StatsTab from './tabs/StatsTab';
 import TaskCardsTab from './tabs/TaskCardsTab';
 
-type TabId = 'archive' | 'requests' | 'history' | 'inventory' | 'stats';
+type TabId = 'archive' | 'requests' | 'achievements' | 'history' | 'inventory' | 'stats';
 
 const TABS: Array<{ id: TabId; label: string; icon: typeof Archive }> = [
   { id: 'archive', label: 'Архив', icon: Archive },
   { id: 'requests', label: 'Запросы', icon: Send },
+  { id: 'achievements', label: 'Достижения', icon: Trophy },
   { id: 'history', label: 'Покупки', icon: History },
   { id: 'inventory', label: 'Инвентарь', icon: Package },
   { id: 'stats', label: 'Статистика', icon: BarChart3 },
@@ -121,6 +124,7 @@ export default function SkillModule({ config, store, progress }: Props) {
         ) : (
           <RequestsTab config={config} store={store} requests={requests} onReload={() => void load()} />
         ))}
+      {tab === 'achievements' && <SkillAchievementsTab skill={config.id} />}
       {tab === 'history' && <PurchaseHistoryTab purchases={purchases} />}
       {tab === 'inventory' && (
         <InventoryTab inventory={inventory} onReload={() => void load()} />

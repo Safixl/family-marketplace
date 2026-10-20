@@ -14,6 +14,7 @@ import com.familymarket.dto.GrantResult;
 import com.familymarket.house.HouseDayRepository;
 import com.familymarket.math.MathAttemptRepository;
 import com.familymarket.purchase.PurchaseRepository;
+import com.familymarket.reading.ReadingBook;
 import com.familymarket.reading.ReadingLogRepository;
 import com.familymarket.store.Store;
 import com.familymarket.store.StoreRepository;
@@ -29,12 +30,28 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 @Service
 public class AchievementService {
+
+    /** Ключевые слова для определения жанра книги (регистронезависимо). */
+    private static final Map<String, List<String>> GENRE_KEYWORDS = Map.ofEntries(
+            Map.entry("READING_GENRE_FANTASY", List.of("фэнтези", "fantasy")),
+            Map.entry("READING_GENRE_SCIFI", List.of("фантастик", "фантасти", "sci-fi", "sci fi", "scifi", "science fiction")),
+            Map.entry("READING_GENRE_DETECTIVE", List.of("детектив")),
+            Map.entry("READING_GENRE_ADVENTURE", List.of("приключ")),
+            Map.entry("READING_GENRE_CONTEMPORARY", List.of("современн", "проза", "драма", "жизнь")),
+            Map.entry("READING_GENRE_HISTORY", List.of("историч", "историческ", "history")),
+            Map.entry("READING_GENRE_HORROR", List.of("ужас", "мистик", "horror", "хоррор")),
+            Map.entry("READING_GENRE_SCIENCE", List.of("научпоп", "научно-поп", "энцикл", "познават", "non-fiction", "nonfiction")),
+            Map.entry("READING_GENRE_FAIRYTALE", List.of("сказк", "миф", "легенд", "басн")),
+            Map.entry("READING_GENRE_POETRY", List.of("поэзи", "стих", "поэм")),
+            Map.entry("READING_GENRE_COMICS", List.of("комикс", "манга", "manga")),
+            Map.entry("READING_GENRE_HUMOR", List.of("юмор", "комеди", "comedy", "смешн")));
 
     private final AchievementRepository achievementRepository;
     private final ChildRepository childRepository;
@@ -78,9 +95,25 @@ public class AchievementService {
         this.balanceService = balanceService;
     }
 
+    @Transactional
     public List<AchievementDto> list(Long parentId) {
+        ensureDefaultAchievements(parentId);
         return achievementRepository.findByParentIdOrderByCreatedAtDesc(parentId)
                 .stream().map(AchievementDto::from).toList();
+    }
+
+    /**
+     * Автогенерация стартового комплекта достижений чтения (вызывается при первом
+     * обращении родителя/ребёнка, пока у родителя нет ни одного READING-достижения).
+     */
+    @Transactional
+    public void ensureDefaultAchievements(Long parentId) {
+        if (achievementRepository.countByParentIdAndSkill(parentId, "READING") > 0) {
+            return;
+        }
+        User parent = userRepository.findById(parentId)
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
+        achievementRepository.saveAll(AchievementDefaults.reading(parent));
     }
 
     @Transactional
@@ -262,10 +295,11 @@ public class AchievementService {
      * Все достижения родителя для ребёнка, сгруппированные по уровням.
      * Ребёнок видит только ближайший уровень; скрытая награда скрыта до достижения.
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public List<ChildAchievementGroupDto> childAchievements(Long childId) {
         Long parentId = childRepository.findParentIdById(childId)
                 .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
+        ensureDefaultAchievements(parentId);
         List<Achievement> achievements = achievementRepository.findByParentIdOrderByCreatedAtAsc(parentId);
         List<ChildAchievementGroupDto> result = new ArrayList<>();
         for (List<Achievement> group : groupByLevel(achievements)) {
@@ -363,6 +397,16 @@ public class AchievementService {
         return switch (achievement.getTargetType()) {
             case "READING_BOOKS" -> readingLogRepository.countApprovedByChildId(childId);
             case "READING_PAGES" -> readingLogRepository.sumPagesByChildId(childId);
+            case "READING_GENRES" -> bookGenreCodes(childId).size();
+            case "READING_SERIES" -> bookSeries(childId).size();
+            case "READING_HEAVY_BOOKS" -> readingLogRepository.findApprovedBooksByChildId(childId).stream()
+                    .filter(b -> b.getPages() >= 600).count();
+            case "READING_GENRE_FANTASY", "READING_GENRE_SCIFI", "READING_GENRE_DETECTIVE",
+                    "READING_GENRE_ADVENTURE", "READING_GENRE_CONTEMPORARY", "READING_GENRE_HISTORY",
+                    "READING_GENRE_HORROR", "READING_GENRE_SCIENCE", "READING_GENRE_FAIRYTALE",
+                    "READING_GENRE_POETRY", "READING_GENRE_COMICS", "READING_GENRE_HUMOR" ->
+                    readingLogRepository.findApprovedBooksByChildId(childId).stream()
+                            .filter(b -> achievement.getTargetType().equals(genreCodeOf(b))).count();
             case "MATH_TASKS" -> mathAttemptRepository.countCorrectByChildId(childId);
             case "POINTS_EARNED" -> balanceRepository.sumByChildId(childId).longValue();
             case "MATH_STREAK" -> streak(mathAttemptRepository.findDistinctCorrectDates(childId));
@@ -425,12 +469,63 @@ public class AchievementService {
         }
         String normalized = targetType.trim().toUpperCase();
         return switch (normalized) {
-            case "READING_BOOKS", "READING_PAGES", "MATH_TASKS", "POINTS_EARNED",
+            case "READING_BOOKS", "READING_PAGES", "READING_GENRES", "READING_SERIES",
+                    "READING_HEAVY_BOOKS", "READING_GENRE_FANTASY", "READING_GENRE_SCIFI",
+                    "READING_GENRE_DETECTIVE", "READING_GENRE_ADVENTURE", "READING_GENRE_CONTEMPORARY",
+                    "READING_GENRE_HISTORY", "READING_GENRE_HORROR", "READING_GENRE_SCIENCE",
+                    "READING_GENRE_FAIRYTALE", "READING_GENRE_POETRY", "READING_GENRE_COMICS",
+                    "READING_GENRE_HUMOR",
+                    "MATH_TASKS", "POINTS_EARNED",
                     "MATH_STREAK", "HOUSE_CLEAN_STREAK", "HOUSE_HELP_STREAK", "HOME_PURCHASES",
                     "LOGIC_TASKS", "LANG_WORDS", "SPORT_DAYS",
                     "READING_STREAK", "LOGIC_STREAK", "LANG_STREAK", "SPORT_STREAK" -> normalized;
             default -> "NONE";
         };
+    }
+
+    // ---------- Чтение: жанры и серии ----------
+
+    /** Коды жанров книг, которые ребёнок уже прочитал (без повторов). */
+    private Set<String> bookGenreCodes(Long childId) {
+        Set<String> codes = new LinkedHashSet<>();
+        for (ReadingBook book : readingLogRepository.findApprovedBooksByChildId(childId)) {
+            String code = genreCodeOf(book);
+            if (code != null) {
+                codes.add(code);
+            }
+        }
+        return codes;
+    }
+
+    /** Уникальные серии прочитанных книг (без пустых). */
+    private Set<String> bookSeries(Long childId) {
+        Set<String> series = new LinkedHashSet<>();
+        for (ReadingBook book : readingLogRepository.findApprovedBooksByChildId(childId)) {
+            if (book.getSeries() != null && !book.getSeries().isBlank()) {
+                series.add(book.getSeries().trim().toLowerCase());
+            }
+        }
+        return series;
+    }
+
+    /** Код жанра книги по ключевым словам или null, если жанр не распознан. */
+    private String genreCodeOf(ReadingBook book) {
+        return genreCodeOf(book.getGenre());
+    }
+
+    private String genreCodeOf(String rawGenre) {
+        if (rawGenre == null || rawGenre.isBlank()) {
+            return null;
+        }
+        String genre = rawGenre.toLowerCase();
+        for (Map.Entry<String, List<String>> entry : GENRE_KEYWORDS.entrySet()) {
+            for (String keyword : entry.getValue()) {
+                if (genre.contains(keyword)) {
+                    return entry.getKey();
+                }
+            }
+        }
+        return null;
     }
 
     private String trimToNull(String value) {

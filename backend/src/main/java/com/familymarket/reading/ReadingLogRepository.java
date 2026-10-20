@@ -28,4 +28,8 @@ public interface ReadingLogRepository extends JpaRepository<ReadingLog, Long> {
 
     @Query("select distinct l.readAt from ReadingLog l where l.child.id = :childId and l.status = 'APPROVED'")
     List<java.time.LocalDate> findDistinctApprovedDates(@Param("childId") Long childId);
+
+    /** Одобренные книги ребёнка (для жанров, серий, «тяжёлых» книг). */
+    @Query("select l.book from ReadingLog l where l.child.id = :childId and l.status = 'APPROVED'")
+    List<ReadingBook> findApprovedBooksByChildId(@Param("childId") Long childId);
 }
