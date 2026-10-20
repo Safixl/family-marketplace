@@ -13,6 +13,7 @@ import com.familymarket.dto.ChildBookDto;
 import com.familymarket.dto.ChildReadingResponse;
 import com.familymarket.dto.ReadingBookDto;
 import com.familymarket.dto.ReadingBookUpsertRequest;
+import com.familymarket.dto.ReadingCatalogBookDto;
 import com.familymarket.dto.ReadingLogCreateRequest;
 import com.familymarket.dto.ReadingLogDto;
 import com.familymarket.dto.ReadingRequestApproveRequest;
@@ -239,6 +240,27 @@ public class ReadingService {
         ReadingLog log = getOwnedLog(parentId, logId);
         notificationService.markDoneByRef("readingLog", logId);
         logRepository.delete(log);
+    }
+
+    // ---------- Каталог книг из достижений ----------
+
+    @Transactional(readOnly = true)
+    public List<ReadingCatalogBookDto> catalogForChild(Long parentId, Long childId) {
+        childRepository.findByIdAndParentId(childId, parentId)
+                .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
+        return buildCatalog(childId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ReadingCatalogBookDto> catalogForMe(Long childId) {
+        return buildCatalog(childId);
+    }
+
+    private List<ReadingCatalogBookDto> buildCatalog(Long childId) {
+        return ReadingBookCatalog.all().stream()
+                .map(b -> ReadingCatalogBookDto.from(b,
+                        logRepository.countApprovedByName(childId, b.name()) > 0))
+                .toList();
     }
 
     // ---------- Заявки ребёнка на книги ----------

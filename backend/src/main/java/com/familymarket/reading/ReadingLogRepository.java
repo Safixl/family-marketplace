@@ -32,4 +32,8 @@ public interface ReadingLogRepository extends JpaRepository<ReadingLog, Long> {
     /** Одобренные книги ребёнка (для жанров, серий, «тяжёлых» книг). */
     @Query("select l.book from ReadingLog l where l.child.id = :childId and l.status = 'APPROVED'")
     List<ReadingBook> findApprovedBooksByChildId(@Param("childId") Long childId);
+
+    /** Прочитано ли хотя бы раз одобренной книгой с таким названием (для чек-листов). */
+    @Query("select count(l) from ReadingLog l where l.child.id = :childId and l.status = 'APPROVED' and lower(l.book.name) = lower(:name)")
+    long countApprovedByName(@Param("childId") Long childId, @Param("name") String name);
 }

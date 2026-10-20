@@ -20,5 +20,9 @@ public record ChildAchievementGroupDto(
         BigDecimal rewardAmount,
         boolean hiddenReward,
         boolean unlocked,
-        boolean completed) {
+        boolean completed,
+        /** Серийный книжный квест: названия книг чек-листа (null — не квест). */
+        java.util.List<String> questBooks,
+        /** Статусы прочтения книг чек-листа (true — прочитана). */
+        java.util.List<Boolean> questRead) {
 }

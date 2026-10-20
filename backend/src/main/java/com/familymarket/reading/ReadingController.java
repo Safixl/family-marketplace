@@ -4,6 +4,7 @@ import com.familymarket.common.CurrentUser;
 import com.familymarket.dto.BookmarkRequest;
 import com.familymarket.dto.ChildReadingResponse;
 import com.familymarket.dto.ReadingBookDto;
+import com.familymarket.dto.ReadingCatalogBookDto;
 import com.familymarket.dto.ReadingBookUpsertRequest;
 import com.familymarket.dto.ReadingLogCreateRequest;
 import com.familymarket.dto.ReadingLogDto;
@@ -59,6 +60,12 @@ public class ReadingController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteBook(@PathVariable Long id) {
         readingService.deleteBook(CurrentUser.parentId(), id);
+    }
+
+    /** Каталог готовых книг из достижений (с признаком «прочитана») для ребёнка. */
+    @GetMapping("/api/parent/children/{childId}/reading-book-catalog")
+    public List<ReadingCatalogBookDto> catalog(@PathVariable Long childId) {
+        return readingService.catalogForChild(CurrentUser.parentId(), childId);
     }
 
     // ---------- Отметки и статистика (родитель) ----------
@@ -122,6 +129,12 @@ public class ReadingController {
     @GetMapping("/api/child/reading")
     public ChildReadingResponse childReading() {
         return readingService.childReading(CurrentUser.childId());
+    }
+
+    /** Каталог готовых книг из достижений для ребёнка (чек-листы серий). */
+    @GetMapping("/api/child/reading/catalog")
+    public List<ReadingCatalogBookDto> catalogForMe() {
+        return readingService.catalogForMe(CurrentUser.childId());
     }
 
     @PostMapping("/api/child/books/{id}/read")

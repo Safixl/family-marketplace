@@ -15,6 +15,7 @@ import com.familymarket.house.HouseDayRepository;
 import com.familymarket.math.MathAttemptRepository;
 import com.familymarket.purchase.PurchaseRepository;
 import com.familymarket.reading.ReadingBook;
+import com.familymarket.reading.ReadingBookCatalog;
 import com.familymarket.reading.ReadingLogRepository;
 import com.familymarket.store.Store;
 import com.familymarket.store.StoreRepository;
@@ -305,6 +306,17 @@ public class AchievementService {
         for (List<Achievement> group : groupByLevel(achievements)) {
             Achievement first = group.get(0);
             Achievement current = null;
+            // Чек-лист серийного книжного квеста (книги из каталога достижений)
+            List<String> questBooks = null;
+            List<Boolean> questRead = null;
+            String groupKey = first.getGroupKey();
+            if (groupKey != null && groupKey.startsWith("READING_QUEST_")) {
+                List<ReadingBookCatalog.CatalogBook> quest = ReadingBookCatalog.byQuest(groupKey);
+                questBooks = quest.stream().map(ReadingBookCatalog.CatalogBook::name).toList();
+                questRead = quest.stream()
+                        .map(b -> readingLogRepository.countApprovedByName(childId, b.name()) > 0)
+                        .toList();
+            }
             boolean completed = true;
             for (Achievement achievement : group) {
                 long progress = progressFor(achievement, childId);
@@ -344,7 +356,9 @@ public class AchievementService {
                     reward,
                     current.isHiddenReward(),
                     unlocked,
-                    completed));
+                    completed,
+                    questBooks,
+                    questRead));
         }
         return result;
     }

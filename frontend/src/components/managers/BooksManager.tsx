@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { BookOpen, Check, CheckCircle2, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { ArrowLeft, BookOpen, Check, CheckCircle2, Library, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { api } from '../../api/client';
 import {
   ChildDto,
   ReadingBookDto,
+  ReadingCatalogBookDto,
   ReadingLogDto,
   ReadingRequestDto,
   ReadingSettingsDto,
@@ -26,6 +27,25 @@ interface BookForm {
 
 const EMPTY_BOOK: BookForm = { name: '', author: '', series: '', genre: '', pages: '', multiplier: '1', active: true };
 
+/** Жанры достижений чтения (выпадающий список). */
+const GENRES = [
+  'Фэнтези',
+  'Научная фантастика',
+  'Детектив',
+  'Приключения',
+  'Современная проза',
+  'Исторические романы',
+  'Ужасы и мистика',
+  'Научпоп и энциклопедии',
+  'Сказки, мифы и легенды',
+  'Поэзия',
+  'Комиксы и манга',
+  'Юмор',
+];
+
+/** Режим добавления книги: выбор источника, каталог достижений или ручное заполнение. */
+type BookMode = 'choose' | 'catalog' | 'custom';
+
 interface Props {
   store: StoreDto;
   onClose: () => void;
@@ -42,10 +62,13 @@ export default function BooksManager({ store, onClose }: Props) {
   const [busy, setBusy] = useState(false);
 
   const [bookModal, setBookModal] = useState(false);
+  const [bookMode, setBookMode] = useState<BookMode>('choose');
   const [editing, setEditing] = useState<ReadingBookDto | null>(null);
   const [form, setForm] = useState<BookForm>(EMPTY_BOOK);
+  const [catalog, setCatalog] = useState<ReadingCatalogBookDto[]>([]);
 
   const [approveRequest, setApproveRequest] = useState<ReadingRequestDto | null>(null);
+  const [requestMode, setRequestMode] = useState<BookMode>('choose');
   const [requestForm, setRequestForm] = useState<BookForm>(EMPTY_BOOK);
 
   const loadBooks = useCallback(async (id: string) => {
@@ -113,6 +136,16 @@ export default function BooksManager({ store, onClose }: Props) {
     }
   }, []);
 
+  /** Каталог готовых книг из достижений (с признаком «прочитана»). */
+  const loadCatalog = useCallback(async (id: string) => {
+    if (!id) return;
+    try {
+      setCatalog(await api.get<ReadingCatalogBookDto[]>(`/parent/children/${id}/reading-book-catalog`));
+    } catch {
+      setCatalog([]);
+    }
+  }, []);
+
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -127,11 +160,13 @@ export default function BooksManager({ store, onClose }: Props) {
     void loadStats(childId);
     void loadRequests(childId);
     void loadReadingSettings(childId);
-  }, [childId, loadBooks, loadStats, loadRequests, loadReadingSettings]);
+    void loadCatalog(childId);
+  }, [childId, loadBooks, loadStats, loadRequests, loadReadingSettings, loadCatalog]);
 
   const openCreate = () => {
     setEditing(null);
     setForm(EMPTY_BOOK);
+    setBookMode('choose');
     setBookModal(true);
   };
 
@@ -146,7 +181,34 @@ export default function BooksManager({ store, onClose }: Props) {
       multiplier: String(book.multiplier),
       active: book.active,
     });
+    setBookMode('custom');
     setBookModal(true);
+  };
+
+  /** Создать книгу из каталога достижений (параметры готовые, множитель 1). */
+  const createFromCatalog = async (item: ReadingCatalogBookDto) => {
+    if (!childId) {
+      alert('Сначала выберите ребёнка');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.post(`/parent/stores/${store.id}/children/${childId}/books`, {
+        name: item.name,
+        author: item.author,
+        series: item.series,
+        genre: item.genre,
+        pages: item.pages,
+        multiplier: 1,
+        active: true,
+      });
+      setBookModal(false);
+      await Promise.all([loadBooks(childId), loadCatalog(childId)]);
+    } catch (e) {
+      alert(errMsg(e));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const saveBook = async () => {
@@ -239,7 +301,30 @@ export default function BooksManager({ store, onClose }: Props) {
 
   const openApproveRequest = (request: ReadingRequestDto) => {
     setApproveRequest(request);
+    setRequestMode('choose');
     setRequestForm({ ...EMPTY_BOOK, name: request.title });
+  };
+
+  /** Принять заявку ребёнка книгой из каталога достижений. */
+  const approveFromCatalog = async (item: ReadingCatalogBookDto) => {
+    if (!approveRequest) return;
+    setBusy(true);
+    try {
+      await api.post(`/parent/reading-requests/${approveRequest.id}/approve`, {
+        name: item.name,
+        author: item.author,
+        series: item.series,
+        genre: item.genre,
+        pages: item.pages,
+        multiplier: 1,
+      });
+      setApproveRequest(null);
+      await Promise.all([loadBooks(childId), loadRequests(childId), loadCatalog(childId)]);
+    } catch (e) {
+      alert(errMsg(e));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const saveApproveRequest = async () => {
@@ -525,88 +610,247 @@ export default function BooksManager({ store, onClose }: Props) {
         )}
       </div>
 
-      {/* Модалка книги */}
+      {/* Модалка книги: выбор источника / каталог достижений / форма */}
       {bookModal && (
-        <Modal title={editing ? 'Редактировать книгу' : 'Новая книга'} onClose={() => setBookModal(false)}>
-          <div className="space-y-4">
-            <div>
-              <label className="label">Название</label>
-              <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} autoFocus />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label">Автор</label>
-                <input className="input" value={form.author} onChange={(e) => setForm({ ...form, author: e.target.value })} />
+        <Modal
+          title={editing ? 'Редактировать книгу' : 'Новая книга'}
+          onClose={() => setBookModal(false)}
+          wide={!editing && bookMode !== 'custom'}
+        >
+          <div className="space-y-3">
+            {!editing && bookMode === 'choose' && (
+              <>
+                <p className="text-sm text-slate-500">Откуда добавить книгу?</p>
+                <ChooseSource
+                  onCatalog={() => setBookMode('catalog')}
+                  onCustom={() => {
+                    setForm(EMPTY_BOOK);
+                    setBookMode('custom');
+                  }}
+                />
+              </>
+            )}
+
+            {!editing && bookMode === 'catalog' && (
+              <>
+                <BackButton onClick={() => setBookMode('choose')} />
+                <CatalogPicker catalog={catalog} busy={busy} onPick={(item) => void createFromCatalog(item)} />
+              </>
+            )}
+
+            {(editing || bookMode === 'custom') && <BookFormFields form={form} setForm={setForm} />}
+
+            {(editing || bookMode === 'custom') && (
+              <div className="flex justify-end gap-2 border-t border-slate-100 pt-2">
+                {!editing && <button className="btn-secondary" onClick={() => setBookMode('choose')}>Назад</button>}
+                <button className="btn-secondary" onClick={() => setBookModal(false)}>Отмена</button>
+                <button className="btn-primary" disabled={busy} onClick={() => void saveBook()}>Сохранить</button>
               </div>
-              <div>
-                <label className="label">Серия</label>
-                <input className="input" value={form.series} onChange={(e) => setForm({ ...form, series: e.target.value })} />
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="label">Жанр</label>
-                <input className="input" value={form.genre} onChange={(e) => setForm({ ...form, genre: e.target.value })} />
-              </div>
-              <div>
-                <label className="label">Страниц</label>
-                <input className="input" type="number" min="0" value={form.pages} onChange={(e) => setForm({ ...form, pages: e.target.value })} />
-              </div>
-              <div>
-                <label className="label">Множитель</label>
-                <input className="input" type="number" min="0" step="0.1" value={form.multiplier} onChange={(e) => setForm({ ...form, multiplier: e.target.value })} />
-              </div>
-            </div>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />
-              Книга активна (видна ребенку)
-            </label>
-            <div className="flex justify-end gap-2 pt-2">
-              <button className="btn-secondary" onClick={() => setBookModal(false)}>Отмена</button>
-              <button className="btn-primary" disabled={busy} onClick={() => void saveBook()}>Сохранить</button>
-            </div>
+            )}
           </div>
         </Modal>
       )}
 
-      {/* Модалка принятия заявки */}
+      {/* Модалка принятия заявки: выбор источника / каталог / форма */}
       {approveRequest && (
-        <Modal title={`Принять заявку: ${approveRequest.title}`} onClose={() => setApproveRequest(null)}>
-          <div className="space-y-4">
-            <p className="text-sm text-slate-500">
-              Заполните данные книги — она появится у ребёнка с множителем.
-            </p>
-            <div>
-              <label className="label">Название</label>
-              <input className="input" value={requestForm.name} onChange={(e) => setRequestForm({ ...requestForm, name: e.target.value })} autoFocus />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label">Автор</label>
-                <input className="input" value={requestForm.author} onChange={(e) => setRequestForm({ ...requestForm, author: e.target.value })} />
+        <Modal title={`Принять заявку: ${approveRequest.title}`} onClose={() => setApproveRequest(null)} wide={requestMode !== 'custom'}>
+          <div className="space-y-3">
+            {requestMode === 'choose' && (
+              <>
+                <p className="text-sm text-slate-500">Чем станет книга из заявки?</p>
+                <ChooseSource
+                  onCatalog={() => setRequestMode('catalog')}
+                  onCustom={() => setRequestMode('custom')}
+                />
+              </>
+            )}
+
+            {requestMode === 'catalog' && (
+              <>
+                <BackButton onClick={() => setRequestMode('choose')} />
+                <CatalogPicker catalog={catalog} busy={busy} onPick={(item) => void approveFromCatalog(item)} />
+              </>
+            )}
+
+            {requestMode === 'custom' && (
+              <>
+                <BackButton onClick={() => setRequestMode('choose')} />
+                <BookFormFields form={requestForm} setForm={setRequestForm} />
+              </>
+            )}
+
+            {requestMode === 'custom' && (
+              <div className="flex justify-end gap-2 border-t border-slate-100 pt-2">
+                <button className="btn-secondary" onClick={() => setApproveRequest(null)}>Отмена</button>
+                <button className="btn-primary" disabled={busy} onClick={() => void saveApproveRequest()}>Принять</button>
               </div>
-              <div>
-                <label className="label">Жанр</label>
-                <input className="input" value={requestForm.genre} onChange={(e) => setRequestForm({ ...requestForm, genre: e.target.value })} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label">Страниц</label>
-                <input className="input" type="number" min="0" value={requestForm.pages} onChange={(e) => setRequestForm({ ...requestForm, pages: e.target.value })} />
-              </div>
-              <div>
-                <label className="label">Множитель</label>
-                <input className="input" type="number" min="0" step="0.1" value={requestForm.multiplier} onChange={(e) => setRequestForm({ ...requestForm, multiplier: e.target.value })} />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button className="btn-secondary" onClick={() => setApproveRequest(null)}>Отмена</button>
-              <button className="btn-primary" disabled={busy} onClick={() => void saveApproveRequest()}>Принять</button>
-            </div>
+            )}
           </div>
         </Modal>
       )}
     </Modal>
+  );
+}
+
+// ---------- Вспомогательные элементы ----------
+
+function BackButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button className="text-sm font-medium text-indigo-600 hover:underline" onClick={onClick}>
+      <ArrowLeft size={16} className="mr-1 inline" /> Назад
+    </button>
+  );
+}
+
+/** Выбор источника: книга из достижений или кастомная. */
+function ChooseSource({ onCatalog, onCustom }: { onCatalog: () => void; onCustom: () => void }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <button
+        onClick={onCatalog}
+        className="flex flex-col items-start gap-2 rounded-2xl border border-slate-200 p-4 text-left transition hover:border-indigo-300 hover:bg-indigo-50"
+      >
+        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
+          <Library size={20} />
+        </span>
+        <span className="font-bold text-slate-700">Книга из достижений</span>
+        <span className="text-xs text-slate-500">
+          Готовые книги серий: Гарри Поттер, Властелин колец, Нарния, Волков, Перси Джексон
+        </span>
+      </button>
+      <button
+        onClick={onCustom}
+        className="flex flex-col items-start gap-2 rounded-2xl border border-slate-200 p-4 text-left transition hover:border-emerald-300 hover:bg-emerald-50"
+      >
+        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+          <BookOpen size={20} />
+        </span>
+        <span className="font-bold text-slate-700">Кастомная</span>
+        <span className="text-xs text-slate-500">
+          Заполните параметры сами: название, автор, жанр, страницы, множитель
+        </span>
+      </button>
+    </div>
+  );
+}
+
+/** Список заготовок каталога достижений: серые — не прочитаны, зелёные — прочитаны. */
+function CatalogPicker({
+  catalog,
+  busy,
+  onPick,
+}: {
+  catalog: ReadingCatalogBookDto[];
+  busy: boolean;
+  onPick: (item: ReadingCatalogBookDto) => void;
+}) {
+  if (catalog.length === 0) {
+    return <EmptyState title="Каталог пуст" hint="Книги из достижений скоро появятся" />;
+  }
+  return (
+    <div className="max-h-96 space-y-2 overflow-y-auto pr-1">
+      {catalog.map((item) => (
+        <button
+          key={item.id}
+          disabled={busy}
+          onClick={() => onPick(item)}
+          className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left transition ${
+            item.read
+              ? 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100'
+              : 'border-slate-200 bg-slate-50 hover:border-indigo-300 hover:bg-white'
+          }`}
+        >
+          <div
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-lg ${
+              item.read ? 'bg-emerald-100' : 'bg-slate-200'
+            }`}
+          >
+            {item.read ? (
+              <CheckCircle2 size={18} className="text-emerald-600" />
+            ) : (
+              <BookOpen size={16} className="text-slate-500" />
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className={`truncate text-sm font-semibold ${item.read ? 'text-emerald-800' : 'text-slate-600'}`}>
+              {item.name}
+            </div>
+            <div className="truncate text-xs text-slate-400">
+              {[item.author, item.series, item.genre].filter(Boolean).join(' · ')} · {item.pages} стр.
+            </div>
+          </div>
+          {item.read && <span className="badge bg-emerald-100 text-emerald-700">прочитана</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Поля формы книги (кастомная): жанр из списка достижений, множитель по умолчанию 1. */
+function BookFormFields({ form, setForm }: { form: BookForm; setForm: (next: BookForm) => void }) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="label">Название</label>
+        <input
+          className="input"
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          autoFocus
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="label">Автор</label>
+          <input className="input" value={form.author} onChange={(e) => setForm({ ...form, author: e.target.value })} />
+        </div>
+        <div>
+          <label className="label">Серия</label>
+          <input className="input" value={form.series} onChange={(e) => setForm({ ...form, series: e.target.value })} />
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label className="label">Жанр</label>
+          <select className="input" value={form.genre} onChange={(e) => setForm({ ...form, genre: e.target.value })}>
+            <option value="">— не выбран —</option>
+            {GENRES.map((g) => (
+              <option key={g} value={g}>
+                {g}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="label">Страниц</label>
+          <input
+            className="input"
+            type="number"
+            min="0"
+            value={form.pages}
+            onChange={(e) => setForm({ ...form, pages: e.target.value })}
+          />
+        </div>
+        <div>
+          <label className="label">Множитель</label>
+          <input
+            className="input"
+            type="number"
+            min="0"
+            step="0.1"
+            value={form.multiplier}
+            onChange={(e) => setForm({ ...form, multiplier: e.target.value })}
+          />
+        </div>
+      </div>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={form.active}
+          onChange={(e) => setForm({ ...form, active: e.target.checked })}
+        />
+        Книга активна (видна ребёнку)
+      </label>
+    </div>
   );
 }

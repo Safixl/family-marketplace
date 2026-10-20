@@ -144,6 +144,10 @@ export interface ChildAchievementGroupDto {
   hiddenReward: boolean;
   unlocked: boolean;
   completed: boolean;
+  /** Серийный книжный квест: названия книг чек-листа (null — не квест). */
+  questBooks: string[] | null;
+  /** Статусы прочтения книг чек-листа (true — прочитана). */
+  questRead: boolean[] | null;
 }
 
 export interface PurchasedItemDto {
@@ -331,6 +335,19 @@ export interface ReadingSettingsDto {
   pagesTarget: number;
   rewardAmount: number;
   xpReward: number;
+}
+
+/** Заготовка книги из достижений (серийные книжные квесты). */
+export interface ReadingCatalogBookDto {
+  id: string;
+  name: string;
+  author: string | null;
+  series: string | null;
+  genre: string;
+  pages: number;
+  quest: string;
+  /** Прочитана ли книга ребёнком (одобренный лог с таким названием). */
+  read: boolean;
 }
 
 export interface MathTaskDto {

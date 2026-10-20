@@ -131,6 +131,35 @@ export default function SkillAchievementsTab({ skill }: { skill: SkillId }) {
                       {a.description}
                     </p>
 
+                    {/* Чек-лист серийного книжного квеста (зелёный — прочитана) */}
+                    {a.questBooks && a.questRead && (
+                      <div className="mt-2 rounded-xl bg-stone-900/70 p-2">
+                        <div className="mb-1 text-[11px] font-semibold text-stone-400">
+                          📋 Книги серии: {a.questRead.filter(Boolean).length}/{a.questBooks.length} прочитано
+                        </div>
+                        <ul className="space-y-1">
+                          {a.questBooks.map((title, i) => {
+                            const done = a.questRead?.[i] ?? false;
+                            return (
+                              <li
+                                key={`${a.achievementId}-${i}`}
+                                className={`flex items-center gap-1.5 text-xs ${
+                                  done ? 'text-emerald-300' : 'text-stone-500'
+                                }`}
+                              >
+                                {done ? (
+                                  <CheckCircle2 size={13} className="shrink-0 text-emerald-400" />
+                                ) : (
+                                  <span className="inline-block h-3 w-3 shrink-0 rounded-sm border border-stone-600" />
+                                )}
+                                <span className={done ? 'opacity-80' : ''}>{title}</span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    )}
+
                     {hasTarget && (
                       <div className="mt-2">
                         <div className="mb-0.5 flex justify-between text-[11px] text-stone-400">
