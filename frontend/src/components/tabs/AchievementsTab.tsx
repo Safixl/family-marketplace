@@ -79,7 +79,7 @@ export default function AchievementsTab() {
   const [viewChildId, setViewChildId] = useState('');
   /** Статусы достижений выбранного ребёнка (по groupKey). */
   const [childMeta, setChildMeta] = useState<ChildAchievementGroupDto[]>([]);
-  const [skillFilter, setSkillFilter] = useState<'ALL' | 'READING' | 'MATH' | 'NONE'>('ALL');
+  const [skillFilter, setSkillFilter] = useState<'ALL' | 'READING' | 'MATH' | 'HOUSE' | 'NONE'>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'DONE' | 'OPEN'>('ALL');
   /** Каталог прочитанных книг по ребёнку: childId → книги с read-статусом. */
   const [catalogByChild, setCatalogByChild] = useState<Record<string, ReadingCatalogBookDto[]>>({});
@@ -300,11 +300,12 @@ export default function AchievementsTab() {
             <select
               className="input !w-auto"
               value={skillFilter}
-              onChange={(e) => setSkillFilter(e.target.value as 'ALL' | 'READING' | 'MATH' | 'NONE')}
+              onChange={(e) => setSkillFilter(e.target.value as 'ALL' | 'READING' | 'MATH' | 'HOUSE' | 'NONE')}
             >
               <option value="ALL">Все навыки</option>
               <option value="READING">📚 Чтение</option>
               <option value="MATH">🧮 Математика</option>
+              <option value="HOUSE">🏠 Порядок в комнате</option>
               <option value="NONE">Без навыка</option>
             </select>
             <select
@@ -319,11 +320,18 @@ export default function AchievementsTab() {
           </div>
 
           {/* Секции по навыкам */}
-          {(['READING', 'MATH', 'NONE'] as const).map((skill) => {
+          {(['READING', 'MATH', 'HOUSE', 'NONE'] as const).map((skill) => {
             if (skillFilter !== 'ALL' && skillFilter !== skill) return null;
             const skillGroups = Object.entries(grouped).filter(([, group]) => (group[0].skill ?? 'NONE') === skill);
             if (skillGroups.length === 0) return null;
-            const skillLabel = skill === 'READING' ? '📚 Чтение' : skill === 'MATH' ? '🧮 Математика' : '🏅 Без навыка';
+            const skillLabel =
+              skill === 'READING'
+                ? '📚 Чтение'
+                : skill === 'MATH'
+                  ? '🧮 Математика'
+                  : skill === 'HOUSE'
+                    ? '🏠 Порядок в комнате'
+                    : '🏅 Без навыка';
             return (
               <section key={skill}>
                 <h2 className="mb-2 text-lg font-extrabold text-slate-700">{skillLabel}</h2>
