@@ -280,6 +280,8 @@ export interface ReadingBookDto {
   multiplier: number;
   active: boolean;
   createdAt: string;
+  /** Текущая страница ребёнка (закладка), null — не начинал. */
+  currentPage: number | null;
 }
 
 export type ReadingLogStatus = 'PENDING' | 'APPROVED' | 'REJECTED';

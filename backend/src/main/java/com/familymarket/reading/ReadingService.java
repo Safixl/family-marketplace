@@ -90,7 +90,11 @@ public class ReadingService {
         childRepository.findByIdAndParentId(childId, parentId)
                 .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
         return bookRepository.findByChildIdOrderByCreatedAtAsc(childId)
-                .stream().map(ReadingBookDto::from).toList();
+                .stream()
+                .map(b -> ReadingBookDto.withCurrentPage(b,
+                        bookmarkRepository.findByChildIdAndBookId(childId, b.getId())
+                                .map(ReadingBookmark::getPage).orElse(null)))
+                .toList();
     }
 
     @Transactional

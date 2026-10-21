@@ -51,6 +51,13 @@ interface Props {
   onClose: () => void;
 }
 
+const ARCHIVE_STATUS: Record<string, { label: string; cls: string }> = {
+  read: { label: '✅ Прочитана', cls: 'bg-emerald-100 text-emerald-700' },
+  reading: { label: '📖 Читает', cls: 'bg-sky-100 text-sky-700' },
+  pending: { label: '⏳ На проверке', cls: 'bg-amber-100 text-amber-700' },
+  library: { label: '📚 В библиотеке', cls: 'bg-slate-100 text-slate-600' },
+};
+
 export default function BooksManager({ store, onClose }: Props) {
   const [books, setBooks] = useState<ReadingBookDto[]>([]);
   const [children, setChildren] = useState<ChildDto[]>([]);
@@ -70,6 +77,11 @@ export default function BooksManager({ store, onClose }: Props) {
   const [approveRequest, setApproveRequest] = useState<ReadingRequestDto | null>(null);
   const [requestMode, setRequestMode] = useState<BookMode>('choose');
   const [requestForm, setRequestForm] = useState<BookForm>(EMPTY_BOOK);
+
+  const [archiveQuery, setArchiveQuery] = useState('');
+  const [archiveStatus, setArchiveStatus] = useState<'ALL' | 'read' | 'reading' | 'pending' | 'library'>('ALL');
+  const [archiveGenre, setArchiveGenre] = useState('ALL');
+  const [archiveSort, setArchiveSort] = useState<'added' | 'read' | 'pages' | 'name'>('added');
 
   const loadBooks = useCallback(async (id: string) => {
     if (!id) return;
@@ -376,6 +388,47 @@ export default function BooksManager({ store, onClose }: Props) {
   const approvedIds = new Set(stats?.logs.filter((l) => l.status === 'APPROVED').map((l) => l.bookId) ?? []);
   const pendingIds = new Set(pendingLogs.map((l) => l.bookId));
 
+  // Архив чтения: прочитанные и книги в процессе, с фильтрами по колонкам
+  const archiveGenres = Array.from(new Set(books.map((b) => b.genre).filter((g): g is string => !!g)));
+  const archiveRows = books
+    .map((book) => {
+      const approved = (stats?.logs ?? []).find((l) => l.bookId === book.id && l.status === 'APPROVED');
+      const pending = (stats?.logs ?? []).find((l) => l.bookId === book.id && l.status === 'PENDING');
+      const page = book.currentPage ?? 0;
+      const status: 'read' | 'reading' | 'pending' | 'library' = approved
+        ? 'read'
+        : pending
+          ? 'pending'
+          : page > 0 && page < book.pages
+            ? 'reading'
+            : 'library';
+      return {
+        book,
+        status,
+        points: approved ? approved.points : 0,
+        readAt: approved ? approved.readAt : null,
+      };
+    })
+    .filter((r) => {
+      const q = archiveQuery.trim().toLowerCase();
+      if (q && !`${r.book.name} ${r.book.author ?? ''}`.toLowerCase().includes(q)) return false;
+      if (archiveStatus !== 'ALL' && r.status !== archiveStatus) return false;
+      if (archiveGenre !== 'ALL' && (r.book.genre ?? '') !== archiveGenre) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      switch (archiveSort) {
+        case 'pages':
+          return b.book.pages - a.book.pages;
+        case 'name':
+          return a.book.name.localeCompare(b.book.name, 'ru');
+        case 'read':
+          return (b.readAt ?? '').localeCompare(a.readAt ?? '');
+        default:
+          return b.book.createdAt.localeCompare(a.book.createdAt);
+      }
+    });
+
   return (
     <Modal title={`📚 ${store.name} — книги и чтение`} onClose={onClose} wide>
       <div className="space-y-5">
@@ -560,6 +613,94 @@ export default function BooksManager({ store, onClose }: Props) {
             </div>
           )}
         </div>
+
+        {/* Архив чтения: прочитанные + в процессе, с фильтрами по колонкам */}
+        {childId && (
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-600">Архив чтения ({archiveRows.length})</h3>
+            </div>
+            <div className="mb-2 flex flex-wrap gap-2">
+              <input
+                className="input !w-60"
+                placeholder="Поиск по названию/автору…"
+                value={archiveQuery}
+                onChange={(e) => setArchiveQuery(e.target.value)}
+              />
+              <select
+                className="input !w-auto"
+                value={archiveStatus}
+                onChange={(e) => setArchiveStatus(e.target.value as typeof archiveStatus)}
+              >
+                <option value="ALL">Все статусы</option>
+                <option value="read">✅ Прочитана</option>
+                <option value="reading">📖 Читает</option>
+                <option value="pending">⏳ На проверке</option>
+                <option value="library">📚 В библиотеке</option>
+              </select>
+              <select className="input !w-auto" value={archiveGenre} onChange={(e) => setArchiveGenre(e.target.value)}>
+                <option value="ALL">Все жанры</option>
+                {archiveGenres.map((g) => (
+                  <option key={g} value={g}>
+                    {g}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="input !w-auto"
+                value={archiveSort}
+                onChange={(e) => setArchiveSort(e.target.value as typeof archiveSort)}
+              >
+                <option value="added">По добавлению</option>
+                <option value="read">По дате прочтения</option>
+                <option value="pages">По страницам</option>
+                <option value="name">По названию</option>
+              </select>
+            </div>
+            {archiveRows.length === 0 ? (
+              <EmptyState title="Книг не найдено" hint="Измените фильтры" />
+            ) : (
+              <div className="max-h-96 overflow-auto rounded-xl border border-slate-100">
+                <table className="w-full min-w-[680px] text-left text-sm">
+                  <thead className="sticky top-0 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                    <tr>
+                      <th className="px-3 py-2">Книга</th>
+                      <th className="px-3 py-2">Жанр</th>
+                      <th className="px-3 py-2">Страниц</th>
+                      <th className="px-3 py-2">Текущая</th>
+                      <th className="px-3 py-2">Статус</th>
+                      <th className="px-3 py-2">Баллы</th>
+                      <th className="px-3 py-2">Прочитана</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {archiveRows.map((r) => {
+                      const meta = ARCHIVE_STATUS[r.status];
+                      return (
+                        <tr key={r.book.id} className="border-t border-slate-100">
+                          <td className="px-3 py-2">
+                            <div className="font-semibold text-slate-800">{r.book.name}</div>
+                            <div className="text-xs text-slate-500">{r.book.author ?? '—'}</div>
+                          </td>
+                          <td className="px-3 py-2 text-slate-600">{r.book.genre ?? '—'}</td>
+                          <td className="px-3 py-2 text-slate-600">{r.book.pages}</td>
+                          <td className="px-3 py-2 text-slate-600">{r.book.currentPage ?? 0}</td>
+                          <td className="px-3 py-2">
+                            <span className={`badge ${meta.cls}`}>{meta.label}</span>
+                          </td>
+                          <td className="px-3 py-2 text-slate-600">{r.points ? fmtAmount(r.points) : '—'}</td>
+                          <td className="px-3 py-2 text-slate-500">
+                            {r.readAt ? new Date(r.readAt).toLocaleDateString('ru-RU') : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Ожидают подтверждения (отметил ребёнок) */}
         {pendingLogs.length > 0 && (
