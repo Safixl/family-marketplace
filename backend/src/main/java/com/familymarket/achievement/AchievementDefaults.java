@@ -23,10 +23,10 @@ public final class AchievementDefaults {
     private static final int[] BOOK_COUNTS = {1, 3, 5, 8, 12, 16, 20, 25, 30, 35, 40};
 
     /** Опыт за ступени многоуровневых достижений (I→XI). */
-    private static final int[] LEVEL_XP = {10, 25, 50, 85, 130, 190, 270, 370, 500, 660, 860};
+    public static final int[] LEVEL_XP = {10, 25, 50, 85, 130, 190, 270, 370, 500, 660, 860};
 
     /** Опыт за одиночные достижения (квесты, вызовы, сеты). */
-    private static final int SINGLE_XP = 130;
+    public static final int SINGLE_XP = 130;
 
     private AchievementDefaults() {
     }

@@ -126,6 +126,23 @@ public class AchievementService {
         if (achievementRepository.countByParentIdAndSkill(parentId, "HOUSE") == 0) {
             achievementRepository.saveAll(AchievementDefaults.house(parent));
         }
+        syncDefaultXp(parentId);
+    }
+
+    /** Обновляет XP у дефолтных достижений (ступени 10…860, одиночные 130) — для уже созданных комплектов. */
+    private void syncDefaultXp(Long parentId) {
+        for (Achievement achievement : achievementRepository.findByParentIdOrderByCreatedAtAsc(parentId)) {
+            if (!isDefault(achievement)) {
+                continue;
+            }
+            int xp = achievement.getLevel() > 0
+                    ? AchievementDefaults.LEVEL_XP[Math.min(10, achievement.getLevel() - 1)]
+                    : AchievementDefaults.SINGLE_XP;
+            if (achievement.getXpReward() != xp) {
+                achievement.setXpReward(xp);
+                achievementRepository.save(achievement);
+            }
+        }
     }
 
     @Transactional

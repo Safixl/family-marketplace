@@ -98,8 +98,13 @@ public class SkillService {
             long unlocked = childAchievementRepository.countByChildIdAndAchievementIdIn(
                     childId, achievements.stream().map(Achievement::getId).toList());
 
-            // Достиженческая часть: максимальный прогресс по группам уровней (0..60)
-            double achievementScore = achievementScore(childId, achievements);
+            // Опыт от полученных достижений навыка (полный xpReward за каждое)
+            long achievementXp = achievements.stream()
+                    .filter(a -> a.getXpReward() > 0)
+                    .filter(a -> childAchievementRepository
+                            .findByChildIdAndAchievementId(childId, a.getId()).isPresent())
+                    .mapToLong(Achievement::getXpReward)
+                    .sum();
 
             // Активностная часть (0..40)
             double activityScore = switch (meta.skill()) {
@@ -112,8 +117,9 @@ public class SkillService {
                 default -> 0;
             };
 
-            long xp = Math.round(achievementScore + activityScore);
-            int progress = (int) Math.min(100, xp);
+            // 800 XP = 1% прогресса → 80 000 XP = 100% (60-й уровень навыка)
+            long xp = achievementXp + Math.round(activityScore);
+            int progress = (int) Math.min(100, xp / 800);
             result.add(new SkillProgressDto(meta.skill(), meta.name(), meta.icon(), progress, xp, unlocked));
         }
         return result;
