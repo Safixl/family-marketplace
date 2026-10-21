@@ -113,8 +113,12 @@ public class AchievementService {
      * Автогенерация стартовых комплектов достижений чтения и математики
      * (вызывается при первом обращении родителя/ребёнка, пока их нет).
      */
+    /**
+     * synchronized: защита от гонки при первом обращении — несколько конкурентных запросов
+     * (навыки, уровень, обзор, достижения) не должны создать несколько комплектов дефолтов.
+     */
     @Transactional
-    public void ensureDefaultAchievements(Long parentId) {
+    public synchronized void ensureDefaultAchievements(Long parentId) {
         User parent = userRepository.findById(parentId)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
         if (achievementRepository.countByParentIdAndSkill(parentId, "READING") == 0) {

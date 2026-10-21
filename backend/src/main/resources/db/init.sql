@@ -297,6 +297,21 @@ UPDATE achievements SET xp_reward = CASE
 END
 WHERE skill IN ('READING','MATH','HOUSE') AND group_key IS NOT NULL;
 
+-- Дедупликация дефолтных достижений: гонка при первом обращении могла создать несколько комплектов
+-- (оставляем самую старую запись по каждому parent_id + group_key + level)
+DELETE FROM achievements
+WHERE id IN (
+    SELECT id FROM (
+        SELECT id, row_number() OVER (PARTITION BY parent_id, group_key, level ORDER BY id) AS rn
+        FROM achievements
+        WHERE group_key IS NOT NULL
+    ) t
+    WHERE t.rn > 1
+);
+-- Уникальность дефолтных достижений (защита от повторной гонки)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_achievements_parent_group_level
+    ON achievements (parent_id, group_key, level);
+
 -- Сезонные ивенты: ограниченное время, валюта-жетоны
 CREATE TABLE IF NOT EXISTS seasonal_events (
     id          BIGSERIAL PRIMARY KEY,
