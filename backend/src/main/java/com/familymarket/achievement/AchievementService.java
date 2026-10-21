@@ -123,6 +123,9 @@ public class AchievementService {
         if (achievementRepository.countByParentIdAndSkill(parentId, "MATH") == 0) {
             achievementRepository.saveAll(AchievementDefaults.math(parent));
         }
+        if (achievementRepository.countByParentIdAndSkill(parentId, "HOUSE") == 0) {
+            achievementRepository.saveAll(AchievementDefaults.house(parent));
+        }
     }
 
     @Transactional
@@ -341,7 +344,7 @@ public class AchievementService {
 
     /** Дефолтное (системное) достижение — нельзя удалять и менять параметры, только награду. */
     private boolean isDefault(Achievement achievement) {
-        return List.of("READING", "MATH").contains(achievement.getSkill()) && achievement.getGroupKey() != null;
+        return List.of("READING", "MATH", "HOUSE").contains(achievement.getSkill()) && achievement.getGroupKey() != null;
     }
 
     /** Сколько ступеней достижений есть и получено по каждому навыку (полоска прогресса). */
@@ -505,6 +508,8 @@ public class AchievementService {
                             .filter(b -> achievement.getTargetType().equals(genreCodeOf(b))).count();
             case "MATH_TASKS" -> mathAttemptRepository.countCorrectByChildId(childId);
             case "MATH_CARDS" -> childTaskCardRepository.countDoneMathByChildId(childId);
+            case "HOUSE_ROOM_POINTS" -> houseDayRepository.sumRoomScoreByChildId(childId);
+            case "HOUSE_HELP_POINTS" -> houseDayRepository.sumLivingScoreByChildId(childId);
             case "POINTS_EARNED" -> balanceRepository.sumByChildId(childId).longValue();
             case "MATH_STREAK" -> streak(mathAttemptRepository.findDistinctCorrectDates(childId));
             case "HOUSE_CLEAN_STREAK" -> streak(houseDayRepository.findCleanRoomDays(childId));
@@ -581,7 +586,7 @@ public class AchievementService {
                     "READING_GENRE_HISTORY", "READING_GENRE_HORROR", "READING_GENRE_SCIENCE",
                     "READING_GENRE_FAIRYTALE", "READING_GENRE_POETRY", "READING_GENRE_COMICS",
                     "READING_GENRE_HUMOR",
-                    "MATH_TASKS", "MATH_CARDS", "POINTS_EARNED",
+                    "MATH_TASKS", "MATH_CARDS", "HOUSE_ROOM_POINTS", "HOUSE_HELP_POINTS", "POINTS_EARNED",
                     "MATH_STREAK", "HOUSE_CLEAN_STREAK", "HOUSE_HELP_STREAK", "HOME_PURCHASES",
                     "LOGIC_TASKS", "LANG_WORDS", "SPORT_DAYS",
                     "READING_STREAK", "LOGIC_STREAK", "LANG_STREAK", "SPORT_STREAK" -> normalized;

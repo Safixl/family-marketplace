@@ -372,6 +372,147 @@ public final class AchievementDefaults {
         out.add(a);
     }
 
+    /** Стартовый комплект достижений навыка «Порядок в комнате». */
+    public static List<Achievement> house(User parent) {
+        List<Achievement> out = new ArrayList<>();
+
+        addLevelsHouse(out, parent, "Магистр Чистоты",
+                "Накопленные баллы за порядок в СВОЕЙ комнате. Идеальный темп — около 700–1000 баллов в год.",
+                "🧹", "HOUSE_ROOM_POINTS", "HOUSE_CLEAN_POINTS",
+                new int[]{50, 250, 600, 1200, 2000, 3000, 4200, 5500, 7000, 8500, 10000},
+                new String[]{"Гость в собственном доме", "Борьба с пылью", "Видимый пол", "Аккуратный жилец",
+                        "Хранитель уюта", "Эксперт клининга", "Гроза беспорядка", "Эстетичный хозяин",
+                        "Остров безупречности", "Перфекционист", "Абсолютный Повелитель Чистоты"},
+                "баллов");
+
+        addLevelsHouse(out, parent, "Незаменимый помощник",
+                "Всего баллов за ПОМОЩЬ по дому. При помощи на 3–4 балла в день за 6 лет — около 7000–8000 баллов.",
+                "🤝", "HOUSE_HELP_POINTS", "HOUSE_HELP_POINTS",
+                new int[]{50, 200, 500, 1000, 1800, 2800, 4000, 5300, 6700, 8200, 10000},
+                new String[]{"Разовая услуга", "Полезный союзник", "Семейная опора", "Мастер на все руки",
+                        "Менеджер комфорта", "Хранитель домашнего очага", "Управляющий бытом", "Правая рука семьи",
+                        "Шеф-помощник", "Легенда кооперации", "Генеральный директор Уюта"},
+                "баллов");
+
+        addHouseCategory(out, parent, "HOUSE_CAT_DISHES", "🍽️", "Шеф-мойщик",
+                "Мытьё посуды или загрузка/разгрузка посудомойки.");
+        addHouseCategory(out, parent, "HOUSE_CAT_MOP", "🌊", "Повелитель швабры",
+                "Мытьё полов или качественная сухая уборка пылесосом во всей квартире.");
+        addHouseCategory(out, parent, "HOUSE_CAT_LAUNDRY", "🧺", "Стильный эксперт",
+                "Загрузка стиральной машины, развешивание белья или глажка одежды.");
+        addHouseCategory(out, parent, "HOUSE_CAT_SHOPPING", "🛒", "Добытчик ресурсов",
+                "Поход в магазин за продуктами по списку.");
+        addHouseCategory(out, parent, "HOUSE_CAT_TRASH", "🗑️", "Эко-патруль",
+                "Вынос мусора (включая сортировку, если она есть).");
+        addHouseCategory(out, parent, "HOUSE_CAT_COOKING", "🍳", "Су-шеф",
+                "Приготовление завтрака/обеда/ужина на всю семью (или активная помощь в готовке).");
+        addHouseCategory(out, parent, "HOUSE_CAT_REPAIR", "🛠️", "Домашний инженер",
+                "Мелкий ремонт, сборка мебели, замена лампочки или чистка фильтров.");
+        addHouseCategory(out, parent, "HOUSE_CAT_PLANTS", "🌱", "Ботаник-хранитель",
+                "Полив всех комнатных растений или уход за домашним питомцем.");
+
+        singleHouse(out, parent, "🎮", "Ультимативный Геймер",
+                "Купить комбо для отдыха:\nТелевизор 📺\nИгровая приставка 🎮\nКресло-мешок или пуфик 🛋️",
+                "HOUSE_SET_GAMER");
+        singleHouse(out, parent, "🧠", "Кибер-оазис",
+                "Собрать идеальное рабочее место:\nКомпьютер или ноутбук 💻\nУмный свет для стола 💡\nУдобное кресло 💺",
+                "HOUSE_SET_CYBER");
+        singleHouse(out, parent, "🔐", "Моя крепость",
+                "Максимальный уровень личных границ:\nСобственный замок на дверь комнаты 🔑\n"
+                        + "Личный сейф или закрывающийся ящик 🔓",
+                "HOUSE_SET_FORTRESS");
+        singleHouse(out, parent, "🎵", "Умный дом",
+                "Технологический апгрейд комнаты:\nУмная колонка 🔊\nУмные розетки или RGB-лента, "
+                        + "управляемая голосом 📱",
+                "HOUSE_SET_SMARTHOME");
+
+        singleHouseWithTarget(out, parent, "👑", "Идеальный месяц",
+                "Поддерживать порядок в своей комнате на оценку «+2» 30 дней подряд без единого срыва в «0» или «−1».",
+                "HOUSE_PERFECT_MONTH", "HOUSE_CLEAN_STREAK", 30);
+        singleHouse(out, parent, "🚀", "Максимальный оборот",
+                "Заработать за один день полные +8 баллов: +2 за идеальную комнату и +6 за шесть разных видов помощи.",
+                "HOUSE_MAX_DAY");
+        singleHouse(out, parent, "🎒", "Мини-минимализм",
+                "Провести глобальное расхламление: выбросить или отдать 30 ненужных вещей из своей комнаты.",
+                "HOUSE_MINIMALISM");
+        singleHouse(out, parent, "🔧", "Сам себе дизайнер",
+                "Полностью переставить мебель в комнате или переоформить рабочий стол для максимального удобства.",
+                "HOUSE_DESIGNER");
+        singleHouse(out, parent, "📦", "Сезонная эвакуация",
+                "Самостоятельно разобрать гардероб, убрать сезонные вещи на хранение и аккуратно сложить текущую одежду.",
+                "HOUSE_SEASONAL");
+        singleHouse(out, parent, "🧼", "Генеральный разгром",
+                "Провести «глубокую» уборку: помыть окна в комнате, протереть пыль на шкафах и постирать шторы.",
+                "HOUSE_DEEP_CLEAN");
+
+        return out;
+    }
+
+    /** Вариант addLevels для навыка «Порядок в комнате». */
+    private static void addLevelsHouse(List<Achievement> out, User parent, String name, String description, String icon,
+                                      String targetType, String groupKey, int[] values, String[] stepNames, String unit) {
+        for (int i = 0; i < values.length; i++) {
+            Achievement a = new Achievement();
+            a.setParent(parent);
+            a.setName(name);
+            a.setDescription(stepNames[i] + " — " + values[i] + " " + unit + ".\n" + description);
+            a.setIcon(icon);
+            a.setTargetType(targetType);
+            a.setTargetValue(values[i]);
+            a.setGroupKey(groupKey);
+            a.setSkill("HOUSE");
+            a.setLevel(i + 1);
+            a.setHiddenReward(false);
+            a.setCreatedAt(Instant.now());
+            out.add(a);
+        }
+    }
+
+    /** Категория помощи по дому: шкала 5→1700 действий, звания Стажер→Генеральный директор Уюта. */
+    private static void addHouseCategory(List<Achievement> out, User parent, String groupKey, String icon,
+                                         String name, String hint) {
+        String[] ranks = {"Стажер", "Новичок", "Практик", "Мастер", "Шеф", "Эксперт",
+                "Гроссмейстер", "Магистр", "Легенда быта", "Хранитель очага", "Генеральный директор Уюта"};
+        int[] counts = {5, 20, 60, 120, 250, 400, 600, 850, 1100, 1400, 1700};
+        for (int i = 0; i < ranks.length; i++) {
+            Achievement a = new Achievement();
+            a.setParent(parent);
+            a.setName(name);
+            a.setDescription(ranks[i] + " — " + counts[i] + " действий · " + name + ". " + hint);
+            a.setIcon(icon);
+            a.setTargetType("NONE");
+            a.setTargetValue(counts[i]);
+            a.setGroupKey(groupKey);
+            a.setSkill("HOUSE");
+            a.setLevel(i + 1);
+            a.setHiddenReward(false);
+            a.setCreatedAt(Instant.now());
+            out.add(a);
+        }
+    }
+
+    private static void singleHouse(List<Achievement> out, User parent, String icon, String name, String description,
+                                    String groupKey) {
+        singleHouseWithTarget(out, parent, icon, name, description, groupKey, "NONE", 0);
+    }
+
+    private static void singleHouseWithTarget(List<Achievement> out, User parent, String icon, String name,
+                                              String description, String groupKey, String targetType, int targetValue) {
+        Achievement a = new Achievement();
+        a.setParent(parent);
+        a.setName(name);
+        a.setDescription(description);
+        a.setIcon(icon);
+        a.setTargetType(targetType);
+        a.setTargetValue(targetValue);
+        a.setGroupKey(groupKey);
+        a.setSkill("HOUSE");
+        a.setLevel(0);
+        a.setHiddenReward(false);
+        a.setCreatedAt(Instant.now());
+        out.add(a);
+    }
+
     private static void singleWithTarget(List<Achievement> out, User parent, String icon, String name,
                                          String description, String groupKey, String targetType, int targetValue) {
         Achievement a = new Achievement();

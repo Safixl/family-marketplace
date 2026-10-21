@@ -164,7 +164,7 @@ export default function ChildHouseView({ storeId }: Props) {
           <div className="mt-3 flex flex-wrap justify-center gap-1.5">
             {ROOM_RATINGS.map((r) => (
               <span key={r.value} className="badge bg-stone-800/80 text-stone-300" title={r.hint}>
-                {r.icon} {r.label} ({r.value > 0 ? `+${r.value}` : r.value} 🪙)
+                {r.icon} {r.label} ({r.value > 0 ? `+${r.value}` : r.value} 🧹)
               </span>
             ))}
           </div>
@@ -197,22 +197,22 @@ export default function ChildHouseView({ storeId }: Props) {
                     const r = ROOM_RATINGS.find((x) => x.value === selectedDay.d!.roomScore);
                     return r ? (
                       <span className="text-sm text-amber-100">
-                        {r.icon} {r.label} · {r.value > 0 ? `+${r.value}` : r.value} 🪙
+                        {r.icon} {r.label} · {r.value > 0 ? `+${r.value}` : r.value} 🧹
                       </span>
                     ) : (
-                      <span className="text-sm text-amber-100">{selectedDay.d!.roomScore} 🪙</span>
+                      <span className="text-sm text-amber-100">{selectedDay.d!.roomScore} 🧹</span>
                     );
                   })()}
                 </DayInfo>
                 <DayInfo label="Помощь по дому">
                   <span className="text-sm text-amber-100">
-                    {selectedDay.d.livingScore > 0 ? '+' : ''} {selectedDay.d.livingScore} 🪙
+                    {selectedDay.d.livingScore > 0 ? '+' : ''} {selectedDay.d.livingScore} 🧹
                   </span>
                 </DayInfo>
                 <DayInfo label="Баллы за день">
                   <span className={`text-sm font-bold ${selectedDay.d.points < 0 ? 'text-rose-300' : 'text-emerald-300'}`}>
                     {selectedDay.d.points > 0 ? '+' : ''}
-                    {selectedDay.d.points} 🪙
+                    {selectedDay.d.points} 🧹
                     {!selectedDay.d.settled && ' · начислят 1-го числа'}
                   </span>
                 </DayInfo>

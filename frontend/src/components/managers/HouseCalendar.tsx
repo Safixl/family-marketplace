@@ -276,7 +276,7 @@ export default function HouseCalendar({ store, onClose }: Props) {
             <div className="mt-3 flex flex-wrap gap-1.5">
               {ROOM_RATINGS.map((r) => (
                 <span key={r.value} className="badge bg-stone-800 text-stone-300" title={r.hint}>
-                  {r.icon} {r.label} ({r.value > 0 ? `+${r.value}` : r.value} 🪙)
+                  {r.icon} {r.label} ({r.value > 0 ? `+${r.value}` : r.value} 🧹)
                 </span>
               ))}
             </div>
@@ -316,7 +316,7 @@ export default function HouseCalendar({ store, onClose }: Props) {
                   >
                     <span className="text-base">{r.icon}</span>
                     <span>
-                      {r.label} · {r.value > 0 ? `+${r.value}` : r.value} 🪙
+                      {r.label} · {r.value > 0 ? `+${r.value}` : r.value} 🧹
                     </span>
                   </button>
                 ))}
