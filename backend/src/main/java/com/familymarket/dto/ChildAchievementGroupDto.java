@@ -8,6 +8,7 @@ import java.math.BigDecimal;
  */
 public record ChildAchievementGroupDto(
         Long achievementId,
+        String groupKey,
         String name,
         String description,
         String icon,

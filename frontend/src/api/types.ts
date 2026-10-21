@@ -131,6 +131,7 @@ export interface AchievementDto {
 
 export interface ChildAchievementGroupDto {
   achievementId: number;
+  groupKey: string | null;
   name: string;
   description: string | null;
   icon: string;

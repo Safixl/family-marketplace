@@ -3,6 +3,7 @@ package com.familymarket.achievement;
 import com.familymarket.common.CurrentUser;
 import com.familymarket.dto.AchievementDto;
 import com.familymarket.dto.AchievementUpsertRequest;
+import com.familymarket.dto.ChildAchievementGroupDto;
 import com.familymarket.dto.GrantAchievementRequest;
 import com.familymarket.dto.GrantResult;
 import jakarta.validation.Valid;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/** Родитель: управление достижениями и просмотр статусов детей. */
 @RestController
 @RequestMapping("/api/parent/achievements")
 public class AchievementController {
@@ -59,5 +61,11 @@ public class AchievementController {
     @PostMapping("/grant")
     public GrantResult grant(@Valid @RequestBody GrantAchievementRequest request) {
         return achievementService.grant(CurrentUser.parentId(), request);
+    }
+
+    /** Статусы достижений (выполнено/прогресс) по конкретному ребёнку. */
+    @GetMapping("/children/{childId}")
+    public List<ChildAchievementGroupDto> childAchievements(@PathVariable Long childId) {
+        return achievementService.childAchievementsForParent(CurrentUser.parentId(), childId);
     }
 }

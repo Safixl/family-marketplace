@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Award, Layers, Pencil, Plus, Trash2 } from 'lucide-react';
 import { api } from '../../api/client';
-import { AchievementDto, ChildDto, ReadingCatalogBookDto, StoreDto } from '../../api/types';
+import { AchievementDto, ChildAchievementGroupDto, ChildDto, ReadingCatalogBookDto, StoreDto } from '../../api/types';
 import { errMsg, fmtAmount } from '../../lib/format';
 import { tierForLevel } from '../../lib/achievementTiers';
 import Modal from '../Modal';
@@ -75,8 +75,12 @@ export default function AchievementsTab() {
   const [grantFor, setGrantFor] = useState<AchievementDto | null>(null);
   const [grantChildId, setGrantChildId] = useState('');
 
-  /** Ребёнок, для которого показывается прогресс прочтения книг серий. */
-  const [questChildId, setQuestChildId] = useState('');
+  /** Ребёнок, для которого показываются статусы и прогресс. */
+  const [viewChildId, setViewChildId] = useState('');
+  /** Статусы достижений выбранного ребёнка (по groupKey). */
+  const [childMeta, setChildMeta] = useState<ChildAchievementGroupDto[]>([]);
+  const [skillFilter, setSkillFilter] = useState<'ALL' | 'READING' | 'MATH' | 'NONE'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'DONE' | 'OPEN'>('ALL');
   /** Каталог прочитанных книг по ребёнку: childId → книги с read-статусом. */
   const [catalogByChild, setCatalogByChild] = useState<Record<string, ReadingCatalogBookDto[]>>({});
 
@@ -89,6 +93,20 @@ export default function AchievementsTab() {
       setCatalogByChild((prev) => ({ ...prev, [childId]: [] }));
     }
   }, []);
+
+  const loadChildMeta = useCallback(async (childId: string) => {
+    if (!childId) return;
+    try {
+      setChildMeta(await api.get<ChildAchievementGroupDto[]>(`/parent/achievements/children/${childId}`));
+    } catch {
+      setChildMeta([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadChildMeta(viewChildId);
+    void loadCatalog(viewChildId);
+  }, [viewChildId, loadChildMeta, loadCatalog]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -103,9 +121,8 @@ export default function AchievementsTab() {
       setChildren(c);
       setStores(s);
       const firstChild = c.find((ch) => ch.active);
-      if (firstChild && !questChildId) {
-        setQuestChildId(String(firstChild.id));
-        void loadCatalog(String(firstChild.id));
+      if (firstChild && !viewChildId) {
+        setViewChildId(String(firstChild.id));
       }
     } catch (e) {
       setError(errMsg(e));
@@ -264,37 +281,113 @@ export default function AchievementsTab() {
           hint="Создайте достижение с целью и наградой — ребёнок получит её автоматически"
         />
       ) : (
-        <div className="space-y-4">
-          {Object.entries(grouped).map(([key, group]) => {
-            const sorted = [...group].sort((a, b) => a.level - b.level);
-            const isQuest = sorted[0].groupKey != null && sorted[0].groupKey.startsWith('READING_QUEST_');
-            return (
-              <div key={key} className="card space-y-3">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-100 to-orange-100 text-2xl">
-                    {sorted[0].icon}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="font-bold">
-                      {sorted[0].name}
-                      {sorted.length > 1 && (
-                        <span className="badge ml-2 bg-indigo-100 text-indigo-700">
-                          {sorted.length} ступеней
-                        </span>
-                      )}
-                      {isQuest && (
-                        <span className="badge ml-2 bg-emerald-50 text-emerald-700">
-                          ✨ авто-выдача при полном чек-листе
-                        </span>
-                      )}
-                    </div>
-                    {!isQuest && sorted[0].description && (
-                      <p className="text-sm text-slate-500">{sorted[0].description}</p>
-                    )}
-                  </div>
-                </div>
+        <div className="space-y-5">
+          {/* Фильтры: ребёнок / навык / статус */}
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              className="input !w-auto"
+              value={viewChildId}
+              onChange={(e) => setViewChildId(e.target.value)}
+            >
+              {children
+                .filter((c) => c.active)
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.avatarEmoji} {c.name}
+                  </option>
+                ))}
+            </select>
+            <select
+              className="input !w-auto"
+              value={skillFilter}
+              onChange={(e) => setSkillFilter(e.target.value as 'ALL' | 'READING' | 'MATH' | 'NONE')}
+            >
+              <option value="ALL">Все навыки</option>
+              <option value="READING">📚 Чтение</option>
+              <option value="MATH">🧮 Математика</option>
+              <option value="NONE">Без навыка</option>
+            </select>
+            <select
+              className="input !w-auto"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as 'ALL' | 'DONE' | 'OPEN')}
+            >
+              <option value="ALL">Любой статус</option>
+              <option value="DONE">✅ Выполнено</option>
+              <option value="OPEN">⏳ Не выполнено</option>
+            </select>
+          </div>
 
-                <div className="space-y-2">
+          {/* Секции по навыкам */}
+          {(['READING', 'MATH', 'NONE'] as const).map((skill) => {
+            if (skillFilter !== 'ALL' && skillFilter !== skill) return null;
+            const skillGroups = Object.entries(grouped).filter(([, group]) => (group[0].skill ?? 'NONE') === skill);
+            if (skillGroups.length === 0) return null;
+            const skillLabel = skill === 'READING' ? '📚 Чтение' : skill === 'MATH' ? '🧮 Математика' : '🏅 Без навыка';
+            return (
+              <section key={skill}>
+                <h2 className="mb-2 text-lg font-extrabold text-slate-700">{skillLabel}</h2>
+                <div className="space-y-4">
+                  {skillGroups.map(([key, group]) => {
+                    const sorted = [...group].sort((a, b) => a.level - b.level);
+                    const isQuest = sorted[0].groupKey != null && sorted[0].groupKey.startsWith('READING_QUEST_');
+                    const meta = childMeta.find((m) => m.groupKey === sorted[0].groupKey);
+                    const steps = sorted.length;
+                    const doneSteps = meta
+                      ? meta.completed
+                        ? steps
+                        : meta.unlocked
+                          ? Math.max(1, Math.min(steps, meta.level))
+                          : Math.max(0, Math.min(steps, Math.max(0, meta.level - 1)))
+                      : 0;
+                    const pct = steps > 0 ? Math.round((doneSteps / steps) * 100) : 0;
+                    const completed = meta?.completed ?? false;
+                    if (statusFilter === 'DONE' && !completed) return null;
+                    if (statusFilter === 'OPEN' && completed) return null;
+                    return (
+                      <div key={key} className="card space-y-3">
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-100 to-orange-100 text-2xl">
+                            {sorted[0].icon}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-bold">
+                              {sorted[0].name}
+                              {sorted.length > 1 && (
+                                <span className="badge ml-2 bg-indigo-100 text-indigo-700">
+                                  {sorted.length} ступеней
+                                </span>
+                              )}
+                              {isQuest && (
+                                <span className="badge ml-2 bg-emerald-50 text-emerald-700">
+                                  ✨ авто-выдача при полном чек-листе
+                                </span>
+                              )}
+                            </div>
+                            {!isQuest && sorted[0].description && (
+                              <p className="text-sm text-slate-500">{sorted[0].description}</p>
+                            )}
+                          </div>
+                          <div className="min-w-[140px] text-right">
+                            {viewChildId && (
+                              <>
+                                <span
+                                  className={`badge ${completed ? 'bg-emerald-100 text-emerald-700' : doneSteps > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}
+                                >
+                                  {completed ? '✅ выполнено' : doneSteps > 0 ? `🔓 ${doneSteps} из ${steps} ступеней` : '⏳ не начато'}
+                                </span>
+                                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                                  <div
+                                    className={`h-full rounded-full ${completed ? 'bg-emerald-500' : 'bg-amber-400'}`}
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
                   {sorted.map((achievement) => {
                     const unit = TARGET_OPTIONS.find((o) => o.value === achievement.targetType)?.unit ?? '';
                     const store = stores.find((s) => s.id === achievement.rewardStoreId);
@@ -371,18 +464,13 @@ export default function AchievementsTab() {
 
                 {/* Чек-лист серийных квестов: какие книги уже прочитаны ребёнком */}
                 {isQuest && (
-                  <QuestReadChecklist
-                    groupKey={sorted[0].groupKey ?? ''}
-                    questChildId={questChildId}
-                    setQuestChildId={(id) => {
-                      setQuestChildId(id);
-                      void loadCatalog(id);
-                    }}
-                    children={children}
-                    catalog={catalogByChild[questChildId] ?? []}
-                  />
+                  <QuestReadChecklist groupKey={sorted[0].groupKey ?? ''} catalog={catalogByChild[viewChildId] ?? []} />
                 )}
               </div>
+            );
+          })}
+        </div>
+              </section>
             );
           })}
         </div>
@@ -570,25 +658,13 @@ export default function AchievementsTab() {
 }
 
 /** Чек-лист серийного квеста: какие книги серии уже прочитаны выбранным ребёнком. */
-function QuestReadChecklist({
-  groupKey,
-  questChildId,
-  setQuestChildId,
-  children,
-  catalog,
-}: {
-  groupKey: string;
-  questChildId: string;
-  setQuestChildId: (id: string) => void;
-  children: ChildDto[];
-  catalog: ReadingCatalogBookDto[];
-}) {
+function QuestReadChecklist({ groupKey, catalog }: { groupKey: string; catalog: ReadingCatalogBookDto[] }) {
   const books = catalog.filter((b) => b.quest === groupKey);
   const readCount = books.filter((b) => b.read).length;
   const complete = books.length > 0 && readCount === books.length;
   return (
     <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+      <div className="mb-2">
         <span className="text-xs font-semibold text-slate-500">
           📋 Прочитанные книги серии
           {complete ? (
@@ -599,22 +675,9 @@ function QuestReadChecklist({
             </span>
           )}
         </span>
-        <select
-          className="input !w-auto !py-1 text-xs"
-          value={questChildId}
-          onChange={(e) => setQuestChildId(e.target.value)}
-        >
-          {children
-            .filter((c) => c.active)
-            .map((c) => (
-              <option key={c.id} value={String(c.id)}>
-                {c.avatarEmoji} {c.name}
-              </option>
-            ))}
-        </select>
       </div>
       {books.length === 0 ? (
-        <p className="text-xs text-slate-400">Выберите ребёнка, чтобы увидеть чек-лист</p>
+        <p className="text-xs text-slate-400">Каталог книг не загружен</p>
       ) : (
         <ul className="grid gap-1 sm:grid-cols-2">
           {books.map((b) => (

@@ -365,6 +365,14 @@ public class AchievementService {
         return result;
     }
 
+    /** Достижения (статусы ребёнка) для просмотра родителем. */
+    @Transactional
+    public List<ChildAchievementGroupDto> childAchievementsForParent(Long parentId, Long childId) {
+        childRepository.findByIdAndParentId(childId, parentId)
+                .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
+        return childAchievements(childId);
+    }
+
     /**
      * Все достижения родителя для ребёнка, сгруппированные по уровням.
      * Ребёнок видит только ближайший уровень; скрытая награда скрыта до достижения.
@@ -417,6 +425,7 @@ public class AchievementService {
                     : current.getRewardAmount();
             result.add(new ChildAchievementGroupDto(
                     first.getId(),
+                    first.getGroupKey(),
                     first.getName(),
                     first.getDescription(),
                     first.getIcon(),
