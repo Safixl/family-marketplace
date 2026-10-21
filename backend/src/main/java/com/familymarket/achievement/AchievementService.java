@@ -347,6 +347,12 @@ public class AchievementService {
             credited = achievement.getRewardAmount();
             storeId = achievement.getRewardStore().getId();
         }
+        // «Матриксы» = XP математики 1:1 и при ручной выдаче достижения
+        if ("MATH".equals(achievement.getSkill()) && achievement.getXpReward() > 0) {
+            storeRepository.findByParentIdAndTemplateType(parentId, "MATH")
+                    .ifPresent(s -> balanceService.credit(child.getId(), s.getId(),
+                            BigDecimal.valueOf(achievement.getXpReward())));
+        }
         return new GrantResult(achievement.getId(), child.getId(), credited, storeId);
     }
 
