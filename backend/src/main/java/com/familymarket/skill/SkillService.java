@@ -108,14 +108,14 @@ public class SkillService {
                     .mapToLong(Achievement::getXpReward)
                     .sum();
 
-            // Активностная часть (0..40)
+            // Активностная часть (без потолка — итоговый прогресс ограничен формулой xp/800)
             double activityScore = switch (meta.skill()) {
-                case "MATH" -> Math.min(40, mathCorrect * 2.0 + dailyXp(childId, "MATH"));
-                case "READING" -> Math.min(40, booksRead * 2.0 + pagesRead / 200.0);
-                case "HOUSE" -> Math.min(40, housePositive * 1.5);
-                case "LOGIC" -> Math.min(40, dailyXp(childId, "LOGIC"));
-                case "LANG" -> Math.min(40, dailyXp(childId, "LANG"));
-                case "SPORT" -> Math.min(40, dailyXp(childId, "SPORT"));
+                case "MATH" -> mathCorrect * 2.0 + dailyXp(childId, "MATH");
+                case "READING" -> booksRead * 2.0 + pagesRead / 4.0; // 4 страницы = 1 XP
+                case "HOUSE" -> housePositive * 1.5;
+                case "LOGIC" -> dailyXp(childId, "LOGIC");
+                case "LANG" -> dailyXp(childId, "LANG");
+                case "SPORT" -> dailyXp(childId, "SPORT");
                 default -> 0;
             };
 

@@ -46,6 +46,22 @@ export const XP_CURVE: number[] = [
 /** Суммарный опыт, необходимый для достижения уровня 60 (весь путь). */
 export const MAX_TOTAL_XP: number = XP_CURVE.reduce((sum, x) => sum + x, 0);
 
+/**
+ * Кривая опыта навыков (дизайн): 1–10 ур. по 500 XP, 11–30 по 1000,
+ * 31–50 по 1500, 51–60 по 2500. Итого 80 000 XP на 60 уровней.
+ */
+export const SKILL_XP_CURVE: number[] = [
+  500, 500, 500, 500, 500, 500, 500, 500, 500, 500,
+  1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000,
+  1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000,
+  1500, 1500, 1500, 1500, 1500, 1500, 1500, 1500, 1500, 1500,
+  1500, 1500, 1500, 1500, 1500, 1500, 1500, 1500, 1500, 1500,
+  2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500,
+];
+
+/** Суммарный опыт навыка на весь путь 1→60 (80 000 XP). */
+export const SKILL_TOTAL_XP: number = SKILL_XP_CURVE.reduce((sum, x) => sum + x, 0);
+
 /** Ранги персонажа/навыка: имя и уровень, с которого ранг действует. */
 export const RANKS: Array<{ min: number; name: string; emoji: string }> = [
   { min: 1, name: 'Дерево', emoji: '🌳' },
@@ -83,6 +99,27 @@ export function rankForLevel(level: number): { name: string; emoji: string } {
   return { name: rank.name, emoji: rank.emoji };
 }
 
+/** Уровень навыка по накопленному опыту (кривая 500/1000/1500/2500). */
+export function skillLevelFromXp(xp: number): RpgLevel {
+  let level = 1;
+  let remaining = Math.max(0, xp);
+  while (level < MAX_LEVEL && remaining >= SKILL_XP_CURVE[level - 1]) {
+    remaining -= SKILL_XP_CURVE[level - 1];
+    level++;
+  }
+  const capped = level >= MAX_LEVEL;
+  const xpToNext = capped ? 0 : SKILL_XP_CURVE[level - 1];
+  const rank = rankForLevel(level);
+  return {
+    level,
+    xpInLevel: capped ? 0 : remaining,
+    xpToNext,
+    ratio: capped || xpToNext <= 0 ? 1 : Math.min(1, remaining / xpToNext),
+    rank: rank.name,
+    rankEmoji: rank.emoji,
+  };
+}
+
 /** Уровень по суммарному опыту (общий уровень или уровень навыка). */
 export function levelFromXp(xp: number): RpgLevel {
   let level = 1;
@@ -111,7 +148,7 @@ export function levelFromXp(xp: number): RpgLevel {
  */
 export function skillLevelFromProgress(progress: number): number {
   const p = Math.max(0, Math.min(100, progress));
-  return levelFromXp((p / 100) * MAX_TOTAL_XP).level;
+  return skillLevelFromXp((p / 100) * SKILL_TOTAL_XP).level;
 }
 
 /** Ранг навыка по прогрессу 0..100 (по той же таблице рангов, что и общий уровень). */

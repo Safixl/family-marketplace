@@ -1,7 +1,7 @@
 import { ArrowLeft } from 'lucide-react';
 import { SkillProgressDto, StoreDto } from '../../../api/types';
 import { SkillConfig } from '../../../lib/skills';
-import { skillLevelFromProgress } from '../../../lib/rpg';
+import { skillLevelFromXp } from '../../../lib/rpg';
 import SkillModule from './SkillModule';
 
 interface Props {
@@ -12,7 +12,8 @@ interface Props {
 }
 
 export default function SkillPage({ config, store, progress, onBack }: Props) {
-  const level = skillLevelFromProgress(progress?.progress ?? 0);
+  const lvl = skillLevelFromXp(progress?.xp ?? 0);
+  const pct = Math.round(lvl.ratio * 100);
   return (
     <div className="space-y-4">
       <button
@@ -29,10 +30,11 @@ export default function SkillPage({ config, store, progress, onBack }: Props) {
         <div className="min-w-0 flex-1">
           <h2 className="rpg-title text-xl">{config.name}</h2>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-stone-300">
-            <span className="font-bold text-amber-200">Ур. {level}</span>
+            <span className="font-bold text-amber-200">Ур. {lvl.level}</span>
             <span className="text-stone-400">·</span>
+            <span>{progress?.xp ?? 0} XP</span>
             <span className="text-stone-400">·</span>
-            <span>{progress?.progress ?? 0}%</span>
+            <span>{pct}%</span>
             <span className="text-stone-400">·</span>
             <span>{progress?.unlockedAchievements ?? 0} ачивок</span>
           </div>
@@ -41,7 +43,7 @@ export default function SkillPage({ config, store, progress, onBack }: Props) {
           <div className="rpg-progress-track h-3">
             <div
               className="rpg-progress-fill"
-              style={{ width: `${Math.min(100, progress?.progress ?? 0)}%` }}
+              style={{ width: `${Math.min(100, pct)}%` }}
             />
           </div>
         </div>

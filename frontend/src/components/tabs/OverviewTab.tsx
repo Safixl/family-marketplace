@@ -4,7 +4,7 @@ import { api } from '../../api/client';
 import { OverviewChildDto, QuestDto, SkillId, SkillProgressDto } from '../../api/types';
 import { errMsg, fmtAmount } from '../../lib/format';
 import { skillById } from '../../lib/skills';
-import { skillLevelFromProgress } from '../../lib/rpg';
+import { skillLevelFromXp } from '../../lib/rpg';
 import { EmptyState, Spinner } from '../ui';
 
 const LIMIT_META: Record<string, { label: string; emoji: string }> = {
@@ -422,14 +422,14 @@ function QuestRow({ q }: { q: QuestDto }) {
 }
 
 function SkillRow({ s }: { s: SkillProgressDto }) {
-  const level = skillLevelFromProgress(s.progress);
+  const lvl = skillLevelFromXp(s.xp);
   return (
     <div className="flex items-center gap-2 py-0.5">
       <span className="w-6 shrink-0 text-center">{s.icon}</span>
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-2 text-xs">
           <span className="truncate font-medium text-slate-600">{s.name}</span>
-          <span className="shrink-0 text-slate-400">Ур. {level}</span>
+          <span className="shrink-0 text-slate-400">Ур. {lvl.level} · {s.xp} XP</span>
         </div>
         <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
           <div
