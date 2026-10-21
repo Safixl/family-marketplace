@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Check, Clock3, RefreshCw, Send, X } from 'lucide-react';
+import { Check, Clock3, Send, X } from 'lucide-react';
 import { api } from '../../../../api/client';
 import { MathCardDayDto, MathCardDto, MathCardSubmitResult, MathChoice } from '../../../../api/types';
 import { errMsg } from '../../../../lib/format';
@@ -115,14 +115,6 @@ export default function MathCardView({ onDone }: { onDone?: () => void }) {
 
   return (
     <div className="space-y-3">
-      {/* Счётчик лимита */}
-      <div className="flex items-center justify-between rounded-xl bg-stone-900/60 px-3 py-2 text-xs text-stone-300">
-        <span>🧮 Карточки по математике</span>
-        <span className="font-bold text-amber-200">
-          {Math.min(doneToday, dailyLimit)}/{dailyLimit} за день
-        </span>
-      </div>
-
       {limitReached && !active && (
         <div className="rpg-panel p-3 text-sm text-stone-400">
           Лимит на сегодня исчерпан — новые карточки появятся завтра в 9:00
@@ -151,14 +143,6 @@ export default function MathCardView({ onDone }: { onDone?: () => void }) {
           ))}
         </div>
       )}
-
-      <button
-        className="rpg-btn rpg-btn-ghost text-xs"
-        onClick={() => void load()}
-        disabled={busy || generating}
-      >
-        <RefreshCw size={14} /> Обновить
-      </button>
 
       {visible.map((card) => {
         const inProgress = card.status === 'IN_PROGRESS';

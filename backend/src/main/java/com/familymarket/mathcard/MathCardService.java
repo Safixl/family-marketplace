@@ -349,8 +349,28 @@ public class MathCardService {
         log.setPoints(BigDecimal.valueOf(finished));
         boolean fullClear = finished >= DAILY_LIMIT;
         log.setFullClear(fullClear);
-        log.setXp(fullClear ? 2 : 0);
+        if (fullClear) {
+            // За стрик правильно решённых карточек опыт за дейлик удваивается (2 → 4 XP)
+            log.setXp(correctStreak(childId, day) >= 2 ? 4 : 2);
+        } else {
+            log.setXp(0);
+        }
         dailyLogRepository.save(log);
+    }
+
+    /** Сколько дней подряд (заканчивая сегодня) ребёнок успешно решал карточку. */
+    private long correctStreak(Long childId, LocalDate day) {
+        Set<LocalDate> set = new java.util.HashSet<>(cardRepository.findSuccessDates(childId));
+        LocalDate cursor = day;
+        if (!set.contains(cursor)) {
+            cursor = cursor.minusDays(1);
+        }
+        long count = 0;
+        while (set.contains(cursor)) {
+            count++;
+            cursor = cursor.minusDays(1);
+        }
+        return count;
     }
 
     /** Просроченные IN_PROGRESS-карточки завершаются как «не сдано» (0%, без XP). */
