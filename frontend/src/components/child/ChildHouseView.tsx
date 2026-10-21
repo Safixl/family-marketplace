@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Clock3, Send, Sparkles } from 'lucide-react'
 import { api } from '../../api/client';
 import { HouseDayDto, HouseMonthResponse } from '../../api/types';
 import { errMsg, fmtAmount } from '../../lib/format';
+import { ROOM_RATINGS } from '../../lib/houseScale';
 import { Spinner } from '../ui';
 
 interface Props {
@@ -69,11 +70,11 @@ export default function ChildHouseView({ storeId }: Props) {
 
   const cellClass = (d: HouseDayDto | undefined) => {
     if (!d || (d.roomScore === 0 && d.livingScore === 0)) {
-      return 'bg-slate-50 text-slate-400';
+      return 'bg-stone-800/60 text-stone-400';
     }
-    if (d.points < 0) return 'bg-rose-100 text-rose-700';
-    if (d.points > 0) return 'bg-emerald-100 text-emerald-700';
-    return 'bg-amber-100 text-amber-700';
+    if (d.points < 0) return 'bg-rose-500/20 text-rose-200';
+    if (d.points > 0) return 'bg-emerald-500/20 text-emerald-200';
+    return 'bg-amber-500/15 text-amber-200';
   };
 
   return (
@@ -106,14 +107,14 @@ export default function ChildHouseView({ storeId }: Props) {
 
       {data && (
         <div className="flex flex-wrap justify-center gap-2 text-sm">
-          <span className="badge bg-emerald-100 text-emerald-700">Комната «+»: {data.positiveRoomDays}</span>
-          <span className="badge bg-sky-100 text-sky-700">Помощь «+»: {data.positiveLivingDays}</span>
-          <span className="badge bg-rose-100 text-rose-700">Отрицательные: {data.negativeDays}</span>
-          <span className="badge bg-indigo-100 text-indigo-700">
+          <span className="badge bg-emerald-500/15 text-emerald-300">Комната «+»: {data.positiveRoomDays}</span>
+          <span className="badge bg-sky-500/15 text-sky-300">Помощь «+»: {data.positiveLivingDays}</span>
+          <span className="badge bg-rose-500/15 text-rose-300">Отрицательные: {data.negativeDays}</span>
+          <span className="badge bg-indigo-500/15 text-indigo-300">
             <Sparkles size={13} /> Баллов: {fmtAmount(data.monthPoints)}
           </span>
           {data.pendingPoints !== 0 && (
-            <span className="badge bg-amber-100 text-amber-700">
+            <span className="badge bg-amber-500/15 text-amber-300">
               <Clock3 size={13} /> Начислят 1-го числа: {fmtAmount(data.pendingPoints)}
             </span>
           )}
@@ -160,8 +161,16 @@ export default function ChildHouseView({ storeId }: Props) {
               );
             })}
           </div>
-          <p className="mt-3 text-center text-xs text-slate-400">
-            Зелёный — положительные оценки, красный — отрицательные. Баллы начисляются 1-го числа следующего месяца.
+          <div className="mt-3 flex flex-wrap justify-center gap-1.5">
+            {ROOM_RATINGS.map((r) => (
+              <span key={r.value} className="badge bg-stone-800/80 text-stone-300" title={r.hint}>
+                {r.icon} {r.label} ({r.value > 0 ? `+${r.value}` : r.value} 🪙)
+              </span>
+            ))}
+          </div>
+          <p className="mt-2 text-center text-xs text-stone-400">
+            Зелёный — положительные оценки ☣️(−2)…👑(+2), красный — отрицательные. Баллы начисляются 1-го числа
+            следующего месяца.
           </p>
         </div>
       )}

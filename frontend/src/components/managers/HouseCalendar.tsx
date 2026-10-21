@@ -3,6 +3,7 @@ import { CheckCircle2, ChevronLeft, ChevronRight, Clock3, Sparkles, XCircle } fr
 import { api } from '../../api/client';
 import { ChildDto, HouseCheckRequestDto, HouseDayDto, HouseMonthResponse, StoreDto } from '../../api/types';
 import { errMsg, fmtAmount } from '../../lib/format';
+import { ROOM_RATINGS } from '../../lib/houseScale';
 import Modal from '../Modal';
 import { Spinner } from '../ui';
 
@@ -12,7 +13,6 @@ interface Props {
 }
 
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-const ROOM_OPTIONS = [-2, -1, 0, 1, 2];
 const LIVING_OPTIONS = [-3, -2, -1, 0, 1, 2, 3, 4, 5, 6];
 
 function monthKey(date: Date): string {
@@ -150,11 +150,11 @@ export default function HouseCalendar({ store, onClose }: Props) {
 
   const cellClass = (d: HouseDayDto | undefined) => {
     if (!d || (d.roomScore === 0 && d.livingScore === 0)) {
-      return 'bg-slate-50 text-slate-400 hover:bg-slate-100';
+      return 'bg-slate-700/40 text-slate-300 hover:bg-slate-700/70';
     }
-    if (d.points < 0) return 'bg-rose-100 text-rose-700 hover:bg-rose-200';
-    if (d.points > 0) return 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200';
-    return 'bg-amber-100 text-amber-700 hover:bg-amber-200';
+    if (d.points < 0) return 'bg-rose-500/20 text-rose-200 hover:bg-rose-500/30';
+    if (d.points > 0) return 'bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30';
+    return 'bg-amber-500/15 text-amber-200 hover:bg-amber-500/25';
   };
 
   return (
@@ -253,7 +253,7 @@ export default function HouseCalendar({ store, onClose }: Props) {
                     onClick={() => openDay(day)}
                     disabled={isFuture}
                     className={`flex h-14 flex-col items-center justify-center rounded-xl text-sm font-semibold transition ${
-                      isFuture ? 'cursor-not-allowed bg-slate-50 text-slate-300' : cellClass(d)
+                      isFuture ? 'cursor-not-allowed bg-slate-800/40 text-slate-600' : cellClass(d)
                     }`}
                     title={isFuture ? 'Будущая дата' : 'Отметить день'}
                   >
@@ -268,8 +268,15 @@ export default function HouseCalendar({ store, onClose }: Props) {
                 );
               })}
             </div>
-            <p className="mt-3 text-xs text-slate-400">
-              Нажмите на день, чтобы проставить оценки. Комната: от −2 до +2, помощь по дому: от −3 до +6.
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {ROOM_RATINGS.map((r) => (
+                <span key={r.value} className="badge bg-stone-800 text-stone-300" title={r.hint}>
+                  {r.icon} {r.label} ({r.value > 0 ? `+${r.value}` : r.value} 🪙)
+                </span>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-slate-400">
+              Нажмите на день, чтобы проставить оценки. Помощь по дому: от −3 до +6.
               Баллы начисляются автоматически 1-го числа следующего месяца (звёздочка * — ожидает начисления).
             </p>
           </div>
@@ -280,26 +287,33 @@ export default function HouseCalendar({ store, onClose }: Props) {
         <Modal title={`Оценка за ${editDay}`} onClose={() => setEditDay(null)}>
           <div className="space-y-4">
             <div>
-              <label className="label">Комната (от −2 до +2)</label>
+              <label className="label">Порядок в комнате</label>
               <div className="flex flex-wrap gap-1.5">
-                {ROOM_OPTIONS.map((v) => (
+                {ROOM_RATINGS.map((r) => (
                   <button
-                    key={v}
-                    onClick={() => setRoomScore(v)}
-                    className={`h-10 flex-1 rounded-xl text-sm font-bold transition ${
-                      roomScore === v
-                        ? v < 0
+                    key={r.value}
+                    onClick={() => setRoomScore(r.value)}
+                    title={r.hint}
+                    className={`flex h-14 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-bold transition ${
+                      roomScore === r.value
+                        ? r.value < 0
                           ? 'bg-rose-500 text-white'
-                          : v > 0
+                          : r.value > 0
                             ? 'bg-emerald-500 text-white'
                             : 'bg-slate-500 text-white'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
-                    {v > 0 ? `+${v}` : v}
+                    <span className="text-base">{r.icon}</span>
+                    <span>
+                      {r.label} · {r.value > 0 ? `+${r.value}` : r.value} 🪙
+                    </span>
                   </button>
                 ))}
               </div>
+              <p className="mt-1 text-xs text-slate-500">
+                {ROOM_RATINGS.find((r) => r.value === roomScore)?.hint}
+              </p>
             </div>
             <div>
               <label className="label">Помощь по дому (от −3 до +6)</label>
