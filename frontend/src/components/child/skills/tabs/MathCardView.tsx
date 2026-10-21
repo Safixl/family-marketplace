@@ -174,6 +174,9 @@ export default function MathCardView({ onDone }: { onDone?: () => void }) {
                   <span className="rpg-badge border border-sky-500/40 bg-sky-500/15 text-sky-300">
                     ⚡ +{card.xpReward} XP за успех
                   </span>
+                  <span className="rpg-badge border border-amber-600/40 bg-amber-600/15 text-amber-300">
+                    🪙 до {card.maxMatrixReward} Матрикс за карточку
+                  </span>
                   {card.taskTypes.map((t) => (
                     <span key={t} className="rpg-badge border border-stone-700/40 bg-stone-700/15 text-stone-400">
                       {TYPE_LABELS[t] ?? t}
@@ -188,10 +191,14 @@ export default function MathCardView({ onDone }: { onDone?: () => void }) {
                   </div>
                 )}
                 {card.status === 'SUCCESS' && card.xpEarned > 0 && (
-                  <div className="mt-1.5 text-sm font-bold text-emerald-300">⚡ +{card.xpEarned} XP в навык «Математика»</div>
+                  <div className="mt-1.5 text-sm font-bold text-emerald-300">
+                    ⚡ +{card.xpEarned} XP · 🪙 +{card.xpEarned} Матрикс в навык «Математика»
+                  </div>
                 )}
                 {card.status === 'FAILED' && card.xpEarned > 0 && (
-                  <div className="mt-1.5 text-sm font-bold text-amber-300">⚡ +{card.xpEarned} XP за верные примеры</div>
+                  <div className="mt-1.5 text-sm font-bold text-amber-300">
+                    ⚡ +{card.xpEarned} XP · 🪙 +{card.xpEarned} Матрикс за верные примеры
+                  </div>
                 )}
               </div>
 

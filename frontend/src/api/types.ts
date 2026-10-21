@@ -754,6 +754,7 @@ export interface MathCardDto {
   taskCount: number;
   taskTypes: string[];
   xpReward: number;
+  maxMatrixReward: number;
   status: MathCardStatus;
   startedAt: string | null;
   deadline: string | null;

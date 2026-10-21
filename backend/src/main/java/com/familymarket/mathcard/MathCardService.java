@@ -1,12 +1,15 @@
 package com.familymarket.mathcard;
 
 import com.familymarket.achievement.AchievementService;
+import com.familymarket.balance.BalanceService;
 import com.familymarket.child.Child;
 import com.familymarket.child.ChildRepository;
 import com.familymarket.common.BadRequestException;
 import com.familymarket.common.NotFoundException;
 import com.familymarket.daily.DailyLog;
 import com.familymarket.daily.DailyLogRepository;
+import com.familymarket.store.Store;
+import com.familymarket.store.StoreRepository;
 import com.familymarket.dto.MathCardApprovalDto;
 import com.familymarket.dto.MathCardDayDto;
 import com.familymarket.dto.MathCardDto;
@@ -57,6 +60,8 @@ public class MathCardService {
     private final UserRepository userRepository;
     private final MathCardGenerator generator;
     private final AchievementService achievementService;
+    private final StoreRepository storeRepository;
+    private final BalanceService balanceService;
 
     public MathCardService(MathTopicRepository topicRepository,
                            MathTopicSettingsRepository settingsRepository,
@@ -69,7 +74,9 @@ public class MathCardService {
                            ChildRepository childRepository,
                            UserRepository userRepository,
                            MathCardGenerator generator,
-                           AchievementService achievementService) {
+                           AchievementService achievementService,
+                           StoreRepository storeRepository,
+                           BalanceService balanceService) {
         this.topicRepository = topicRepository;
         this.settingsRepository = settingsRepository;
         this.cardRepository = cardRepository;
@@ -82,6 +89,8 @@ public class MathCardService {
         this.userRepository = userRepository;
         this.generator = generator;
         this.achievementService = achievementService;
+        this.storeRepository = storeRepository;
+        this.balanceService = balanceService;
     }
 
     // ---------- Темы и настройки родителя ----------
@@ -277,6 +286,8 @@ public class MathCardService {
         card.setSubmittedAt(Instant.now());
         card.setXpEarned(xpEarned);
         cardRepository.save(card);
+        // «Матриксы» = XP математики 1:1: начисляем в баланс магазина «Математика»
+        creditMatrices(childId, card.getChild().getParent().getId(), xpEarned);
         // Синхронизация дейлика «Математика»: счётчик = число завершённых карточек дня
         syncDailyMath(childId, card.getCardDate());
         // Авто-начисление достижений по математике (примеры, карточки, стрики)
@@ -371,6 +382,17 @@ public class MathCardService {
             cursor = cursor.minusDays(1);
         }
         return count;
+    }
+
+    /** «Матриксы» = XP математики 1:1 в баланс магазина «Математика». */
+    private void creditMatrices(Long childId, Long parentId, long amount) {
+        if (amount <= 0) {
+            return;
+        }
+        Store store = storeRepository.findByParentIdAndTemplateType(parentId, "MATH").orElse(null);
+        if (store != null) {
+            balanceService.credit(childId, store.getId(), BigDecimal.valueOf(amount));
+        }
     }
 
     /** Просроченные IN_PROGRESS-карточки завершаются как «не сдано» (0%, без XP). */

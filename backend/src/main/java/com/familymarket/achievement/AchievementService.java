@@ -402,6 +402,12 @@ public class AchievementService {
         if (achievement.getRewardStore() != null && achievement.getRewardAmount().signum() > 0) {
             balanceService.credit(childId, achievement.getRewardStore().getId(), achievement.getRewardAmount());
         }
+        // «Матриксы» = XP математики 1:1: каждое достижение навыка «Математика» даёт столько же в магазин математики
+        if ("MATH".equals(achievement.getSkill()) && achievement.getXpReward() > 0) {
+            storeRepository.findByParentIdAndTemplateType(achievement.getParent().getId(), "MATH")
+                    .ifPresent(s -> balanceService.credit(childId, s.getId(),
+                            BigDecimal.valueOf(achievement.getXpReward())));
+        }
     }
 
     /** Дефолтное (системное) достижение — нельзя удалять и менять параметры, только награду. */

@@ -25,6 +25,7 @@ public record MathCardDto(
         int taskCount,
         List<String> taskTypes,
         int xpReward,
+        int maxMatrixReward,
         String status,
         Instant startedAt,
         Instant deadline,
@@ -41,6 +42,8 @@ public record MathCardDto(
                         .map(t -> new MathCardTaskDto(t.getId(), t.getTopicCode(), t.getTaskType(), t.getText()))
                         .toList()
                 : List.of();
+        // Максимум «Матриксов» за карточку: все примеры верно (по уровню) + награда за 100%
+        int maxMatrix = card.getTaskCount() * diff.getPerExampleXp() + diff.getSuccessReward() * 2;
         return new MathCardDto(
                 card.getId(),
                 card.getCardDate(),
@@ -52,6 +55,7 @@ public record MathCardDto(
                 card.getTaskCount(),
                 types,
                 card.getXpReward(),
+                maxMatrix,
                 card.getStatus(),
                 card.getStartedAt(),
                 card.getDeadline(),
