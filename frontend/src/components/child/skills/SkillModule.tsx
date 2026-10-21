@@ -48,7 +48,7 @@ export default function SkillModule({ config, store, progress }: Props) {
   const [loading, setLoading] = useState(true);
   const [archive, setArchive] = useState<Awaited<ReturnType<SkillConfig['loadArchive']>>>([]);
   const [requests, setRequests] = useState<SkillRequestRow[]>([]);
-  const [stats, setStats] = useState<SkillStats>({ level: 0, progress: 0, counters: [] });
+  const [stats, setStats] = useState<SkillStats>({ level: 1, progress: 0, xp: 0, xpToNext: 500, counters: [] });
   const [quests, setQuests] = useState<SkillQuest[]>([]);
   const [purchases, setPurchases] = useState<ChildPurchaseDto[]>([]);
   const [inventory, setInventory] = useState<InventoryStackDto[]>([]);

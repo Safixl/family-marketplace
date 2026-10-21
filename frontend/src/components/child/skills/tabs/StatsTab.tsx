@@ -1,6 +1,5 @@
 import { CheckCircle2, ListChecks, Swords } from 'lucide-react';
 import { SkillConfig, SkillQuest, SkillStats } from '../../../../lib/skills';
-import { skillLevelFromProgress } from '../../../../lib/rpg';
 import { EmptyState } from '../../../ui';
 
 interface Props {
@@ -10,7 +9,8 @@ interface Props {
 }
 
 export default function StatsTab({ config, stats, quests }: Props) {
-  const level = skillLevelFromProgress(stats.progress);
+  const pct = Math.min(100, stats.progress);
+  const capped = stats.xpToNext <= 0;
 
   return (
     <div className="space-y-4">
@@ -23,16 +23,16 @@ export default function StatsTab({ config, stats, quests }: Props) {
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline justify-between gap-2">
               <span className="rpg-title text-lg">{config.name}</span>
-              <span className="text-sm font-bold text-amber-200">Ур. {level}</span>
+              <span className="text-sm font-bold text-amber-200">Ур. {stats.level}</span>
             </div>
             <div className="rpg-progress-track mt-2 h-3">
               <div
                 className="rpg-progress-fill"
-                style={{ width: `${Math.min(100, stats.progress)}%` }}
+                style={{ width: `${pct}%` }}
               />
             </div>
             <div className="mt-1 text-right text-xs font-semibold text-amber-100/60">
-              Ур. {level} · {stats.progress}% прогресса
+              {capped ? 'Максимальный уровень' : `${stats.xp}/${stats.xpToNext} XP · ${pct}%`}
             </div>
           </div>
         </div>

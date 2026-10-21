@@ -9,6 +9,7 @@ import {
   SkillId,
   SkillProgressDto,
 } from '../api/types';
+import { skillLevelFromXp } from './rpg';
 
 /**
  * Конфигурация одного направления развития (навыка).
@@ -46,8 +47,24 @@ export interface SkillCounter {
 
 export interface SkillStats {
   level: number;
+  /** Прогресс внутри текущего уровня 0..100 */
   progress: number;
+  /** XP внутри текущего уровня */
+  xp: number;
+  /** XP, нужный для перехода на следующий уровень (0 на потолке) */
+  xpToNext: number;
   counters: SkillCounter[];
+}
+
+/** Базовые поля статистики навыка из прогресса (уровень, XP внутри уровня, % до следующего). */
+export function statsFromProgress(progress: SkillProgressDto | undefined): Omit<SkillStats, 'counters'> {
+  const lvl = skillLevelFromXp(progress?.xp ?? 0);
+  return {
+    level: lvl.level,
+    progress: Math.round(lvl.ratio * 100),
+    xp: lvl.xpInLevel,
+    xpToNext: lvl.xpToNext,
+  };
 }
 
 export interface SkillQuest {
@@ -145,8 +162,7 @@ export const SKILLS: SkillConfig[] = [
       try {
         const stats = await api.get<MathStatsDto>('/child/math-stats');
         return {
-          level: progress?.progress ?? 0,
-          progress: progress?.progress ?? 0,
+          ...statsFromProgress(progress),
           counters: [
             { label: 'Решено задач', value: stats.correct, icon: '✅' },
             { label: 'Попыток', value: stats.total, icon: '🎯' },
@@ -155,7 +171,7 @@ export const SKILLS: SkillConfig[] = [
           ],
         };
       } catch {
-        return { level: 0, progress: 0, counters: [] };
+        return { ...statsFromProgress(undefined), counters: [] };
       }
     },
     loadQuests: async () => {
@@ -205,8 +221,7 @@ export const SKILLS: SkillConfig[] = [
         const data = await api.get<ChildReadingResponse>('/child/reading');
         const genres = new Set(data.books.map((b) => b.genre).filter(Boolean)).size;
         return {
-          level: progress?.progress ?? 0,
-          progress: progress?.progress ?? 0,
+          ...statsFromProgress(progress),
           counters: [
             { label: 'Книг засчитано', value: data.stats.booksRead, icon: '📖' },
             { label: 'Страниц прочитано', value: data.stats.pagesRead, icon: '📄' },
@@ -217,7 +232,7 @@ export const SKILLS: SkillConfig[] = [
           ],
         };
       } catch {
-        return { level: 0, progress: 0, counters: [] };
+        return { ...statsFromProgress(undefined), counters: [] };
       }
     },
     loadQuests: async () => [],
@@ -237,11 +252,10 @@ export const SKILLS: SkillConfig[] = [
     loadArchive: async () => [],
     loadRequests: async () => [],
     loadStats: async (progress) => ({
-      level: progress?.progress ?? 0,
-      progress: progress?.progress ?? 0,
+      ...statsFromProgress(progress),
       counters: [
         { label: 'Ачивок получено', value: progress?.unlockedAchievements ?? 0, icon: '🏆' },
-        { label: 'Прогресс навыка', value: `${progress?.progress ?? 0}%`, icon: '📈' },
+        { label: 'Прогресс навыка', value: `${Math.round((progress?.xp ?? 0) / 800)}%`, icon: '📈' },
       ],
     }),
     loadQuests: async () => [],
@@ -261,11 +275,10 @@ export const SKILLS: SkillConfig[] = [
     loadArchive: async () => [],
     loadRequests: async () => [],
     loadStats: async (progress) => ({
-      level: progress?.progress ?? 0,
-      progress: progress?.progress ?? 0,
+      ...statsFromProgress(progress),
       counters: [
         { label: 'Ачивок получено', value: progress?.unlockedAchievements ?? 0, icon: '🏆' },
-        { label: 'Прогресс навыка', value: `${progress?.progress ?? 0}%`, icon: '📈' },
+        { label: 'Прогресс навыка', value: `${Math.round((progress?.xp ?? 0) / 800)}%`, icon: '📈' },
       ],
     }),
     loadQuests: async () => [],
@@ -285,11 +298,10 @@ export const SKILLS: SkillConfig[] = [
     loadArchive: async () => [],
     loadRequests: async () => [],
     loadStats: async (progress) => ({
-      level: progress?.progress ?? 0,
-      progress: progress?.progress ?? 0,
+      ...statsFromProgress(progress),
       counters: [
         { label: 'Ачивок получено', value: progress?.unlockedAchievements ?? 0, icon: '🏆' },
-        { label: 'Прогресс навыка', value: `${progress?.progress ?? 0}%`, icon: '📈' },
+        { label: 'Прогресс навыка', value: `${Math.round((progress?.xp ?? 0) / 800)}%`, icon: '📈' },
       ],
     }),
     loadQuests: async () => [],
@@ -309,11 +321,10 @@ export const SKILLS: SkillConfig[] = [
     loadArchive: async () => [],
     loadRequests: async () => [],
     loadStats: async (progress) => ({
-      level: progress?.progress ?? 0,
-      progress: progress?.progress ?? 0,
+      ...statsFromProgress(progress),
       counters: [
         { label: 'Ачивок получено', value: progress?.unlockedAchievements ?? 0, icon: '🏆' },
-        { label: 'Прогресс навыка', value: `${progress?.progress ?? 0}%`, icon: '📈' },
+        { label: 'Прогресс навыка', value: `${Math.round((progress?.xp ?? 0) / 800)}%`, icon: '📈' },
       ],
     }),
     loadQuests: async () => [],
