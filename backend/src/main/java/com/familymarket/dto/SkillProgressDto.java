@@ -10,5 +10,6 @@ public record SkillProgressDto(
         String icon,
         int progress,
         long xp,
+        long achievementXp,
         long unlockedAchievements) {
 }

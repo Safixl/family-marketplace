@@ -471,6 +471,7 @@ export interface SkillProgressDto {
   icon: string;
   progress: number;
   xp: number;
+  achievementXp: number;
   unlockedAchievements: number;
 }
 

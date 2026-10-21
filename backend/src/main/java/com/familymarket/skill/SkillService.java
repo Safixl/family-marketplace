@@ -120,7 +120,7 @@ public class SkillService {
             // 800 XP = 1% прогресса → 80 000 XP = 100% (60-й уровень навыка)
             long xp = achievementXp + Math.round(activityScore);
             int progress = (int) Math.min(100, xp / 800);
-            result.add(new SkillProgressDto(meta.skill(), meta.name(), meta.icon(), progress, xp, unlocked));
+            result.add(new SkillProgressDto(meta.skill(), meta.name(), meta.icon(), progress, xp, achievementXp, unlocked));
         }
         return result;
     }

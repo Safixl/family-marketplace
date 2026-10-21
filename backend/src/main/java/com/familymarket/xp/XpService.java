@@ -14,7 +14,9 @@ import java.util.List;
 
 /**
  * Общий уровень персонажа (в стиле MMORPG):
- * XP = 50% от опыта навыков + опыт ачивок (xp_reward) + опыт квестов ГМа (одобренные заявки).
+ * XP = опыт активности навыков (каждые 4 XP навыка = 1 XP герою, без XP достижений)
+ *    + 1/4 опыта ачивок (xp_reward, округление вверх)
+ *    + опыт квестов ГМа (одобренные заявки).
  *
  * Прогрессия 1..60 с потолком на 60-м уровне (Чемпион, финальная точка ~5 лет игры).
  * Та же кривая опыта используется и для уровней отдельных навыков.
@@ -82,10 +84,10 @@ public class XpService {
         long parentId = childRepository.findParentIdById(childId)
                 .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
 
-        // 50% опыта навыков
-        long skillXp = Math.round(skillService.progress(childId).stream()
-                .mapToDouble(s -> s.xp())
-                .sum() * 0.5);
+        // Опыт от активности навыков (без XP достижений): каждые 4 XP навыка = 1 XP герою
+        long skillActivityXp = skillService.progress(childId).stream()
+                .mapToLong(s -> (s.xp() - s.achievementXp()) / 4)
+                .sum();
 
         // Опыт ачивок (разблокированные): в общий уровень героя идёт 1/4 опыта достижения (округление вверх)
         long achievementXp = achievementRepository.findByParentIdOrderByCreatedAtAsc(parentId).stream()
@@ -98,7 +100,7 @@ public class XpService {
         // Опыт квестов ГМа (одобренные заявки)
         long questXp = questSubmissionRepository.sumXpByChildId(childId);
 
-        long totalXp = skillXp + achievementXp + questXp;
+        long totalXp = skillActivityXp + achievementXp + questXp;
         return toLevelDto(totalXp);
     }
 
