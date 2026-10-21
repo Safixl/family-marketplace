@@ -146,15 +146,29 @@ public class AchievementService {
 
     /** Досоздаёт новые дефолтные группы достижений математики (идемпотентно, по groupKey). */
     private void ensureMissingMathDefaults(User parent) {
-        Set<String> existing = new HashSet<>();
-        achievementRepository.findByParentIdAndSkill(parent.getId(), "MATH")
-                .forEach(a -> {
-                    if (a.getGroupKey() != null) {
-                        existing.add(a.getGroupKey());
-                    }
-                });
+        // Старые карточные категории (ручная выдача) заменяются автоматическими
+        Set<String> staleManual = Set.of("MATH_CAT_CARD_EASY", "MATH_CAT_CARD_MEDIUM", "MATH_CAT_CARD_HARD");
+        List<Achievement> existing = achievementRepository.findByParentIdAndSkill(parent.getId(), "MATH");
+        List<Long> toDelete = new ArrayList<>();
+        for (Achievement e : existing) {
+            if (e.getGroupKey() != null && staleManual.contains(e.getGroupKey())
+                    && "NONE".equals(e.getTargetType())) {
+                toDelete.add(e.getId());
+            }
+        }
+        if (!toDelete.isEmpty()) {
+            achievementRepository.deleteAllById(toDelete);
+            achievementRepository.flush();
+        }
+
+        Set<String> present = new HashSet<>();
+        for (Achievement e : existing) {
+            if (e.getGroupKey() != null && !toDelete.contains(e.getId())) {
+                present.add(e.getGroupKey());
+            }
+        }
         for (Achievement a : AchievementDefaults.math(parent)) {
-            if (a.getGroupKey() != null && !existing.contains(a.getGroupKey())) {
+            if (a.getGroupKey() != null && !present.contains(a.getGroupKey())) {
                 achievementRepository.save(a);
             }
         }
@@ -579,6 +593,12 @@ public class AchievementService {
             case "MATH_CARD_LVL_EASY" -> mathCardRepository.countByChildIdAndStatusAndFinalLevel(childId, "SUCCESS", "EASY");
             case "MATH_CARD_LVL_EXTREME" -> mathCardRepository.countByChildIdAndStatusAndFinalLevel(childId, "SUCCESS", "EXTREME");
             case "MATH_CARD_LVL_OLYMPIAD" -> mathCardRepository.countByChildIdAndStatusAndFinalLevel(childId, "SUCCESS", "OLYMPIAD");
+            case "MATH_CARD_DONE_EASY" -> mathCardRepository.countByChildIdAndStatusAndFinalLevel(childId, "SUCCESS", "EASY");
+            case "MATH_CARD_DONE_MEDIUM" -> mathCardRepository.countByChildIdAndStatusAndFinalLevel(childId, "SUCCESS", "MEDIUM");
+            case "MATH_CARD_DONE_HIGH" -> mathCardRepository.countByChildIdAndStatusAndFinalLevel(childId, "SUCCESS", "HIGH");
+            case "MATH_CARD_DONE_HARD" -> mathCardRepository.countByChildIdAndStatusAndFinalLevel(childId, "SUCCESS", "HARD");
+            case "MATH_CARD_DONE_EXTREME" -> mathCardRepository.countByChildIdAndStatusAndFinalLevel(childId, "SUCCESS", "EXTREME");
+            case "MATH_CARD_DONE_OLYMPIAD" -> mathCardRepository.countByChildIdAndStatusAndFinalLevel(childId, "SUCCESS", "OLYMPIAD");
             default -> 0;
         };
     }

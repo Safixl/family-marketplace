@@ -212,12 +212,22 @@ public final class AchievementDefaults {
                 "Дроби и проценты: обыкновенные, десятичные дроби, задачи на проценты (5–6 класс).");
         addMathCategory(out, parent, "MATH_CAT_GEOMETRY", "📐", "Геометрический Гений",
                 "Геометрия: площади, периметры, углы и работа с фигурами (7–8 класс).");
-        addMathCategory(out, parent, "MATH_CAT_CARD_EASY", "🃏", "Легкая прогулка",
-                "Карточки с заданиями: лёгкий уровень.");
-        addMathCategory(out, parent, "MATH_CAT_CARD_MEDIUM", "⚔️", "Крепкий орешек",
-                "Карточки с заданиями: средний уровень.");
-        addMathCategory(out, parent, "MATH_CAT_CARD_HARD", "🔥", "Зона хардкора",
-                "Карточки с заданиями: сложный уровень.");
+        // ---------- Ежедневные карточки по уровням сложности (6 достижений) ----------
+        int[] cardCounts = {1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 66};          // обычные уровни
+        int[] olympCardCounts = {1, 2, 3, 5, 7, 10, 13, 17, 21, 26, 33};       // 1 карточка в 2 месяца → 11 ступень за 5–6 лет
+        addCardCategory(out, parent, "MATH_CAT_CARD_EASY", "🃏", "Легкая прогулка", "MATH_CARD_DONE_EASY",
+                "Успешно решённые ежедневные карточки уровня «Лёгкая» (80%+ верных).", cardCounts);
+        addCardCategory(out, parent, "MATH_CAT_CARD_MEDIUM", "⚔️", "Крепкий орешек", "MATH_CARD_DONE_MEDIUM",
+                "Успешно решённые ежедневные карточки уровня «Обычная».", cardCounts);
+        addCardCategory(out, parent, "MATH_CAT_CARD_HIGH", "🚀", "Высокий полёт", "MATH_CARD_DONE_HIGH",
+                "Успешно решённые ежедневные карточки уровня «Высокая».", cardCounts);
+        addCardCategory(out, parent, "MATH_CAT_CARD_HARD", "🔥", "Зона хардкора", "MATH_CARD_DONE_HARD",
+                "Успешно решённые ежедневные карточки уровня «Сложная».", cardCounts);
+        addCardCategory(out, parent, "MATH_CAT_CARD_EXTREME", "💀", "Хардкор-экстрим", "MATH_CARD_DONE_EXTREME",
+                "Успешно решённые ежедневные карточки уровня «Хард» — для настоящих смельчаков.", cardCounts);
+        addCardCategory(out, parent, "MATH_CAT_CARD_OLYMPIAD", "🏆", "Олимпийская вершина", "MATH_CARD_DONE_OLYMPIAD",
+                "Успешно решённые олимпиадные карточки. Примерно 1 раз в 2 месяца — вершина покоряется за 5–6 лет.",
+                olympCardCounts);
 
         // ---------- Большие математические квесты ----------
 
@@ -374,6 +384,29 @@ public final class AchievementDefaults {
             a.setDescription(ranks[i] + " — " + counts[i] + " заданий · " + name + ". " + hint);
             a.setIcon(icon);
             a.setTargetType("NONE");
+            a.setTargetValue(counts[i]);
+            a.setGroupKey(groupKey);
+            a.setSkill("MATH");
+            a.setLevel(i + 1);
+            a.setXpReward(LEVEL_XP[i]);
+            a.setHiddenReward(false);
+            a.setCreatedAt(Instant.now());
+            out.add(a);
+        }
+    }
+
+    /** Категория ежедневных карточек математики: 11 ступеней по числу успешно решённых карточек уровня. */
+    private static void addCardCategory(List<Achievement> out, User parent, String groupKey, String icon,
+                                        String name, String targetType, String hint, int[] counts) {
+        String[] ranks = {"Стажер", "Новичок", "Практик", "Специалист", "Аналитик", "Эксперт",
+                "Мастер", "Гроссмейстер", "Магистр", "Легенда", "Математический Титан"};
+        for (int i = 0; i < ranks.length; i++) {
+            Achievement a = new Achievement();
+            a.setParent(parent);
+            a.setName(name);
+            a.setDescription(ranks[i] + " — " + counts[i] + " карточек · " + name + ". " + hint);
+            a.setIcon(icon);
+            a.setTargetType(targetType);
             a.setTargetValue(counts[i]);
             a.setGroupKey(groupKey);
             a.setSkill("MATH");
