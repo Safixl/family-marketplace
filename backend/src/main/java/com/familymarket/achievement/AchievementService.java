@@ -15,6 +15,8 @@ import com.familymarket.dto.GrantResult;
 import com.familymarket.dto.SkillTotalDto;
 import com.familymarket.house.HouseDayRepository;
 import com.familymarket.math.MathAttemptRepository;
+import com.familymarket.mathcard.MathCardAttemptRepository;
+import com.familymarket.mathcard.MathCardRepository;
 import com.familymarket.purchase.PurchaseRepository;
 import com.familymarket.reading.ReadingBook;
 import com.familymarket.reading.ReadingBookCatalog;
@@ -66,6 +68,8 @@ public class AchievementService {
     private final UserRepository userRepository;
     private final ReadingLogRepository readingLogRepository;
     private final MathAttemptRepository mathAttemptRepository;
+    private final MathCardRepository mathCardRepository;
+    private final MathCardAttemptRepository mathCardAttemptRepository;
     private final HouseDayRepository houseDayRepository;
     private final PurchaseRepository purchaseRepository;
     private final DailyLogRepository dailyLogRepository;
@@ -81,6 +85,8 @@ public class AchievementService {
                               UserRepository userRepository,
                               ReadingLogRepository readingLogRepository,
                               MathAttemptRepository mathAttemptRepository,
+                              MathCardRepository mathCardRepository,
+                              MathCardAttemptRepository mathCardAttemptRepository,
                               HouseDayRepository houseDayRepository,
                               PurchaseRepository purchaseRepository,
                               DailyLogRepository dailyLogRepository,
@@ -95,6 +101,8 @@ public class AchievementService {
         this.userRepository = userRepository;
         this.readingLogRepository = readingLogRepository;
         this.mathAttemptRepository = mathAttemptRepository;
+        this.mathCardRepository = mathCardRepository;
+        this.mathCardAttemptRepository = mathCardAttemptRepository;
         this.houseDayRepository = houseDayRepository;
         this.purchaseRepository = purchaseRepository;
         this.dailyLogRepository = dailyLogRepository;
@@ -126,11 +134,30 @@ public class AchievementService {
         }
         if (achievementRepository.countByParentIdAndSkill(parentId, "MATH") == 0) {
             achievementRepository.saveAll(AchievementDefaults.math(parent));
+        } else {
+            // Новые дефолтные группы математики досоздаются и у существующих родителей
+            ensureMissingMathDefaults(parent);
         }
         if (achievementRepository.countByParentIdAndSkill(parentId, "HOUSE") == 0) {
             achievementRepository.saveAll(AchievementDefaults.house(parent));
         }
         syncDefaultXp(parentId);
+    }
+
+    /** Досоздаёт новые дефолтные группы достижений математики (идемпотентно, по groupKey). */
+    private void ensureMissingMathDefaults(User parent) {
+        Set<String> existing = new HashSet<>();
+        achievementRepository.findByParentIdAndSkill(parent.getId(), "MATH")
+                .forEach(a -> {
+                    if (a.getGroupKey() != null) {
+                        existing.add(a.getGroupKey());
+                    }
+                });
+        for (Achievement a : AchievementDefaults.math(parent)) {
+            if (a.getGroupKey() != null && !existing.contains(a.getGroupKey())) {
+                achievementRepository.save(a);
+            }
+        }
     }
 
     /** Обновляет XP у дефолтных достижений (ступени 10…860, одиночные 130) — для уже созданных комплектов. */
@@ -528,12 +555,15 @@ public class AchievementService {
                     "READING_GENRE_POETRY", "READING_GENRE_COMICS", "READING_GENRE_HUMOR" ->
                     readingLogRepository.findApprovedBooksByChildId(childId).stream()
                             .filter(b -> achievement.getTargetType().equals(genreCodeOf(b))).count();
-            case "MATH_TASKS" -> mathAttemptRepository.countCorrectByChildId(childId);
-            case "MATH_CARDS" -> childTaskCardRepository.countDoneMathByChildId(childId);
+            case "MATH_TASKS" -> mathAttemptRepository.countCorrectByChildId(childId)
+                    + mathCardAttemptRepository.countCorrectByChildId(childId);
+            case "MATH_CARDS" -> childTaskCardRepository.countDoneMathByChildId(childId)
+                    + mathCardRepository.countByChildIdAndStatus(childId, "SUCCESS");
             case "HOUSE_ROOM_POINTS" -> houseDayRepository.sumRoomScoreByChildId(childId);
             case "HOUSE_HELP_POINTS" -> houseDayRepository.sumLivingScoreByChildId(childId);
             case "POINTS_EARNED" -> balanceRepository.sumByChildId(childId).longValue();
-            case "MATH_STREAK" -> streak(mathAttemptRepository.findDistinctCorrectDates(childId));
+            case "MATH_STREAK" -> streak(union(mathAttemptRepository.findDistinctCorrectDates(childId),
+                    mathCardRepository.findFinishedDates(childId)));
             case "HOUSE_CLEAN_STREAK" -> streak(houseDayRepository.findCleanRoomDays(childId));
             case "HOUSE_HELP_STREAK" -> streak(houseDayRepository.findHelpDays(childId));
             case "HOME_PURCHASES" -> purchaseRepository.countPaidInHomeStores(childId);
@@ -544,8 +574,20 @@ public class AchievementService {
             case "LOGIC_STREAK" -> streak(dailyLogRepository.findActiveDays(childId, "LOGIC"));
             case "LANG_STREAK" -> streak(dailyLogRepository.findActiveDays(childId, "LANG"));
             case "SPORT_STREAK" -> streak(dailyLogRepository.findActiveDays(childId, "SPORT"));
+            case "MATH_CARD_SUCCESS" -> mathCardRepository.countByChildIdAndStatus(childId, "SUCCESS");
+            case "MATH_CARD_STREAK" -> streak(mathCardRepository.findFinishedDates(childId));
+            case "MATH_CARD_LVL_EASY" -> mathCardRepository.countByChildIdAndStatusAndFinalLevel(childId, "SUCCESS", "EASY");
+            case "MATH_CARD_LVL_EXTREME" -> mathCardRepository.countByChildIdAndStatusAndFinalLevel(childId, "SUCCESS", "EXTREME");
+            case "MATH_CARD_LVL_OLYMPIAD" -> mathCardRepository.countByChildIdAndStatusAndFinalLevel(childId, "SUCCESS", "OLYMPIAD");
             default -> 0;
         };
+    }
+
+    /** Объединение списков дат (для стриков по нескольким источникам). */
+    private List<LocalDate> union(List<LocalDate> a, List<LocalDate> b) {
+        List<LocalDate> out = new ArrayList<>(a);
+        out.addAll(b);
+        return out;
     }
 
     private long streak(List<LocalDate> dates) {

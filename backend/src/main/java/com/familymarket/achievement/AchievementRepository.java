@@ -14,4 +14,6 @@ public interface AchievementRepository extends JpaRepository<Achievement, Long> 
     Optional<Achievement> findByIdAndParentId(Long id, Long parentId);
 
     long countByParentIdAndSkill(Long parentId, String skill);
+
+    List<Achievement> findByParentIdAndSkill(Long parentId, String skill);
 }

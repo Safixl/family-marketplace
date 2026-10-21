@@ -1,5 +1,6 @@
 package com.familymarket.mathcard;
 
+import com.familymarket.achievement.AchievementService;
 import com.familymarket.child.Child;
 import com.familymarket.child.ChildRepository;
 import com.familymarket.common.BadRequestException;
@@ -51,6 +52,7 @@ public class MathCardService {
     private final ChildRepository childRepository;
     private final UserRepository userRepository;
     private final MathCardGenerator generator;
+    private final AchievementService achievementService;
 
     public MathCardService(MathTopicRepository topicRepository,
                            MathTopicSettingsRepository settingsRepository,
@@ -61,7 +63,8 @@ public class MathCardService {
                            MathOlympiadTaskRepository olympiadTaskRepository,
                            ChildRepository childRepository,
                            UserRepository userRepository,
-                           MathCardGenerator generator) {
+                           MathCardGenerator generator,
+                           AchievementService achievementService) {
         this.topicRepository = topicRepository;
         this.settingsRepository = settingsRepository;
         this.cardRepository = cardRepository;
@@ -72,6 +75,7 @@ public class MathCardService {
         this.childRepository = childRepository;
         this.userRepository = userRepository;
         this.generator = generator;
+        this.achievementService = achievementService;
     }
 
     // ---------- Темы и настройки родителя ----------
@@ -265,6 +269,8 @@ public class MathCardService {
         card.setSubmittedAt(Instant.now());
         card.setXpEarned(xpEarned);
         cardRepository.save(card);
+        // Авто-начисление достижений по математике (примеры, карточки, стрики)
+        achievementService.checkProgress(childId);
         return new MathCardSubmitResult(percent, success, correct, tasks.size(), perExampleXp, successReward, xpEarned);
     }
 

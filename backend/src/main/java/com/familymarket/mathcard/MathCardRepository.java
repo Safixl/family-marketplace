@@ -38,4 +38,14 @@ public interface MathCardRepository extends JpaRepository<MathCard, Long> {
     /** Сумма фактически начисленного XP по карточкам ребёнка (в навык «Математика»). */
     @Query("SELECT COALESCE(SUM(c.xpEarned), 0) FROM MathCard c WHERE c.child.id = :childId")
     long sumXpByChildId(@Param("childId") Long childId);
+
+    /** Успешно решённые карточки (для достижений). */
+    long countByChildIdAndStatus(Long childId, String status);
+
+    /** Успешно решённые карточки конкретного уровня (для достижений). */
+    long countByChildIdAndStatusAndFinalLevel(Long childId, String status, String finalLevel);
+
+    /** Даты дней, когда ребёнок завершал карточки (успех или нет) — для стрика достижений. */
+    @Query("SELECT c.cardDate FROM MathCard c WHERE c.child.id = :childId AND c.status IN ('SUCCESS','FAILED')")
+    List<LocalDate> findFinishedDates(@Param("childId") Long childId);
 }
