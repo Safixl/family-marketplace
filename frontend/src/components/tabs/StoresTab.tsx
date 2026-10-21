@@ -9,6 +9,7 @@ import HouseCalendar from '../managers/HouseCalendar';
 import TaskCardsManager from '../managers/TaskCardsManager';
 import TasksManager from '../managers/TasksManager';
 import MathCardSettings from '../managers/MathCardSettings';
+import ReadingArchive from '../managers/ReadingArchive';
 import { EmptyState, Spinner } from '../ui';
 
 interface StoreForm {
@@ -295,6 +296,9 @@ export default function StoresTab({ templateFilter, title }: StoresTabProps) {
 
   return (
     <div className="space-y-4">
+      {/* Архив чтения ребёнка — прямо во вкладке «Чтение» */}
+      {templateFilter === 'READING' && <ReadingArchive />}
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-xl font-extrabold">{title ?? 'Магазины'}</h1>
