@@ -87,12 +87,12 @@ public class XpService {
                 .mapToDouble(s -> s.xp())
                 .sum() * 0.5);
 
-        // Опыт ачивок (разблокированные)
+        // Опыт ачивок (разблокированные): в общий уровень героя идёт 1/4 опыта достижения (округление вверх)
         long achievementXp = achievementRepository.findByParentIdOrderByCreatedAtAsc(parentId).stream()
                 .filter(a -> a.getXpReward() > 0)
                 .filter(a -> childAchievementRepository
                         .findByChildIdAndAchievementId(childId, a.getId()).isPresent())
-                .mapToLong(a -> a.getXpReward())
+                .mapToLong(a -> (a.getXpReward() + 3) / 4)
                 .sum();
 
         // Опыт квестов ГМа (одобренные заявки)

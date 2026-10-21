@@ -10,6 +10,7 @@ public record ChildAchievementGroupDto(
         Long achievementId,
         String groupKey,
         String name,
+        int xpReward,
         String description,
         String icon,
         String targetType,

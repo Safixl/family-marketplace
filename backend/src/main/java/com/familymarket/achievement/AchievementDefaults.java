@@ -22,6 +22,12 @@ public final class AchievementDefaults {
     /** Шкала количества книг жанровых достижений. */
     private static final int[] BOOK_COUNTS = {1, 3, 5, 8, 12, 16, 20, 25, 30, 35, 40};
 
+    /** Опыт за ступени многоуровневых достижений (I→XI). */
+    private static final int[] LEVEL_XP = {10, 25, 50, 85, 130, 190, 270, 370, 500, 660, 860};
+
+    /** Опыт за одиночные достижения (квесты, вызовы, сеты). */
+    private static final int SINGLE_XP = 130;
+
     private AchievementDefaults() {
     }
 
@@ -277,6 +283,7 @@ public final class AchievementDefaults {
             a.setGroupKey(groupKey);
             a.setSkill("READING");
             a.setLevel(i + 1);
+            a.setXpReward(LEVEL_XP[i]);
             a.setHiddenReward(false);
             a.setCreatedAt(Instant.now());
             out.add(a);
@@ -297,6 +304,7 @@ public final class AchievementDefaults {
             a.setGroupKey(groupKey);
             a.setSkill("MATH");
             a.setLevel(i + 1);
+            a.setXpReward(LEVEL_XP[i]);
             a.setHiddenReward(false);
             a.setCreatedAt(Instant.now());
             out.add(a);
@@ -316,6 +324,7 @@ public final class AchievementDefaults {
             a.setGroupKey(groupKey);
             a.setSkill("READING");
             a.setLevel(i + 1);
+            a.setXpReward(LEVEL_XP[i]);
             a.setHiddenReward(false);
             a.setCreatedAt(Instant.now());
             out.add(a);
@@ -339,6 +348,7 @@ public final class AchievementDefaults {
             a.setGroupKey(groupKey);
             a.setSkill("MATH");
             a.setLevel(i + 1);
+            a.setXpReward(LEVEL_XP[i]);
             a.setHiddenReward(false);
             a.setCreatedAt(Instant.now());
             out.add(a);
@@ -367,6 +377,7 @@ public final class AchievementDefaults {
         a.setGroupKey(groupKey);
         a.setSkill("MATH");
         a.setLevel(0);
+        a.setXpReward(SINGLE_XP);
         a.setHiddenReward(false);
         a.setCreatedAt(Instant.now());
         out.add(a);
@@ -462,6 +473,7 @@ public final class AchievementDefaults {
             a.setGroupKey(groupKey);
             a.setSkill("HOUSE");
             a.setLevel(i + 1);
+            a.setXpReward(LEVEL_XP[i]);
             a.setHiddenReward(false);
             a.setCreatedAt(Instant.now());
             out.add(a);
@@ -485,6 +497,7 @@ public final class AchievementDefaults {
             a.setGroupKey(groupKey);
             a.setSkill("HOUSE");
             a.setLevel(i + 1);
+            a.setXpReward(LEVEL_XP[i]);
             a.setHiddenReward(false);
             a.setCreatedAt(Instant.now());
             out.add(a);
@@ -508,6 +521,7 @@ public final class AchievementDefaults {
         a.setGroupKey(groupKey);
         a.setSkill("HOUSE");
         a.setLevel(0);
+        a.setXpReward(SINGLE_XP);
         a.setHiddenReward(false);
         a.setCreatedAt(Instant.now());
         out.add(a);
@@ -525,6 +539,7 @@ public final class AchievementDefaults {
         a.setGroupKey(groupKey);
         a.setSkill("READING");
         a.setLevel(0);
+        a.setXpReward(SINGLE_XP);
         a.setHiddenReward(false);
         a.setCreatedAt(Instant.now());
         out.add(a);

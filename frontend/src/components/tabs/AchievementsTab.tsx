@@ -426,6 +426,9 @@ export default function AchievementsTab() {
                             {store
                               ? `${fmtAmount(achievement.rewardAmount)} в «${store.name}»`
                               : fmtAmount(achievement.rewardAmount)}
+                            {achievement.xpReward > 0 && (
+                              <span className="badge ml-1 bg-sky-100 text-sky-700">⚡ +{achievement.xpReward} XP</span>
+                            )}
                             {def && <span className="badge ml-1 bg-slate-200 text-slate-500">дефолтное</span>}
                           </div>
                         </div>

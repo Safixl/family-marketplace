@@ -430,6 +430,7 @@ public class AchievementService {
                     first.getId(),
                     first.getGroupKey(),
                     first.getName(),
+                    current.getXpReward(),
                     first.getDescription(),
                     first.getIcon(),
                     current.getTargetType(),

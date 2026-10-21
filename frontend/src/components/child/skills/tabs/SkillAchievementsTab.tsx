@@ -153,6 +153,11 @@ export default function SkillAchievementsTab({ skill }: { skill: SkillId }) {
                       <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${tier.badge}`}>
                         {a.level === 0 ? 'Одиночное' : `Ур. ${a.level}`} · {tier.name}
                       </span>
+                      {a.xpReward > 0 && (
+                        <span className="rounded-full bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-bold text-sky-300">
+                          ⚡ +{a.xpReward} XP
+                        </span>
+                      )}
                     </div>
                     {!a.questBooks && (
                       <p className="mt-0.5 whitespace-pre-line text-xs leading-relaxed text-stone-400">

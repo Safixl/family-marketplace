@@ -133,6 +133,7 @@ export interface ChildAchievementGroupDto {
   achievementId: number;
   groupKey: string | null;
   name: string;
+  xpReward: number;
   description: string | null;
   icon: string;
   targetType: string;

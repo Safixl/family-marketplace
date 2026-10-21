@@ -227,6 +227,11 @@ export default function ChildAchievementsTab() {
                           <Gift size={12} /> {fmtAmount(achievement.rewardAmount)}
                         </span>
                       )}
+                      {achievement.xpReward > 0 && (
+                        <span className="rpg-badge border border-sky-500/30 bg-sky-500/15 text-sky-300">
+                          ⚡ +{achievement.xpReward} XP
+                        </span>
+                      )}
                       {achievement.rewardAmount == null && (
                         <span className="rpg-badge border border-stone-500/30 bg-stone-500/15 text-stone-300">
                           награда скрыта 🤫
