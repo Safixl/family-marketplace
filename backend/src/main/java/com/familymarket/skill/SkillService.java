@@ -70,10 +70,12 @@ public class SkillService {
         return dailyLogRepository.sumXpByChildIdAndSkill(childId, skill);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<SkillProgressDto> progress(Long childId) {
         Long parentId = childRepository.findParentIdById(childId)
                 .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
+        // Синхронизация XP дефолтных достижений (старые комплекты могли быть созданы без xpReward)
+        achievementService.ensureDefaultAchievements(parentId);
 
         // Активность ребёнка
         long booksRead = readingLogRepository.countApprovedByChildId(childId);

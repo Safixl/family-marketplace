@@ -79,7 +79,7 @@ public class XpService {
         this.questSubmissionRepository = questSubmissionRepository;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public LevelDto level(Long childId) {
         long parentId = childRepository.findParentIdById(childId)
                 .orElseThrow(() -> new NotFoundException("Ребенок не найден"));

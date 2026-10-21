@@ -279,6 +279,23 @@ ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS item_type VARCHAR(20) NOT N
 -- Общий опыт за ачивку и титул персонажа
 ALTER TABLE achievements ADD COLUMN IF NOT EXISTS xp_reward INT NOT NULL DEFAULT 0;
 ALTER TABLE achievements ADD COLUMN IF NOT EXISTS title VARCHAR(100);
+-- Дефолтный XP достижений: ступени 10…860, одиночные 130 (миграция старых комплектов, идемпотентно)
+UPDATE achievements SET xp_reward = CASE
+    WHEN level = 0 THEN 130
+    WHEN level = 1 THEN 10
+    WHEN level = 2 THEN 25
+    WHEN level = 3 THEN 50
+    WHEN level = 4 THEN 85
+    WHEN level = 5 THEN 130
+    WHEN level = 6 THEN 190
+    WHEN level = 7 THEN 270
+    WHEN level = 8 THEN 370
+    WHEN level = 9 THEN 500
+    WHEN level = 10 THEN 660
+    WHEN level >= 11 THEN 860
+    ELSE xp_reward
+END
+WHERE skill IN ('READING','MATH','HOUSE') AND group_key IS NOT NULL;
 
 -- Сезонные ивенты: ограниченное время, валюта-жетоны
 CREATE TABLE IF NOT EXISTS seasonal_events (
