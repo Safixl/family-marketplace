@@ -672,6 +672,14 @@ CREATE TABLE IF NOT EXISTS math_cards (
     created_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_math_cards_child_date ON math_cards (child_id, card_date);
+-- Жизненный цикл карточки: CREATED/REQUESTED/APPROVED/IN_PROGRESS/SUCCESS/FAILED
+ALTER TABLE math_cards ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'CREATED';
+ALTER TABLE math_cards ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
+ALTER TABLE math_cards ADD COLUMN IF NOT EXISTS deadline TIMESTAMPTZ;
+ALTER TABLE math_cards ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ;
+ALTER TABLE math_cards ADD COLUMN IF NOT EXISTS result_percent INT;
+ALTER TABLE math_cards ADD COLUMN IF NOT EXISTS xp_reward INT NOT NULL DEFAULT 0; -- награда за успех
+ALTER TABLE math_cards ADD COLUMN IF NOT EXISTS xp_earned INT NOT NULL DEFAULT 0; -- фактически начислено в навык
 
 -- Задачи карточки
 CREATE TABLE IF NOT EXISTS math_card_tasks (

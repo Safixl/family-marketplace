@@ -16,7 +16,10 @@ import lombok.Setter;
 import java.time.Instant;
 import java.time.LocalDate;
 
-/** Сгенерированная математическая карточка (история для анти-дублей 30 дней). */
+/**
+ * Сгенерированная математическая карточка (история для анти-дублей 30 дней).
+ * Жизненный цикл: CREATED → REQUESTED → APPROVED → IN_PROGRESS → SUCCESS/FAILED.
+ */
 @Entity
 @Table(name = "math_cards")
 @Getter
@@ -51,6 +54,29 @@ public class MathCard {
 
     @Column(nullable = false)
     private int minutes;
+
+    @Column(nullable = false, length = 20)
+    private String status = "CREATED";
+
+    @Column(name = "started_at")
+    private Instant startedAt;
+
+    @Column(name = "deadline")
+    private Instant deadline;
+
+    @Column(name = "submitted_at")
+    private Instant submittedAt;
+
+    @Column(name = "result_percent")
+    private Integer resultPercent;
+
+    /** Награда за успех (по уровню карточки), при 100% удваивается. */
+    @Column(name = "xp_reward", nullable = false)
+    private int xpReward;
+
+    /** Фактически начислено в навык «Математика» (за примеры + успех). */
+    @Column(name = "xp_earned", nullable = false)
+    private int xpEarned;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

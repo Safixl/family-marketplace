@@ -10,6 +10,7 @@ import com.familymarket.daily.DailyLogRepository;
 import com.familymarket.dto.SkillProgressDto;
 import com.familymarket.house.HouseDayRepository;
 import com.familymarket.math.MathAttemptRepository;
+import com.familymarket.mathcard.MathCardRepository;
 import com.familymarket.reading.ReadingLogRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,6 +47,7 @@ public class SkillService {
     private final HouseDayRepository houseDayRepository;
     private final DailyLogRepository dailyLogRepository;
     private final AchievementService achievementService;
+    private final MathCardRepository mathCardRepository;
 
     public SkillService(ChildRepository childRepository,
                         AchievementRepository achievementRepository,
@@ -54,7 +56,8 @@ public class SkillService {
                         MathAttemptRepository mathAttemptRepository,
                         HouseDayRepository houseDayRepository,
                         DailyLogRepository dailyLogRepository,
-                        AchievementService achievementService) {
+                        AchievementService achievementService,
+                        MathCardRepository mathCardRepository) {
         this.childRepository = childRepository;
         this.achievementRepository = achievementRepository;
         this.childAchievementRepository = childAchievementRepository;
@@ -63,6 +66,7 @@ public class SkillService {
         this.houseDayRepository = houseDayRepository;
         this.dailyLogRepository = dailyLogRepository;
         this.achievementService = achievementService;
+        this.mathCardRepository = mathCardRepository;
     }
 
     /** Опыт из ежедневных дейликов навыка (включает бонус Full Clear). */
@@ -110,7 +114,7 @@ public class SkillService {
 
             // Активностная часть (без потолка — итоговый прогресс ограничен формулой xp/800)
             double activityScore = switch (meta.skill()) {
-                case "MATH" -> mathCorrect * 2.0 + dailyXp(childId, "MATH");
+                case "MATH" -> mathCorrect * 2.0 + dailyXp(childId, "MATH") + mathCardRepository.sumXpByChildId(childId);
                 case "READING" -> booksRead * 2.0 + pagesRead / 4.0; // 4 страницы = 1 XP
                 case "HOUSE" -> housePositive * 1.5;
                 case "LOGIC" -> dailyXp(childId, "LOGIC");

@@ -735,6 +735,14 @@ export interface MathCardTaskDto {
   text: string;
 }
 
+export type MathCardStatus =
+  | 'CREATED'
+  | 'REQUESTED'
+  | 'APPROVED'
+  | 'IN_PROGRESS'
+  | 'SUCCESS'
+  | 'FAILED';
+
 export interface MathCardDto {
   id: number;
   date: string;
@@ -745,10 +753,34 @@ export interface MathCardDto {
   description: string;
   taskCount: number;
   taskTypes: string[];
+  xpReward: number;
+  status: MathCardStatus;
+  startedAt: string | null;
+  deadline: string | null;
+  resultPercent: number | null;
+  xpEarned: number;
   tasks: MathCardTaskDto[];
 }
 
-export interface MathCardAnswerResult {
-  correct: boolean;
-  expected: string;
+export interface MathCardApprovalDto {
+  cardId: number;
+  childId: number;
+  childName: string;
+  childAvatar: string;
+  level: string;
+  levelLabel: string;
+  levelEmoji: string;
+  minutes: number;
+  taskCount: number;
+  xpReward: number;
+}
+
+export interface MathCardSubmitResult {
+  percent: number;
+  success: boolean;
+  correct: number;
+  total: number;
+  perExampleXp: number;
+  successReward: number;
+  xpEarned: number;
 }

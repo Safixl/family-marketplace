@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Save } from 'lucide-react';
+import { Check, Save, X } from 'lucide-react';
 import { api } from '../../api/client';
-import { MathBaseDifficulty, MathTopicDto } from '../../api/types';
+import { MathBaseDifficulty, MathCardApprovalDto, MathTopicDto } from '../../api/types';
 import { errMsg } from '../../lib/format';
 import Modal from '../Modal';
 import { Spinner } from '../ui';
@@ -20,8 +20,17 @@ const BASE_LABELS: Record<MathBaseDifficulty, string> = {
  */
 export default function MathCardSettings({ onClose }: { onClose: () => void }) {
   const [topics, setTopics] = useState<MathTopicDto[] | null>(null);
+  const [approvals, setApprovals] = useState<MathCardApprovalDto[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const loadApprovals = useCallback(async () => {
+    try {
+      setApprovals(await api.get<MathCardApprovalDto[]>('/parent/math-card-approvals'));
+    } catch {
+      setApprovals([]);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -34,7 +43,20 @@ export default function MathCardSettings({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     void load();
-  }, [load]);
+    void loadApprovals();
+  }, [load, loadApprovals]);
+
+  const decide = async (cardId: number, decision: 'approve' | 'reject') => {
+    setBusy(true);
+    try {
+      await api.post(`/parent/math-card-approvals/${cardId}/${decision}`);
+      await loadApprovals();
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const patch = (id: number, next: Partial<MathTopicDto>) => {
     setTopics((prev) => (prev ?? []).map((t) => (t.id === id ? { ...t, ...next } : t)));
@@ -67,6 +89,31 @@ export default function MathCardSettings({ onClose }: { onClose: () => void }) {
           скрыт от ребёнка и смещает реальную сложность задач (потолок — «Сложный»).
         </p>
         {error && <div className="card text-sm text-rose-600">{error}</div>}
+
+        {approvals.length > 0 && (
+          <div className="card space-y-2">
+            <div className="font-bold text-slate-700">📋 Запросы на одобрение карточек</div>
+            {approvals.map((a) => (
+              <div key={a.cardId} className="flex flex-wrap items-center gap-3 rounded-xl bg-slate-50 p-3">
+                <span className="text-xl">{a.childAvatar}</span>
+                <div className="min-w-0 flex-1 text-sm">
+                  <div className="font-semibold text-slate-800">
+                    {a.childName} · {a.levelEmoji} {a.levelLabel}
+                  </div>
+                  <div className="text-xs text-slate-400">
+                    {a.taskCount} задач · {a.minutes} мин · ⚡ +{a.xpReward} XP
+                  </div>
+                </div>
+                <button className="btn-primary !px-3 !py-1.5 text-xs" disabled={busy} onClick={() => void decide(a.cardId, 'approve')}>
+                  <Check size={14} /> Одобрить
+                </button>
+                <button className="btn-secondary !px-3 !py-1.5 text-xs" disabled={busy} onClick={() => void decide(a.cardId, 'reject')}>
+                  <X size={14} /> Отклонить
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         {topics === null ? (
           <Spinner label="Загружаем темы…" />
         ) : (

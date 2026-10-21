@@ -4,8 +4,9 @@ import com.familymarket.child.Child;
 import com.familymarket.child.ChildRepository;
 import com.familymarket.common.BadRequestException;
 import com.familymarket.common.NotFoundException;
-import com.familymarket.dto.MathCardAnswerResult;
+import com.familymarket.dto.MathCardApprovalDto;
 import com.familymarket.dto.MathCardDto;
+import com.familymarket.dto.MathCardSubmitResult;
 import com.familymarket.dto.MathTopicDto;
 import com.familymarket.dto.MathTopicSettingsItemRequest;
 import com.familymarket.user.User;
@@ -22,14 +23,16 @@ import java.util.Set;
 
 /**
  * Микросервис динамической генерации математических карточек.
- * Настройки тем и базовой сложности — у родителя; финальный уровень — по пересечению
- * выбора ребёнка и базового уровня родителя (см. {@link MathDifficulty#resolve}).
+ * Жизненный цикл карточки: CREATED → REQUESTED (запрос родителю) → APPROVED →
+ * IN_PROGRESS (единый серверный таймер) → SUCCESS/FAILED (проверка одним сабмитом).
+ * XP в навык «Математика»: за каждый верный пример (по уровню 1..10) + награда за
+ * карточку ≥80% (при 100% удваивается).
  */
 @Service
 public class MathCardService {
 
-    /** Число задач по финальному уровню (динамические карточки). */
-    private static final int[] TASK_COUNT = {8, 10, 12, 14, 16, 0}; // EASY..OLYMPIAD (0 — берём из шаблона)
+    private static final int TASK_COUNT[] = {8, 10, 12, 14, 16, 0}; // EASY..OLYMPIAD (0 — из шаблона)
+    private static final int SUCCESS_PERCENT = 80;
 
     private final MathTopicRepository topicRepository;
     private final MathTopicSettingsRepository settingsRepository;
@@ -66,7 +69,6 @@ public class MathCardService {
 
     // ---------- Темы и настройки родителя ----------
 
-    /** Создаёт настройки по умолчанию (тема активна, базовая сложность Средний), если их нет. */
     @Transactional
     public void ensureTopics(Long parentId) {
         User parent = userRepository.findById(parentId)
@@ -84,7 +86,6 @@ public class MathCardService {
         seedOlympiadTemplates();
     }
 
-    /** Настройки тем для панели родителя (тумблеры + матрица базовой сложности). */
     @Transactional
     public List<MathTopicDto> parentSettings(Long parentId) {
         ensureTopics(parentId);
@@ -97,7 +98,6 @@ public class MathCardService {
                 .toList();
     }
 
-    /** Сохранение тумблеров тем и базовой сложности (потолок базового уровня — «Сложный»). */
     @Transactional
     public List<MathTopicDto> updateSettings(Long parentId, List<MathTopicSettingsItemRequest> items) {
         ensureTopics(parentId);
@@ -110,70 +110,214 @@ public class MathCardService {
                 settings.setActive(item.active());
             }
             if (item.baseDifficulty() != null) {
-                MathDifficulty diff = parseBase(item.baseDifficulty());
-                settings.setBaseDifficulty(diff.name());
+                settings.setBaseDifficulty(parseBase(item.baseDifficulty()).name());
             }
             settingsRepository.save(settings);
         }
         return parentSettings(parentId);
     }
 
-    // ---------- Генерация и работа с карточками ----------
+    // ---------- Карточки: просмотр и генерация ----------
 
-    /** Сегодняшняя карточка ребёнка (последняя созданная за день) или null. */
-    @Transactional(readOnly = true)
-    public MathCardDto today(Long childId) {
-        MathCard card = cardRepository.findFirstByChildIdAndCardDateOrderByIdDesc(childId, LocalDate.now()).orElse(null);
-        return card == null ? null : MathCardDto.of(card, taskRepository.findByCardIdOrderByIdAsc(card.getId()));
+    /** Карточки дня ребёнка (последние созданные), просроченные IN_PROGRESS завершаются. */
+    @Transactional
+    public List<MathCardDto> listToday(Long childId) {
+        expireOverdue(childId);
+        LocalDate today = LocalDate.now();
+        return cardRepository.findByChildIdAndCardDateOrderByCreatedAtDesc(childId, today).stream()
+                .map(c -> MathCardDto.of(c, taskRepository.findByCardIdOrderByIdAsc(c.getId()), includeTasks(c)))
+                .toList();
     }
 
-    /** Генерация карточки по выбору ребёнка; повторный запрос того же уровня возвращает ту же карточку дня. */
     @Transactional
     public MathCardDto generate(Long childId, String choice) {
         Child child = childRepository.findById(childId)
                 .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
         Long parentId = child.getParent().getId();
         ensureTopics(parentId);
+        expireOverdue(childId);
 
         LocalDate today = LocalDate.now();
-        MathDifficulty finalLevel = resolveFinal(childId, parentId, choice);
+        // Пока карточка решается — другие не создаём, отдаём активную
+        List<MathCard> active = cardRepository.findByChildIdAndCardDateAndStatus(childId, today, "IN_PROGRESS");
+        if (!active.isEmpty()) {
+            MathCard inProgress = active.get(0);
+            return MathCardDto.of(inProgress, taskRepository.findByCardIdOrderByIdAsc(inProgress.getId()), true);
+        }
 
-        // Одна карточка в день для этого уровня — не плодим дубли
+        MathDifficulty finalLevel = resolveFinal(childId, parentId, choice);
         MathCard existing = cardRepository
                 .findFirstByChildIdAndCardDateAndFinalLevelOrderByIdDesc(childId, today, finalLevel.name())
                 .orElse(null);
         if (existing != null) {
-            return MathCardDto.of(existing, taskRepository.findByCardIdOrderByIdAsc(existing.getId()));
+            return MathCardDto.of(existing, taskRepository.findByCardIdOrderByIdAsc(existing.getId()), includeTasks(existing));
         }
 
         MathCard card = buildCard(child, parentId, today, finalLevel);
         List<MathCardTask> tasks = buildTasks(childId, card, parentId, finalLevel);
         card.setTaskCount(tasks.size());
         card.setTaskTypes(String.join(",", taskTypeSet(tasks)));
+        card.setXpReward(finalLevel.getSuccessReward());
+        card.setStatus("CREATED");
         cardRepository.save(card);
         taskRepository.saveAll(tasks);
-        return MathCardDto.of(card, tasks);
+        return MathCardDto.of(card, tasks, false);
     }
 
-    /** Проверка ответа на задачу карточки (история сохраняется). */
+    // ---------- Жизненный цикл (ребёнок) ----------
+
+    /** «Взять задачу» — запрос родителю на одобрение. */
     @Transactional
-    public MathCardAnswerResult answer(Long childId, Long taskId, String answer) {
-        MathCardTask task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new NotFoundException("Задача не найдена"));
-        if (!task.getCard().getChild().getId().equals(childId)) {
-            throw new NotFoundException("Задача не найдена");
+    public MathCardDto request(Long childId, Long cardId) {
+        MathCard card = ownedCard(childId, cardId);
+        if (!"CREATED".equals(card.getStatus())) {
+            throw new BadRequestException("Карточка уже взята");
         }
-        boolean correct = normalize(task.getAnswer()).equals(normalize(answer));
-        MathCardAttempt attempt = new MathCardAttempt();
-        attempt.setTask(task);
-        attempt.setAnswer(answer == null ? "" : answer.trim());
-        attempt.setCorrect(correct);
-        attempt.setAttemptedAt(Instant.now());
-        attemptRepository.save(attempt);
-        return new MathCardAnswerResult(correct, task.getAnswer());
+        card.setStatus("REQUESTED");
+        cardRepository.save(card);
+        return MathCardDto.of(card, taskRepository.findByCardIdOrderByIdAsc(cardId), false);
+    }
+
+    /** Отзыв запроса (повторное нажатие «Ожидает одобрения»). */
+    @Transactional
+    public MathCardDto revoke(Long childId, Long cardId) {
+        MathCard card = ownedCard(childId, cardId);
+        if (!"REQUESTED".equals(card.getStatus())) {
+            throw new BadRequestException("Отозвать можно только ожидающий одобрения запрос");
+        }
+        card.setStatus("CREATED");
+        cardRepository.save(card);
+        return MathCardDto.of(card, taskRepository.findByCardIdOrderByIdAsc(cardId), false);
+    }
+
+    /** «Начать задачу» — старт единого серверного таймера. */
+    @Transactional
+    public MathCardDto start(Long childId, Long cardId) {
+        MathCard card = ownedCard(childId, cardId);
+        if (!"APPROVED".equals(card.getStatus())) {
+            throw new BadRequestException("Карточка ещё не одобрена родителем");
+        }
+        if (!cardRepository.findByChildIdAndCardDateAndStatus(childId, card.getCardDate(), "IN_PROGRESS").isEmpty()) {
+            throw new BadRequestException("Сначала завершите текущую карточку");
+        }
+        Instant now = Instant.now();
+        card.setStatus("IN_PROGRESS");
+        card.setStartedAt(now);
+        card.setDeadline(now.plusSeconds(card.getMinutes() * 60L));
+        cardRepository.save(card);
+        return MathCardDto.of(card, taskRepository.findByCardIdOrderByIdAsc(cardId), true);
+    }
+
+    /** Отправка на проверку (одной кнопкой): проверка всех ответов, начисление XP. */
+    @Transactional
+    public MathCardSubmitResult submit(Long childId, Long cardId, List<String> answers) {
+        MathCard card = ownedCard(childId, cardId);
+        expireOverdue(childId);
+        if (!"IN_PROGRESS".equals(card.getStatus())) {
+            throw new BadRequestException("Карточка не в работе");
+        }
+        List<MathCardTask> tasks = taskRepository.findByCardIdOrderByIdAsc(cardId);
+        MathDifficulty level = MathDifficulty.valueOf(card.getFinalLevel());
+
+        List<String> list = answers == null ? List.of() : answers;
+        int correct = 0;
+        for (int i = 0; i < tasks.size(); i++) {
+            String given = i < list.size() ? list.get(i) : "";
+            boolean ok = normalize(tasks.get(i).getAnswer()).equals(normalize(given));
+            if (ok) {
+                correct++;
+            }
+            MathCardAttempt attempt = new MathCardAttempt();
+            attempt.setTask(tasks.get(i));
+            attempt.setAnswer(given == null ? "" : given.trim());
+            attempt.setCorrect(ok);
+            attempt.setAttemptedAt(Instant.now());
+            attemptRepository.save(attempt);
+        }
+
+        int percent = tasks.isEmpty() ? 0 : (int) Math.round(correct * 100.0 / tasks.size());
+        boolean success = percent >= SUCCESS_PERCENT;
+        int perExampleXp = correct * level.getPerExampleXp();
+        int successReward = success ? level.getSuccessReward() * (percent == 100 ? 2 : 1) : 0;
+        int xpEarned = perExampleXp + successReward;
+
+        card.setStatus(success ? "SUCCESS" : "FAILED");
+        card.setResultPercent(percent);
+        card.setSubmittedAt(Instant.now());
+        card.setXpEarned(xpEarned);
+        cardRepository.save(card);
+        return new MathCardSubmitResult(percent, success, correct, tasks.size(), perExampleXp, successReward, xpEarned);
+    }
+
+    // ---------- Одобрение родителем ----------
+
+    @Transactional(readOnly = true)
+    public List<MathCardApprovalDto> parentApprovals(Long parentId) {
+        return cardRepository.findByParentRequested(parentId).stream()
+                .map(MathCardApprovalDto::of)
+                .toList();
+    }
+
+    @Transactional
+    public void approve(Long parentId, Long cardId) {
+        MathCard card = ownedByParent(parentId, cardId);
+        if (!"REQUESTED".equals(card.getStatus())) {
+            throw new BadRequestException("Запроса на одобрение нет");
+        }
+        card.setStatus("APPROVED");
+        cardRepository.save(card);
+    }
+
+    @Transactional
+    public void reject(Long parentId, Long cardId) {
+        MathCard card = ownedByParent(parentId, cardId);
+        if (!"REQUESTED".equals(card.getStatus())) {
+            throw new BadRequestException("Запроса на одобрение нет");
+        }
+        card.setStatus("CREATED");
+        cardRepository.save(card);
     }
 
     // ---------- Внутренняя логика ----------
+
+    private boolean includeTasks(MathCard card) {
+        return "IN_PROGRESS".equals(card.getStatus())
+                || "SUCCESS".equals(card.getStatus())
+                || "FAILED".equals(card.getStatus());
+    }
+
+    /** Просроченные IN_PROGRESS-карточки завершаются как «не сдано» (0%, без XP). */
+    private void expireOverdue(Long childId) {
+        Instant now = Instant.now();
+        LocalDate today = LocalDate.now();
+        for (MathCard card : cardRepository.findByChildIdAndCardDateAndStatus(childId, today, "IN_PROGRESS")) {
+            if (card.getDeadline() != null && card.getDeadline().isBefore(now)) {
+                card.setStatus("FAILED");
+                card.setResultPercent(0);
+                card.setXpEarned(0);
+                card.setSubmittedAt(null);
+                cardRepository.save(card);
+            }
+        }
+    }
+
+    private MathCard ownedCard(Long childId, Long cardId) {
+        MathCard card = cardRepository.findById(cardId)
+                .orElseThrow(() -> new NotFoundException("Карточка не найдена"));
+        if (!card.getChild().getId().equals(childId)) {
+            throw new NotFoundException("Карточка не найдена");
+        }
+        return card;
+    }
+
+    private MathCard ownedByParent(Long parentId, Long cardId) {
+        MathCard card = cardRepository.findById(cardId)
+                .orElseThrow(() -> new NotFoundException("Карточка не найдена"));
+        if (!card.getChild().getParent().getId().equals(parentId)) {
+            throw new NotFoundException("Карточка не найдена");
+        }
+        return card;
+    }
 
     private MathDifficulty resolveFinal(Long childId, Long parentId, String choice) {
         String c = choice == null ? "MEDIUM" : choice.trim().toUpperCase();
@@ -182,13 +326,11 @@ public class MathCardService {
         } catch (IllegalArgumentException e) {
             throw new BadRequestException("Неизвестный выбор уровня: " + choice);
         }
-        // Базовый уровень карточки — максимальный базовый уровень активных тем родителя
-        MathDifficulty base = baseLevel(parentId);
-        return MathDifficulty.resolve(base, c);
+        return MathDifficulty.resolve(baseLevel(parentId), c);
     }
 
     private MathDifficulty baseLevel(Long parentId) {
-        int best = 0; // EASY
+        int best = 0;
         boolean found = false;
         for (MathTopicSettings s : settingsRepository.findByParentId(parentId)) {
             if (!s.isActive()) {
@@ -244,7 +386,6 @@ public class MathCardService {
             topics = topicRepository.findAllByOrderBySortOrderAsc().subList(0, 2);
         }
 
-        // Анти-дубль: тексты задач ребёнка за последние 30 дней
         Set<String> recent = recentTexts(childId);
         List<MathCardTask> tasks = new ArrayList<>();
         int guard = 0;
@@ -308,7 +449,7 @@ public class MathCardService {
         }
     }
 
-    /** Сид олимпиадных шаблонов (идемпотентно, при первом обращении). */
+    /** Сид олимпиадных шаблонов (идемпотентно). */
     private void seedOlympiadTemplates() {
         if (olympiadRepository.count() > 0) {
             return;
