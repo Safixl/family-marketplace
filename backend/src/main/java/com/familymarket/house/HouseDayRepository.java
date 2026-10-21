@@ -11,7 +11,10 @@ import java.util.Optional;
 public interface HouseDayRepository extends JpaRepository<HouseDay, Long> {
 
     List<HouseDay> findByStoreIdAndChildIdAndDayBetweenOrderByDayAsc(Long storeId, Long childId,
-                                                                     LocalDate from, LocalDate to);
+                                                                    LocalDate from, LocalDate to);
+
+    /** Все дни ребёнка по порядку дат (для расчёта стрика «Порядок в комнате»). */
+    List<HouseDay> findByChildIdOrderByDayAsc(Long childId);
 
     Optional<HouseDay> findByStoreIdAndChildIdAndDay(Long storeId, Long childId, LocalDate day);
 

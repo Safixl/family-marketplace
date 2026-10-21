@@ -9,17 +9,20 @@ import com.familymarket.common.NotFoundException;
 import com.familymarket.daily.DailyLogRepository;
 import com.familymarket.dto.SkillProgressDto;
 import com.familymarket.house.HouseDayRepository;
+import com.familymarket.house.HouseDay;
 import com.familymarket.math.MathAttemptRepository;
 import com.familymarket.mathcard.MathCardRepository;
 import com.familymarket.reading.ReadingLogRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * Расчёт прогресса 6 направлений развития (Skill Hexagon).
@@ -116,7 +119,7 @@ public class SkillService {
             double activityScore = switch (meta.skill()) {
                 case "MATH" -> mathCorrect * 2.0 + dailyXp(childId, "MATH") + mathCardRepository.sumXpByChildId(childId);
                 case "READING" -> booksRead * 2.0 + pagesRead / 4.0; // 4 страницы = 1 XP
-                case "HOUSE" -> housePositive * 1.5;
+                case "HOUSE" -> houseXp(childId, (int) housePositive);
                 case "LOGIC" -> dailyXp(childId, "LOGIC");
                 case "LANG" -> dailyXp(childId, "LANG");
                 case "SPORT" -> dailyXp(childId, "SPORT");
@@ -129,6 +132,51 @@ public class SkillService {
             result.add(new SkillProgressDto(meta.skill(), meta.name(), meta.icon(), progress, xp, achievementXp, unlocked));
         }
         return result;
+    }
+
+    /**
+     * XP навыка «Порядок в комнате»: 1 подтверждённый рум (порядок или помощь) = 1 XP
+     * + бонус стрика (день 2 → +2, день 5 → +5, … день 31 → +31; максимум 31)
+     * + на поддержании стрика 31 дополнительно 1 рум в день.
+     * Стрик сбрасывается на 1, если день без подтверждений.
+     */
+    private double houseXp(Long childId, int housePositive) {
+        if (housePositive <= 0) {
+            return 0;
+        }
+        // [0]=порядок в комнате, [1]=помощь по дому — по датам
+        Map<LocalDate, int[]> byDay = new TreeMap<>();
+        for (HouseDay d : houseDayRepository.findByChildIdOrderByDayAsc(childId)) {
+            if (d.getRoomScore() <= 0 && d.getLivingScore() <= 0) {
+                continue;
+            }
+            int[] v = byDay.computeIfAbsent(d.getDay(), k -> new int[2]);
+            if (d.getRoomScore() > 0) {
+                v[0] = 1;
+            }
+            if (d.getLivingScore() > 0) {
+                v[1] = 1;
+            }
+        }
+        double total = 0;
+        int streak = 0;
+        LocalDate prev = null;
+        for (Map.Entry<LocalDate, int[]> e : byDay.entrySet()) {
+            LocalDate day = e.getKey();
+            int rooms = e.getValue()[0] + e.getValue()[1];
+            if (streak == 0 || day.equals(prev.plusDays(1))) {
+                streak = Math.min(streak + 1, 31);
+            } else {
+                streak = 1;
+            }
+            prev = day;
+            total += rooms;   // 1 рум = 1 XP
+            total += streak;  // бонус стрика: день 2 → +2 … день 31 → +31
+            if (streak >= 31) {
+                total += 1;   // поддержание стрика 31: +1 рум в день
+            }
+        }
+        return total;
     }
 
     /**
