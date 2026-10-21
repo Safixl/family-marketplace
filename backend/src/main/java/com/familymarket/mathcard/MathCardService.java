@@ -5,6 +5,7 @@ import com.familymarket.child.ChildRepository;
 import com.familymarket.common.BadRequestException;
 import com.familymarket.common.NotFoundException;
 import com.familymarket.dto.MathCardApprovalDto;
+import com.familymarket.dto.MathCardDayDto;
 import com.familymarket.dto.MathCardDto;
 import com.familymarket.dto.MathCardSubmitResult;
 import com.familymarket.dto.MathTopicDto;
@@ -16,7 +17,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -33,6 +37,9 @@ public class MathCardService {
 
     private static final int TASK_COUNT[] = {8, 10, 12, 14, 16, 0}; // EASY..OLYMPIAD (0 — из шаблона)
     private static final int SUCCESS_PERCENT = 80;
+    private static final int DAILY_LIMIT = 3;
+    /** День стартует в 9:00 (МСК) — как в лимитах и карточках заданий. */
+    private static final ZoneId ZONE = ZoneId.of("Europe/Moscow");
 
     private final MathTopicRepository topicRepository;
     private final MathTopicSettingsRepository settingsRepository;
@@ -119,14 +126,21 @@ public class MathCardService {
 
     // ---------- Карточки: просмотр и генерация ----------
 
-    /** Карточки дня ребёнка (последние созданные), просроченные IN_PROGRESS завершаются. */
+    /** Карточки дня (отсортированы по сложности) + счётчик решённых (лимит 3 в день, сброс в 9:00). */
     @Transactional
-    public List<MathCardDto> listToday(Long childId) {
+    public MathCardDayDto listToday(Long childId) {
         expireOverdue(childId);
-        LocalDate today = LocalDate.now();
-        return cardRepository.findByChildIdAndCardDateOrderByCreatedAtDesc(childId, today).stream()
+        LocalDate today = todayDate();
+        long doneToday = cardRepository.countByChildIdAndCardDateAndStatusIn(
+                childId, today, List.of("SUCCESS", "FAILED"));
+        if (doneToday >= DAILY_LIMIT) {
+            return new MathCardDayDto(List.of(), (int) doneToday, DAILY_LIMIT);
+        }
+        List<MathCardDto> cards = cardRepository.findByChildIdAndCardDateOrderByCreatedAtDesc(childId, today).stream()
+                .sorted(Comparator.comparingInt(c -> MathDifficulty.valueOf(c.getFinalLevel()).ordinal()))
                 .map(c -> MathCardDto.of(c, taskRepository.findByCardIdOrderByIdAsc(c.getId()), includeTasks(c)))
                 .toList();
+        return new MathCardDayDto(cards, (int) doneToday, DAILY_LIMIT);
     }
 
     @Transactional
@@ -137,7 +151,12 @@ public class MathCardService {
         ensureTopics(parentId);
         expireOverdue(childId);
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = todayDate();
+        long doneToday = cardRepository.countByChildIdAndCardDateAndStatusIn(
+                childId, today, List.of("SUCCESS", "FAILED"));
+        if (doneToday >= DAILY_LIMIT) {
+            throw new BadRequestException("Лимит карточек на день исчерпан (3). Новые появятся завтра в 9:00");
+        }
         // Пока карточка решается — другие не создаём, отдаём активную
         List<MathCard> active = cardRepository.findByChildIdAndCardDateAndStatus(childId, today, "IN_PROGRESS");
         if (!active.isEmpty()) {
@@ -289,7 +308,7 @@ public class MathCardService {
     /** Просроченные IN_PROGRESS-карточки завершаются как «не сдано» (0%, без XP). */
     private void expireOverdue(Long childId) {
         Instant now = Instant.now();
-        LocalDate today = LocalDate.now();
+        LocalDate today = todayDate();
         for (MathCard card : cardRepository.findByChildIdAndCardDateAndStatus(childId, today, "IN_PROGRESS")) {
             if (card.getDeadline() != null && card.getDeadline().isBefore(now)) {
                 card.setStatus("FAILED");
@@ -414,7 +433,7 @@ public class MathCardService {
     }
 
     private Set<String> recentTexts(Long childId) {
-        LocalDate since = LocalDate.now().minusDays(30);
+        LocalDate since = todayDate().minusDays(30);
         List<MathCard> cards = cardRepository.findByChildIdAndCardDateGreaterThanEqualOrderByCardDateDesc(childId, since);
         List<Long> ids = cards.stream().map(MathCard::getId).toList();
         Set<String> out = new LinkedHashSet<>();
@@ -428,6 +447,13 @@ public class MathCardService {
         Set<String> out = new LinkedHashSet<>();
         tasks.forEach(t -> out.add(t.getTaskType()));
         return out;
+    }
+
+    /** Логическая дата карточного дня: сдвиг в 9:00 (как в лимитах и карточках заданий). */
+    private static LocalDate todayDate() {
+        ZonedDateTime msk = ZonedDateTime.now(ZONE);
+        ZonedDateTime dayStart = msk.toLocalDate().atTime(9, 0).atZone(ZONE);
+        return msk.isBefore(dayStart) ? msk.toLocalDate().minusDays(1) : msk.toLocalDate();
     }
 
     private static String normalize(String s) {

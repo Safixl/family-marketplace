@@ -19,6 +19,9 @@ public interface MathCardRepository extends JpaRepository<MathCard, Long> {
 
     List<MathCard> findByChildIdAndCardDateAndStatus(Long childId, LocalDate cardDate, String status);
 
+    /** Сколько карточек дня уже завершено (SUCCESS/FAILED) — лимит 3. */
+    long countByChildIdAndCardDateAndStatusIn(Long childId, LocalDate cardDate, List<String> statuses);
+
     List<MathCard> findByChildIdAndCardDateGreaterThanEqualOrderByCardDateDesc(
             Long childId, LocalDate since);
 

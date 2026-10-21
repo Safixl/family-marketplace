@@ -784,3 +784,9 @@ export interface MathCardSubmitResult {
   successReward: number;
   xpEarned: number;
 }
+
+export interface MathCardDayDto {
+  cards: MathCardDto[];
+  doneToday: number;
+  dailyLimit: number;
+}

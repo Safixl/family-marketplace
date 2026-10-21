@@ -8,12 +8,12 @@ package com.familymarket.mathcard;
  */
 public enum MathDifficulty {
 
-    EASY("Легкий", "🟢", 30, 0, 1, 20),
-    MEDIUM("Средний", "⚪", 35, 0, 2, 30),
-    HIGH("Высокий", "🔵", 40, 0, 3, 45),
-    HARD("Сложный", "🟣", 45, 0, 4, 60),
-    EXTREME("Хард", "🔴", 50, 0, 5, 80),
-    OLYMPIAD("Олимпиада", "🟠", 60, 1, 10, 120);
+    EASY("Легкий", "🟢", 30, 0, 1, 5),
+    MEDIUM("Средний", "⚪", 35, 0, 2, 10),
+    HIGH("Высокий", "🔵", 40, 0, 3, 25),
+    HARD("Сложный", "🟣", 45, 0, 4, 50),
+    EXTREME("Хард", "🔴", 50, 0, 5, 75),
+    OLYMPIAD("Олимпиада", "🟠", 60, 1, 10, 125);
 
     private final String label;
     private final String emoji;

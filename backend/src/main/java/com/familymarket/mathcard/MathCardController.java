@@ -2,6 +2,7 @@ package com.familymarket.mathcard;
 
 import com.familymarket.common.CurrentUser;
 import com.familymarket.dto.MathCardApprovalDto;
+import com.familymarket.dto.MathCardDayDto;
 import com.familymarket.dto.MathCardDto;
 import com.familymarket.dto.MathCardGenerateRequest;
 import com.familymarket.dto.MathCardSubmitRequest;
@@ -63,7 +64,7 @@ public class MathCardController {
     // ---------- Ребёнок ----------
 
     @GetMapping("/api/child/math-cards")
-    public List<MathCardDto> todayCards() {
+    public MathCardDayDto todayCards() {
         return mathCardService.listToday(CurrentUser.childId());
     }
 
