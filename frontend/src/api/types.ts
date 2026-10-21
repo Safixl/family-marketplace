@@ -435,6 +435,7 @@ export interface HouseDayDto {
   livingScore: number;
   points: number;
   settled: boolean;
+  comment: string | null;
 }
 
 export interface HouseMonthResponse {

@@ -26,6 +26,7 @@ export default function ChildHouseView({ storeId }: Props) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [checkRequested, setCheckRequested] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<{ key: string; d?: HouseDayDto } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -143,12 +144,11 @@ export default function ChildHouseView({ storeId }: Props) {
                 <button
                   key={key}
                   type="button"
-                  disabled={!isToday || !roomNotChecked || busy || checkRequested}
-                  onClick={() => void requestCheck()}
-                  title={isToday && roomNotChecked ? 'Попросить проверить комнату' : undefined}
+                  onClick={() => setSelectedDay({ key, d })}
+                  title={isToday && roomNotChecked ? 'Попросить проверить комнату' : 'Посмотреть день'}
                   className={`flex h-14 flex-col items-center justify-center rounded-xl text-sm font-semibold transition ${cellClass(d)} ${
                     isToday ? 'ring-2 ring-amber-400 ring-offset-1' : ''
-                  } ${isToday && roomNotChecked ? 'cursor-pointer hover:brightness-95' : 'cursor-default'}`}
+                  } cursor-pointer hover:brightness-110`}
                 >
                   <span>{day}</span>
                   {d && (d.roomScore !== 0 || d.livingScore !== 0) && (
@@ -169,11 +169,73 @@ export default function ChildHouseView({ storeId }: Props) {
             ))}
           </div>
           <p className="mt-2 text-center text-xs text-stone-400">
-            Зелёный — положительные оценки ☣️(−2)…👑(+2), красный — отрицательные. Баллы начисляются 1-го числа
+            Нажмите на любой день, чтобы увидеть оценки и комментарий родителя. Баллы начисляются 1-го числа
             следующего месяца.
           </p>
         </div>
       )}
+
+      {/* Просмотр дня: оценки и комментарий родителя */}
+      {selectedDay && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setSelectedDay(null)}
+        >
+          <div className="rpg-panel w-full max-w-md space-y-3" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-bold text-amber-100">📅 {selectedDay.key}</span>
+              <button className="rpg-btn rpg-btn-ghost !px-2.5 !py-1 text-xs" onClick={() => setSelectedDay(null)}>
+                Закрыть
+              </button>
+            </div>
+            {!selectedDay.d || (selectedDay.d.roomScore === 0 && selectedDay.d.livingScore === 0) ? (
+              <p className="text-sm text-stone-400">Оценка за этот день не выставлена — комментария пока нет.</p>
+            ) : (
+              <>
+                <DayInfo label="Порядок в комнате">
+                  {(() => {
+                    const r = ROOM_RATINGS.find((x) => x.value === selectedDay.d!.roomScore);
+                    return r ? (
+                      <span className="text-sm text-amber-100">
+                        {r.icon} {r.label} · {r.value > 0 ? `+${r.value}` : r.value} 🪙
+                      </span>
+                    ) : (
+                      <span className="text-sm text-amber-100">{selectedDay.d!.roomScore} 🪙</span>
+                    );
+                  })()}
+                </DayInfo>
+                <DayInfo label="Помощь по дому">
+                  <span className="text-sm text-amber-100">
+                    {selectedDay.d.livingScore > 0 ? '+' : ''} {selectedDay.d.livingScore} 🪙
+                  </span>
+                </DayInfo>
+                <DayInfo label="Баллы за день">
+                  <span className={`text-sm font-bold ${selectedDay.d.points < 0 ? 'text-rose-300' : 'text-emerald-300'}`}>
+                    {selectedDay.d.points > 0 ? '+' : ''}
+                    {selectedDay.d.points} 🪙
+                    {!selectedDay.d.settled && ' · начислят 1-го числа'}
+                  </span>
+                </DayInfo>
+                <div>
+                  <div className="mb-1 text-xs font-semibold text-stone-400">💬 Комментарий родителя</div>
+                  <p className="rounded-xl bg-stone-800/80 p-3 text-sm leading-relaxed text-stone-200">
+                    {selectedDay.d.comment ?? 'Родитель не оставил комментарий'}
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DayInfo({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-xs font-semibold text-stone-400">{label}</span>
+      {children}
     </div>
   );
 }

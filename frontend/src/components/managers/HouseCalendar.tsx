@@ -3,7 +3,7 @@ import { CheckCircle2, ChevronLeft, ChevronRight, Clock3, Sparkles, XCircle } fr
 import { api } from '../../api/client';
 import { ChildDto, HouseCheckRequestDto, HouseDayDto, HouseMonthResponse, StoreDto } from '../../api/types';
 import { errMsg, fmtAmount } from '../../lib/format';
-import { ROOM_RATINGS } from '../../lib/houseScale';
+import { DEFAULT_ROOM_COMMENTS, ROOM_RATINGS } from '../../lib/houseScale';
 import Modal from '../Modal';
 import { Spinner } from '../ui';
 
@@ -34,6 +34,8 @@ export default function HouseCalendar({ store, onClose }: Props) {
   const [editDay, setEditDay] = useState<string | null>(null);
   const [roomScore, setRoomScore] = useState(0);
   const [livingScore, setLivingScore] = useState(0);
+  const [comment, setComment] = useState('');
+  const [commentDirty, setCommentDirty] = useState(false);
 
   const loadChildren = useCallback(async () => {
     try {
@@ -122,6 +124,8 @@ export default function HouseCalendar({ store, onClose }: Props) {
     const existing = dayMap.get(key);
     setRoomScore(existing?.roomScore ?? 0);
     setLivingScore(existing?.livingScore ?? 0);
+    setComment(existing?.comment ?? DEFAULT_ROOM_COMMENTS[existing?.roomScore ?? 0] ?? '');
+    setCommentDirty(false);
     setEditDay(key);
   };
 
@@ -134,6 +138,7 @@ export default function HouseCalendar({ store, onClose }: Props) {
         day: editDay,
         roomScore,
         livingScore,
+        comment: comment.trim() || null,
       });
       setEditDay(null);
       await loadMonth();
@@ -292,7 +297,12 @@ export default function HouseCalendar({ store, onClose }: Props) {
                 {ROOM_RATINGS.map((r) => (
                   <button
                     key={r.value}
-                    onClick={() => setRoomScore(r.value)}
+                    onClick={() => {
+                      setRoomScore(r.value);
+                      if (!commentDirty) {
+                        setComment(DEFAULT_ROOM_COMMENTS[r.value] ?? '');
+                      }
+                    }}
                     title={r.hint}
                     className={`flex h-14 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-bold transition ${
                       roomScore === r.value
@@ -336,6 +346,25 @@ export default function HouseCalendar({ store, onClose }: Props) {
                   </button>
                 ))}
               </div>
+            </div>
+            <div>
+              <label className="label">Комментарий для ребёнка</label>
+              <textarea
+                className="input min-h-[80px] resize-y"
+                value={comment}
+                placeholder={
+                  DEFAULT_ROOM_COMMENTS[roomScore] ??
+                  'Напишите, что особенно понравилось (например, «Кровать заправлена, стол в порядке! 🎉»)'
+                }
+                onChange={(e) => {
+                  setComment(e.target.value);
+                  setCommentDirty(true);
+                }}
+              />
+              <p className="mt-1 text-xs text-slate-400">
+                Для −2, −1 и 0 подставляется дефолтный текст — можете скорректировать. Для +1 и +2 напишите свой
+                личный комментарий ребёнку.
+              </p>
             </div>
             <div className="rounded-xl bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700">
               Итого за день: {roomScore + livingScore > 0 ? '+' : ''}

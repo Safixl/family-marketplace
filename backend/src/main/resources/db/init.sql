@@ -238,6 +238,7 @@ CREATE TABLE IF NOT EXISTS house_days (
     updated_at   TIMESTAMPTZ   NOT NULL DEFAULT now(),
     CONSTRAINT uq_house_days UNIQUE (store_id, child_id, day)
 );
+ALTER TABLE house_days ADD COLUMN IF NOT EXISTS comment VARCHAR(2000);
 
 -- Индексы
 CREATE INDEX IF NOT EXISTS idx_children_parent        ON children (parent_id);

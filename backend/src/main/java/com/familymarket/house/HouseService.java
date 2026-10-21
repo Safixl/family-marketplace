@@ -105,6 +105,7 @@ public class HouseService {
         day.setRoomScore(roomScore);
         day.setLivingScore(livingScore);
         day.setPoints(BigDecimal.valueOf(roomScore + livingScore));
+        day.setComment(resolveComment(request.comment(), request.roomScore()));
         day.setUpdatedAt(Instant.now());
         houseDayRepository.save(day);
         return HouseDayDto.from(day);
@@ -208,6 +209,34 @@ public class HouseService {
         if (!pending.isEmpty()) {
             achievementService.checkProgress(childId);
         }
+    }
+
+    private String trim(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    /** Комментарий родителя: свой текст или дефолтный по шкале (−2/−1/0), для +1/+2 — только свой. */
+    private String resolveComment(String comment, int roomScore) {
+        String custom = trim(comment);
+        if (custom != null) {
+            return custom;
+        }
+        return switch (roomScore) {
+            case -2 -> "Комната находится в аварийном состоянии. Вещи разбросаны так, что невозможно пройти, "
+                    + "на столе горы грязной посуды или фантиков, одежда валяется на полу комом, "
+                    + "постель не заправлена несколько дней. Проживание в таких условиях нарушает базовые правила гигиены дома.";
+            case -1 -> "Комната не прибрана. Полы грязные, вещи лежат не на своих местах (но проход свободен), "
+                    + "мусорное ведро переполнено, рабочий стол завален вещами. "
+                    + "Порядок явно требует внимания, но ситуация ещё не критическая.";
+            case 0 -> "Нейтральное состояние «жилой» комнаты. Серьёзной грязи нет, но есть лёгкий беспорядок: "
+                    + "не заправлена кровать, на стуле висит пара вещей, на столе лежит раскрытая книга "
+                    + "или школьные принадлежности. Баллы не начисляются, но и не отнимаются.";
+            default -> null;
+        };
     }
 
     private HouseMonthResponse buildMonth(Long storeId, Long childId, YearMonth month) {

@@ -55,4 +55,8 @@ public class HouseDay {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    /** Комментарий родителя к оценке (пусто — дефолтный текст по шкале). */
+    @Column(length = 2000)
+    private String comment;
 }
