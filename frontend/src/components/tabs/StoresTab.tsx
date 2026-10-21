@@ -8,6 +8,7 @@ import BooksManager from '../managers/BooksManager';
 import HouseCalendar from '../managers/HouseCalendar';
 import TaskCardsManager from '../managers/TaskCardsManager';
 import TasksManager from '../managers/TasksManager';
+import MathCardSettings from '../managers/MathCardSettings';
 import { EmptyState, Spinner } from '../ui';
 
 interface StoreForm {
@@ -62,7 +63,8 @@ export default function StoresTab({ templateFilter, title }: StoresTabProps) {
   const [activateChildId, setActivateChildId] = useState<string>('');
   const [templateModal, setTemplateModal] = useState(false);
   const [managerFor, setManagerFor] = useState<
-    { store: StoreDto; type: 'books' | 'tasks' | 'house' | 'cards'; skill?: 'MATH' | 'HOUSE' } | null
+    | { store: StoreDto; type: 'books' | 'tasks' | 'house' | 'cards' | 'mathCard'; skill?: 'MATH' | 'HOUSE' }
+    | null
   >(null);
 
   const [storeModal, setStoreModal] = useState(false);
@@ -412,6 +414,14 @@ export default function StoresTab({ templateFilter, title }: StoresTabProps) {
                         onClick={() => setManagerFor({ store, type: 'cards', skill: 'MATH' })}
                       >
                         🎴 Карточки с заданиями
+                      </button>
+                    )}
+                    {store.templateType === 'MATH' && (
+                      <button
+                        className="btn-secondary !px-3 !py-1.5 text-xs"
+                        onClick={() => setManagerFor({ store, type: 'mathCard' })}
+                      >
+                        🧩 Генератор карточек
                       </button>
                     )}
                     {store.templateType === 'HOME' && (
@@ -776,6 +786,9 @@ export default function StoresTab({ templateFilter, title }: StoresTabProps) {
       )}
       {managerFor?.type === 'cards' && managerFor.skill && (
         <TaskCardsManager store={managerFor.store} skill={managerFor.skill} onClose={() => setManagerFor(null)} />
+      )}
+      {managerFor?.type === 'mathCard' && (
+        <MathCardSettings onClose={() => setManagerFor(null)} />
       )}
     </div>
   );

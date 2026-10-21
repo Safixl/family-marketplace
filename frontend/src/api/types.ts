@@ -706,3 +706,49 @@ export interface OverviewChildDto {
   skills: SkillProgressDto[];
   activatedSkills: string[];
 }
+
+// ---------- Микросервис динамических математических карточек ----------
+
+export type MathChoice =
+  | 'EASY'    // Легкая
+  | 'MEDIUM'  // Обычная
+  | 'HIGH'    // Высокая
+  | 'HARD'    // Сложная
+  | 'EXTREME' // Хард
+  | 'OLYMPIAD'; // Олимпиада
+
+export type MathBaseDifficulty = 'EASY' | 'MEDIUM' | 'HIGH' | 'HARD';
+
+export interface MathTopicDto {
+  id: number;
+  code: string;
+  name: string;
+  gradeLabel: string;
+  active: boolean;
+  baseDifficulty: MathBaseDifficulty;
+}
+
+export interface MathCardTaskDto {
+  id: number;
+  topicCode: string;
+  taskType: string;
+  text: string;
+}
+
+export interface MathCardDto {
+  id: number;
+  date: string;
+  level: string;
+  levelLabel: string;
+  levelEmoji: string;
+  minutes: number;
+  description: string;
+  taskCount: number;
+  taskTypes: string[];
+  tasks: MathCardTaskDto[];
+}
+
+export interface MathCardAnswerResult {
+  correct: boolean;
+  expected: string;
+}

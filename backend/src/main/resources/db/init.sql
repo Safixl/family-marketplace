@@ -634,3 +634,89 @@ CREATE TABLE IF NOT EXISTS child_task_cards (
     CONSTRAINT uq_child_card UNIQUE (child_id, card_id, day)
 );
 CREATE INDEX IF NOT EXISTS idx_child_task_cards_child ON child_task_cards (child_id);
+
+-- ============================================================
+-- Динамическая генерация математических карточек (ТЗ)
+-- ============================================================
+
+-- Темы математики (расширяемый пул на уровне БД)
+CREATE TABLE IF NOT EXISTS math_topics (
+    id          BIGSERIAL PRIMARY KEY,
+    code        VARCHAR(32)  NOT NULL UNIQUE,
+    name        VARCHAR(100) NOT NULL,
+    grade_label VARCHAR(50)  NOT NULL,
+    sort_order  INT          NOT NULL DEFAULT 0
+);
+
+-- Настройки тем для родителя (тумблер Active + базовая сложность)
+CREATE TABLE IF NOT EXISTS math_topic_settings (
+    id              BIGSERIAL PRIMARY KEY,
+    parent_id       BIGINT      NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    topic_id        BIGINT      NOT NULL REFERENCES math_topics (id) ON DELETE CASCADE,
+    active          BOOLEAN     NOT NULL DEFAULT TRUE,
+    base_difficulty VARCHAR(16) NOT NULL DEFAULT 'MEDIUM', -- EASY/MEDIUM/HIGH/HARD (потолок «Сложный»)
+    CONSTRAINT uq_math_topic_settings_parent_topic UNIQUE (parent_id, topic_id)
+);
+
+-- Сгенерированная карточка (история для анти-дублей 30 дней)
+CREATE TABLE IF NOT EXISTS math_cards (
+    id          BIGSERIAL PRIMARY KEY,
+    child_id    BIGINT       NOT NULL REFERENCES children (id) ON DELETE CASCADE,
+    card_date   DATE         NOT NULL,
+    final_level VARCHAR(16)  NOT NULL,                  -- EASY..OLYMPIAD
+    label       VARCHAR(50)  NOT NULL,
+    description VARCHAR(500) NOT NULL,
+    task_count  INT          NOT NULL,
+    task_types  VARCHAR(200) NOT NULL,
+    minutes     INT          NOT NULL,
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_math_cards_child_date ON math_cards (child_id, card_date);
+
+-- Задачи карточки
+CREATE TABLE IF NOT EXISTS math_card_tasks (
+    id         BIGSERIAL PRIMARY KEY,
+    card_id    BIGINT       NOT NULL REFERENCES math_cards (id) ON DELETE CASCADE,
+    topic_code VARCHAR(32)  NOT NULL,
+    task_type  VARCHAR(16)  NOT NULL,   -- CALC / EQUATION / TEXT
+    text       VARCHAR(500) NOT NULL,
+    answer     VARCHAR(100) NOT NULL
+);
+
+-- Попытки ответов на задачи карточки
+CREATE TABLE IF NOT EXISTS math_card_attempts (
+    id           BIGSERIAL PRIMARY KEY,
+    task_id      BIGINT      NOT NULL REFERENCES math_card_tasks (id) ON DELETE CASCADE,
+    answer       VARCHAR(100) NOT NULL,
+    correct      BOOLEAN     NOT NULL,
+    attempted_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Статичные олимпиадные карточки (структурированы по классам)
+CREATE TABLE IF NOT EXISTS math_olympiad_cards (
+    id          BIGSERIAL PRIMARY KEY,
+    title       VARCHAR(200) NOT NULL,
+    grade_label VARCHAR(50)  NOT NULL,
+    minutes     INT          NOT NULL DEFAULT 60,
+    CONSTRAINT uq_math_olympiad_title UNIQUE (title)
+);
+CREATE TABLE IF NOT EXISTS math_olympiad_tasks (
+    id        BIGSERIAL PRIMARY KEY,
+    card_id   BIGINT       NOT NULL REFERENCES math_olympiad_cards (id) ON DELETE CASCADE,
+    task_type VARCHAR(16)  NOT NULL,
+    text      VARCHAR(500) NOT NULL,
+    answer    VARCHAR(100) NOT NULL
+);
+
+-- Сид тем (идемпотентно)
+INSERT INTO math_topics (code, name, grade_label, sort_order) VALUES
+    ('ADD_SUB', 'Сложение / Вычитание', '3 класс', 1),
+    ('MUL_DIV', 'Умножение / Деление', '3 класс', 2),
+    ('EQUATIONS', 'Уравнения', '3-4 класс', 3),
+    ('VARIABLES', 'Задачи с переменными', '4-5 класс', 4),
+    ('FRACTIONS', 'Дроби', '5 класс', 5),
+    ('NEGATIVE', 'Минусовые числа', '6 класс', 6),
+    ('DECIMALS', 'Десятичные дроби', '6 класс', 7),
+    ('ROOTS', 'Корни', '7-8 класс', 8),
+    ('SQUARES_CUBES', 'Квадраты / Кубы', '7-8 класс', 9)
+ON CONFLICT (code) DO NOTHING;

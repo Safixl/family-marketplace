@@ -4,6 +4,7 @@ import { api } from '../../../../api/client';
 import { TaskCardDto } from '../../../../api/types';
 import { errMsg } from '../../../../lib/format';
 import { EmptyState, Spinner } from '../../../ui';
+import MathCardView from './MathCardView';
 
 interface Props {
   skill: 'MATH' | 'HOUSE';
@@ -82,7 +83,7 @@ export default function TaskCardsTab({ skill }: Props) {
 
   if (!cards) return <Spinner label="Загружаем карточки…" />;
 
-  if (cards.length === 0) {
+  if (cards.length === 0 && skill !== 'MATH') {
     return (
       <EmptyState
         title="Карточек пока нет"
@@ -94,6 +95,7 @@ export default function TaskCardsTab({ skill }: Props) {
 
   return (
     <div className="space-y-3">
+      {skill === 'MATH' && <MathCardView onDone={() => void load()} />}
       {cards.map((card) => {
         const status = card.childStatus;
         const rarity = RARITY_META[card.rarity] ?? RARITY_META.COMMON;
