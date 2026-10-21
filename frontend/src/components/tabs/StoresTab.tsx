@@ -296,9 +296,6 @@ export default function StoresTab({ templateFilter, title }: StoresTabProps) {
 
   return (
     <div className="space-y-4">
-      {/* Архив чтения ребёнка — прямо во вкладке «Чтение» */}
-      {templateFilter === 'READING' && <ReadingArchive />}
-
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-xl font-extrabold">{title ?? 'Магазины'}</h1>
@@ -777,6 +774,9 @@ export default function StoresTab({ templateFilter, title }: StoresTabProps) {
           </div>
         </Modal>
       )}
+
+      {/* Архив чтения ребёнка — внизу вкладки «Чтение» */}
+      {templateFilter === 'READING' && <ReadingArchive />}
 
       {/* Менеджеры шаблонных магазинов */}
       {managerFor?.type === 'books' && (
