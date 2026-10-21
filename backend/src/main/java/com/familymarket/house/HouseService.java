@@ -21,7 +21,9 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class HouseService {
@@ -258,7 +260,33 @@ public class HouseService {
                 .map(HouseDayDto::points)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        // Текущий стрик «Порядка в комнате»: серия подтверждённых дней подряд,
+        // оканчивающаяся сегодня (или вчера — стрик ещё можно сохранить сегодня).
+        int currentStreak = 0;
+        LocalDate streakEnd = null;
+        LocalDate today = LocalDate.now();
+        Set<LocalDate> positiveDays = new HashSet<>();
+        for (HouseDay d : houseDayRepository.findByChildIdOrderByDayAsc(childId)) {
+            if (d.getRoomScore() > 0 || d.getLivingScore() > 0) {
+                positiveDays.add(d.getDay());
+            }
+        }
+        if (!positiveDays.isEmpty()) {
+            LocalDate last = positiveDays.stream().max(LocalDate::compareTo).orElse(null);
+            if (last != null && (last.equals(today) || last.equals(today.minusDays(1)))) {
+                streakEnd = last;
+                LocalDate cursor = last;
+                while (positiveDays.contains(cursor)) {
+                    currentStreak++;
+                    cursor = cursor.minusDays(1);
+                }
+            }
+        }
+        // Бонус за следующий день стрика (потолок 31 как в начислении XP навыка)
+        int nextStreakBonus = Math.min(31, currentStreak + 1);
+
         return new HouseMonthResponse(month.toString(), days, positiveRoom, positiveLiving, negative,
-                monthPoints, pendingPoints);
+                monthPoints, pendingPoints, currentStreak, nextStreakBonus,
+                streakEnd == null ? null : streakEnd.toString());
     }
 }

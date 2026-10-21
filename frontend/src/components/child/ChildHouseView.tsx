@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Clock3, Send, Sparkles } from 'lucide-react';
 import { api } from '../../api/client';
 import { HouseDayDto, HouseMonthResponse } from '../../api/types';
@@ -18,6 +18,14 @@ function monthKey(date: Date): string {
 
 function dayKey(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function ruPlural(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
 }
 
 export default function ChildHouseView({ storeId }: Props) {
@@ -69,6 +77,30 @@ export default function ChildHouseView({ storeId }: Props) {
   const todayDay = dayMap.get(todayKey);
   const roomNotChecked = !todayDay || todayDay.roomScore <= 0;
 
+  // Дни текущего стрика (от streakEnd назад currentStreak дней) — для обводки в календаре
+  const streakDays = useMemo(() => {
+    const set = new Set<string>();
+    if (!data || !data.streakEnd || data.currentStreak <= 0) return set;
+    const end = new Date(data.streakEnd + 'T00:00:00');
+    for (let i = 0; i < data.currentStreak; i++) {
+      const d = new Date(end);
+      d.setDate(d.getDate() - i);
+      set.add(dayKey(d.getFullYear(), d.getMonth() + 1, d.getDate()));
+    }
+    return set;
+  }, [data]);
+
+  // Номер дня в текущем стрике для конкретной даты (0 — день не в серии)
+  const streakNumberFor = (key: string): number => {
+    if (!data || !data.streakEnd || data.currentStreak <= 0) return 0;
+    const end = new Date(data.streakEnd + 'T00:00:00').getTime();
+    const day = new Date(key + 'T00:00:00').getTime();
+    const diff = Math.round((end - day) / 86_400_000);
+    if (diff < 0 || diff >= data.currentStreak) return 0;
+    return data.currentStreak - diff;
+  };
+  const selStreak = selectedDay ? streakNumberFor(selectedDay.key) : 0;
+
   const cellClass = (d: HouseDayDto | undefined) => {
     if (!d || (d.roomScore === 0 && d.livingScore === 0)) {
       return 'bg-stone-800/60 text-stone-400';
@@ -93,6 +125,26 @@ export default function ChildHouseView({ storeId }: Props) {
           </button>
         </div>
       )}
+
+      {data && (data.currentStreak > 0 ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-orange-500/40 bg-orange-500/10 p-3 text-sm text-orange-200">
+          <span className="flex-1">
+            🔥 <b>Стрик: {data.currentStreak} {ruPlural(data.currentStreak, 'день', 'дня', 'дней')} подряд!</b>{' '}
+            {roomNotChecked
+              ? 'Убери комнату сегодня, чтобы не прервать его!'
+              : data.currentStreak >= 31
+                ? 'Ты достиг максимума — +31 XP за каждый день уборки!'
+                : `Завтра будет день ${data.currentStreak + 1}: бонус +${data.nextStreakBonus} XP за уборку.`}
+          </span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 rounded-xl border border-sky-500/30 bg-sky-500/10 p-3 text-sm text-sky-200">
+          <span className="flex-1">
+            💡 <b>Секрет XP:</b> убирай комнату без пропусков — каждый день подряд даёт всё больше XP:
+            день 2 → +2, день 3 → +3 … до +31 в день. Пропустил день — стрик начнётся заново!
+          </span>
+        </div>
+      ))}
 
       <div className="flex items-center justify-center gap-2">
         <button className="btn-secondary !px-2.5 !py-2" onClick={() => setCursor(new Date(year, month - 2, 1))}>
@@ -119,6 +171,11 @@ export default function ChildHouseView({ storeId }: Props) {
               <Clock3 size={13} /> Начислят 1-го числа: {fmtAmount(data.pendingPoints)}
             </span>
           )}
+          {data.currentStreak > 0 && (
+            <span className="badge bg-orange-500/15 text-orange-300">
+              🔥 Стрик: {data.currentStreak} дн.
+            </span>
+          )}
         </div>
       )}
 
@@ -140,6 +197,7 @@ export default function ChildHouseView({ storeId }: Props) {
               const key = dayKey(year, month, day);
               const d = dayMap.get(key);
               const isToday = key === todayKey;
+              const inStreak = streakDays.has(key);
               return (
                 <button
                   key={key}
@@ -147,7 +205,7 @@ export default function ChildHouseView({ storeId }: Props) {
                   onClick={() => setSelectedDay({ key, d })}
                   title={isToday && roomNotChecked ? 'Попросить проверить комнату' : 'Посмотреть день'}
                   className={`flex h-14 flex-col items-center justify-center rounded-xl text-sm font-semibold transition ${cellClass(d)} ${
-                    isToday ? 'ring-2 ring-amber-400 ring-offset-1' : ''
+                    inStreak ? 'ring-2 ring-orange-400 ring-offset-1' : isToday ? 'ring-2 ring-amber-400 ring-offset-1' : ''
                   } cursor-pointer hover:brightness-110`}
                 >
                   <span>{day}</span>
@@ -155,6 +213,7 @@ export default function ChildHouseView({ storeId }: Props) {
                     <span className="text-[10px] font-bold">
                       {d.points > 0 ? `+${d.points}` : d.points}
                       {!d.settled && <span className="text-amber-500">*</span>}
+                      {inStreak && <span className="ml-0.5">🔥</span>}
                     </span>
                   )}
                 </button>
@@ -192,6 +251,11 @@ export default function ChildHouseView({ storeId }: Props) {
               <p className="text-sm text-stone-400">Оценка за этот день не выставлена — комментария пока нет.</p>
             ) : (
               <>
+                {selStreak > 0 && (
+                  <div className="rounded-xl border border-orange-500/40 bg-orange-500/15 p-3 text-sm text-orange-200">
+                    🔥 Это день {selStreak} стрика — за уборку начисляется бонус +{selStreak} XP к навыку!
+                  </div>
+                )}
                 <DayInfo label="Порядок в комнате">
                   {(() => {
                     const r = ROOM_RATINGS.find((x) => x.value === selectedDay.d!.roomScore);

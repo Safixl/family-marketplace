@@ -449,6 +449,9 @@ export interface HouseMonthResponse {
   negativeDays: number;
   monthPoints: number;
   pendingPoints: number;
+  currentStreak: number;
+  nextStreakBonus: number;
+  streakEnd: string | null;
 }
 
 export interface HouseCheckRequestDto {
