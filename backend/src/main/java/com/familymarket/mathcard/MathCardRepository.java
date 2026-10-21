@@ -42,6 +42,9 @@ public interface MathCardRepository extends JpaRepository<MathCard, Long> {
     /** Успешно решённые карточки (для достижений). */
     long countByChildIdAndStatus(Long childId, String status);
 
+    /** Карточки дня с указанными статусами (например, завершённые SUCCESS/FAILED). */
+    List<MathCard> findByChildIdAndCardDateAndStatusIn(Long childId, LocalDate cardDate, List<String> statuses);
+
     /** Успешно решённые карточки конкретного уровня (для достижений). */
     long countByChildIdAndStatusAndFinalLevel(Long childId, String status, String finalLevel);
 

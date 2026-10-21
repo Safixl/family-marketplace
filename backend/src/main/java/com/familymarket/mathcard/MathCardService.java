@@ -5,6 +5,8 @@ import com.familymarket.child.Child;
 import com.familymarket.child.ChildRepository;
 import com.familymarket.common.BadRequestException;
 import com.familymarket.common.NotFoundException;
+import com.familymarket.daily.DailyLog;
+import com.familymarket.daily.DailyLogRepository;
 import com.familymarket.dto.MathCardApprovalDto;
 import com.familymarket.dto.MathCardDayDto;
 import com.familymarket.dto.MathCardDto;
@@ -16,6 +18,7 @@ import com.familymarket.user.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -49,6 +52,7 @@ public class MathCardService {
     private final MathCardAttemptRepository attemptRepository;
     private final MathOlympiadRepository olympiadRepository;
     private final MathOlympiadTaskRepository olympiadTaskRepository;
+    private final DailyLogRepository dailyLogRepository;
     private final ChildRepository childRepository;
     private final UserRepository userRepository;
     private final MathCardGenerator generator;
@@ -61,6 +65,7 @@ public class MathCardService {
                            MathCardAttemptRepository attemptRepository,
                            MathOlympiadRepository olympiadRepository,
                            MathOlympiadTaskRepository olympiadTaskRepository,
+                           DailyLogRepository dailyLogRepository,
                            ChildRepository childRepository,
                            UserRepository userRepository,
                            MathCardGenerator generator,
@@ -72,6 +77,7 @@ public class MathCardService {
         this.attemptRepository = attemptRepository;
         this.olympiadRepository = olympiadRepository;
         this.olympiadTaskRepository = olympiadTaskRepository;
+        this.dailyLogRepository = dailyLogRepository;
         this.childRepository = childRepository;
         this.userRepository = userRepository;
         this.generator = generator;
@@ -137,10 +143,12 @@ public class MathCardService {
         LocalDate today = todayDate();
         long doneToday = cardRepository.countByChildIdAndCardDateAndStatusIn(
                 childId, today, List.of("SUCCESS", "FAILED"));
+        // После лимита показываем завершённые карточки (статусы и награды), не взятые скрываются
+        List<MathCard> dayCards = cardRepository.findByChildIdAndCardDateOrderByCreatedAtDesc(childId, today);
         if (doneToday >= DAILY_LIMIT) {
-            return new MathCardDayDto(List.of(), (int) doneToday, DAILY_LIMIT);
+            dayCards = dayCards.stream().filter(c -> "SUCCESS".equals(c.getStatus()) || "FAILED".equals(c.getStatus())).toList();
         }
-        List<MathCardDto> cards = cardRepository.findByChildIdAndCardDateOrderByCreatedAtDesc(childId, today).stream()
+        List<MathCardDto> cards = dayCards.stream()
                 .sorted(Comparator.comparingInt(c -> MathDifficulty.valueOf(c.getFinalLevel()).ordinal()))
                 .map(c -> MathCardDto.of(c, taskRepository.findByCardIdOrderByIdAsc(c.getId()), includeTasks(c)))
                 .toList();
@@ -269,6 +277,8 @@ public class MathCardService {
         card.setSubmittedAt(Instant.now());
         card.setXpEarned(xpEarned);
         cardRepository.save(card);
+        // Синхронизация дейлика «Математика»: счётчик = число завершённых карточек дня
+        syncDailyMath(childId, card.getCardDate());
         // Авто-начисление достижений по математике (примеры, карточки, стрики)
         achievementService.checkProgress(childId);
         return new MathCardSubmitResult(percent, success, correct, tasks.size(), perExampleXp, successReward, xpEarned);
@@ -309,6 +319,38 @@ public class MathCardService {
         return "IN_PROGRESS".equals(card.getStatus())
                 || "SUCCESS".equals(card.getStatus())
                 || "FAILED".equals(card.getStatus());
+    }
+
+    /**
+     * Дейлик «Математика»: points = число завершённых карточек дня (мишень 3),
+     * full clear (3 карточки) даёт бонус +2 XP как у прочих дейликов.
+     */
+    private void syncDailyMath(Long childId, LocalDate day) {
+        long finished = cardRepository.countByChildIdAndCardDateAndStatusIn(
+                childId, day, List.of("SUCCESS", "FAILED"));
+        DailyLog log = dailyLogRepository.findByChildIdAndSkillAndDay(childId, "MATH", day)
+                .orElseGet(() -> {
+                    DailyLog created = new DailyLog();
+                    created.setChild(childRepository.findById(childId)
+                            .orElseThrow(() -> new NotFoundException("Ребенок не найден")));
+                    created.setSkill("MATH");
+                    created.setDay(day);
+                    created.setCreatedAt(Instant.now());
+                    return created;
+                });
+        StringBuilder done = new StringBuilder();
+        for (int i = 0; i < finished; i++) {
+            if (i > 0) {
+                done.append(',');
+            }
+            done.append(i);
+        }
+        log.setPayload("{\"done\":\"" + done + "\"}");
+        log.setPoints(BigDecimal.valueOf(finished));
+        boolean fullClear = finished >= DAILY_LIMIT;
+        log.setFullClear(fullClear);
+        log.setXp(fullClear ? 2 : 0);
+        dailyLogRepository.save(log);
     }
 
     /** Просроченные IN_PROGRESS-карточки завершаются как «не сдано» (0%, без XP). */

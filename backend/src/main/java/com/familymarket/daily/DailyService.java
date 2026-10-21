@@ -337,14 +337,12 @@ public class DailyService {
         if (store == null) {
             return disabled("MATH");
         }
-        List<String[]> tasks = pickMath(age, childId, day);
+        // Математика реализуется ежедневными карточками (лимит 3 в день): мишень — 3 карточки
+        int target = 3;
         Payload payload = loadPayload(childId, "MATH", day);
-        List<DailyTaskDto> taskDtos = new ArrayList<>();
-        for (int i = 0; i < tasks.size(); i++) {
-            taskDtos.add(new DailyTaskDto(i, "math", tasks.get(i)[0]));
-        }
-        return skill("MATH", "Математика", "🧮", store, taskDtos, List.of(), 0, 0,
-                payload.doneIndexes().size(), tasks.size(), payload.doneIndexes().size() >= tasks.size());
+        int done = payload.doneIndexes().size();
+        return skill("MATH", "Математика", "🧮", store, List.of(), List.of(), 0, 0,
+                done, target, done >= target);
     }
 
     // ---------- Чтение (страницы за день) ----------
