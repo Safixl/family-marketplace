@@ -218,7 +218,7 @@ export default function ChildDashboard() {
 
   return (
     <div className="theme-body min-h-screen">
-      <AchievementPopup achievements={achievements} />
+      <AchievementPopup childId={child?.id ?? 0} achievements={achievements} />
 
       {heroOpen && child && (
         <MyHeroPanel childName={child.name} avatarEmoji={child.avatarEmoji} onClose={() => setHeroOpen(false)} />
