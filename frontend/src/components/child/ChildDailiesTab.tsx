@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Brain, CheckCircle2, Dumbbell, Sparkles, Trophy } from 'lucide-react';
+import { CheckCircle2, Sparkles, Trophy } from 'lucide-react';
 import { api } from '../../api/client';
 import { DailySkillDto, DailyStateDto } from '../../api/types';
 import { errMsg } from '../../lib/format';
@@ -10,15 +10,12 @@ import SportCardView from './skills/tabs/SportCardView';
 
 /**
  * Экран «Дейлики»: ежедневные задания по навыкам.
- * Логика — мини-задачи с авто-проверкой (1 ответ = 1 IQ-коин), математика — примеры (1 ответ = 1 Матрикс).
- * Язык — карточки слов (1 слово = 1 лингво-миля).
- * Спорт — минуты активности и шаги (10 мин = 1 очко, 2000 шагов = 1 очко).
- * Идеальное прохождение блока (Full Clear) даёт +2 XP.
+ * Математика — динамические карточки (до 3 в день, Матриксы), логика — логик-карточки (IQ-коины),
+ * язык — 6 видов заданий + словарь + манускрипт (лингво-мили),
+ * спорт и хобби — направления и дейлик с проверкой родителем (×0/×1/×2).
  */
 export default function ChildDailiesTab() {
   const [state, setState] = useState<DailyStateDto | null>(null);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -31,48 +28,6 @@ export default function ChildDailiesTab() {
   useEffect(() => {
     void load();
   }, [load]);
-
-  const submitAnswer = async (skill: string, taskIndex: number) => {
-    const key = `${skill}-${taskIndex}`;
-    const answer = (answers[key] ?? '').trim();
-    if (!answer) return;
-    setBusy(true);
-    try {
-      await api.post(`/child/dailies/${skill === 'MATH' ? 'math' : 'logic'}/answer`, { taskIndex, answer });
-      setAnswers((prev) => ({ ...prev, [key]: '' }));
-      await load();
-    } catch (e) {
-      alert(errMsg(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const learnWords = async (_skill: string, wordIds: string[]) => {
-    if (wordIds.length === 0) return;
-    setBusy(true);
-    try {
-      await api.post('/child/dailies/lang/learn', { wordIds });
-      await load();
-    } catch (e) {
-      alert(errMsg(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const logSport = async (_skill: string, minutes: number, steps: number) => {
-    if (minutes <= 0 && steps <= 0) return;
-    setBusy(true);
-    try {
-      await api.post('/child/dailies/sport/log', { minutes, steps });
-      await load();
-    } catch (e) {
-      alert(errMsg(e));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   if (!state) return <Spinner label="Загружаем дейлики…" />;
 
@@ -116,16 +71,7 @@ export default function ChildDailiesTab() {
       </section>
 
       {state.skills.map((skill) => (
-        <DailySkillCard
-          key={skill.skill}
-          skill={skill}
-          answers={answers}
-          busy={busy}
-          onAnswerChange={(taskIndex, value) => setAnswers((prev) => ({ ...prev, [`${skill.skill}-${taskIndex}`]: value }))}
-          onSubmitAnswer={(taskIndex) => void submitAnswer(skill.skill, taskIndex)}
-          onLearn={learnWords}
-          onSport={logSport}
-        />
+        <DailySkillCard key={skill.skill} skill={skill} />
       ))}
     </div>
   );
@@ -133,26 +79,13 @@ export default function ChildDailiesTab() {
 
 // ---------- Карточка одного навыка ----------
 
-interface CardProps {
-  skill: DailySkillDto;
-  answers: Record<string, string>;
-  busy: boolean;
-  onAnswerChange: (taskIndex: number, value: string) => void;
-  onSubmitAnswer: (taskIndex: number) => void;
-  onLearn: (skill: string, wordIds: string[]) => void;
-  onSport: (skill: string, minutes: number, steps: number) => void;
-}
-
-function DailySkillCard({ skill, answers, busy, onAnswerChange, onSubmitAnswer, onSport }: CardProps) {
+function DailySkillCard({ skill }: { skill: DailySkillDto }) {
   const isLogic = skill.skill === 'LOGIC';
   const isMath = skill.skill === 'MATH';
   const isLang = skill.skill === 'LANG';
   const isSport = skill.skill === 'SPORT';
   const isReading = skill.skill === 'READING';
   const isHouse = skill.skill === 'HOUSE';
-
-  const [minutes, setMinutes] = useState(0);
-  const [steps, setSteps] = useState(0);
 
   return (
     <section className="rpg-panel p-4 sm:p-5">
@@ -172,38 +105,6 @@ function DailySkillCard({ skill, answers, busy, onAnswerChange, onSubmitAnswer, 
         </div>
       </div>
 
-      {/* Логика: задачи с ответами */}
-      {isLogic && (
-        <div className="mt-3 space-y-3">
-          {skill.tasks.map((task) => {
-            const value = answers[`${skill.skill}-${task.index}`] ?? '';
-            return (
-              <div key={task.index} className="flex flex-wrap items-center gap-2 rounded-xl bg-stone-900/60 p-3">
-                <Brain size={16} className="shrink-0 text-violet-400" />
-                <span className="min-w-0 flex-1 text-sm text-stone-200">{task.question}</span>
-                <input
-                  className="rpg-input w-32"
-                  placeholder="Ответ"
-                  value={value}
-                  disabled={busy}
-                  onChange={(e) => onAnswerChange(task.index, e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') onSubmitAnswer(task.index);
-                  }}
-                />
-                <button
-                  className="rpg-btn !px-3 !py-1.5 text-xs"
-                  disabled={busy || !value.trim()}
-                  onClick={() => onSubmitAnswer(task.index)}
-                >
-                  Проверить
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
       {/* Математика: карточки с заданиями (выбор по сложности, решение на 80%+) */}
       {isMath && (
         <div className="mt-3">
@@ -211,7 +112,7 @@ function DailySkillCard({ skill, answers, busy, onAnswerChange, onSubmitAnswer, 
         </div>
       )}
 
-      {/* Логика: динамические карточки (зеркало математики, до 3 в день) */}
+      {/* Логика: динамические логик-карточки (зеркало математики, до 3 в день) */}
       {isLogic && (
         <div className="mt-3">
           <TaskCardsTab skill="LOGIC" />
@@ -271,50 +172,6 @@ function DailySkillCard({ skill, answers, busy, onAnswerChange, onSubmitAnswer, 
           <p className="mt-2 text-sm text-stone-400">
             Попроси родителя проверить комнату на главной или выполни «Помощь по дому» в навыке.
           </p>
-        </div>
-      )}
-
-      {/* Спорт: минуты и шаги */}
-      {isSport && (
-        <div className="mt-3">
-          <div className="flex flex-wrap items-end gap-3">
-            <label className="flex flex-1 flex-col gap-1 text-xs text-stone-400">
-              Минуты активности (10 мин = 1 очко)
-              <input
-                type="number"
-                min={0}
-                className="rpg-input"
-                value={minutes || ''}
-                disabled={busy}
-                onChange={(e) => setMinutes(Math.max(0, Number(e.target.value)))}
-              />
-            </label>
-            <label className="flex flex-1 flex-col gap-1 text-xs text-stone-400">
-              Шаги (2000 = 1 очко)
-              <input
-                type="number"
-                min={0}
-                className="rpg-input"
-                value={steps || ''}
-                disabled={busy}
-                onChange={(e) => setSteps(Math.max(0, Number(e.target.value)))}
-              />
-            </label>
-            <button
-              className="rpg-btn"
-              disabled={busy || (minutes <= 0 && steps <= 0)}
-              onClick={() => {
-                void onSport(skill.skill, minutes, steps);
-                setMinutes(0);
-                setSteps(0);
-              }}
-            >
-              <Dumbbell size={16} /> Записать
-            </button>
-          </div>
-          <div className="mt-2 text-sm text-stone-400">
-            Записано: {skill.minutesLogged} мин · {skill.stepsLogged} шагов
-          </div>
         </div>
       )}
     </section>
