@@ -10,8 +10,11 @@ import com.familymarket.daily.DailyLogRepository;
 import com.familymarket.dto.SkillProgressDto;
 import com.familymarket.house.HouseDayRepository;
 import com.familymarket.house.HouseDay;
+import com.familymarket.langcard.LangCardRepository;
+import com.familymarket.logiccard.LogicCardRepository;
 import com.familymarket.math.MathAttemptRepository;
 import com.familymarket.mathcard.MathCardRepository;
+import com.familymarket.sport.SportCardRepository;
 import com.familymarket.reading.ReadingLogRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,6 +54,9 @@ public class SkillService {
     private final DailyLogRepository dailyLogRepository;
     private final AchievementService achievementService;
     private final MathCardRepository mathCardRepository;
+    private final LogicCardRepository logicCardRepository;
+    private final LangCardRepository langCardRepository;
+    private final SportCardRepository sportCardRepository;
 
     public SkillService(ChildRepository childRepository,
                         AchievementRepository achievementRepository,
@@ -60,7 +66,10 @@ public class SkillService {
                         HouseDayRepository houseDayRepository,
                         DailyLogRepository dailyLogRepository,
                         AchievementService achievementService,
-                        MathCardRepository mathCardRepository) {
+                        MathCardRepository mathCardRepository,
+                        LogicCardRepository logicCardRepository,
+                        LangCardRepository langCardRepository,
+                        SportCardRepository sportCardRepository) {
         this.childRepository = childRepository;
         this.achievementRepository = achievementRepository;
         this.childAchievementRepository = childAchievementRepository;
@@ -70,6 +79,9 @@ public class SkillService {
         this.dailyLogRepository = dailyLogRepository;
         this.achievementService = achievementService;
         this.mathCardRepository = mathCardRepository;
+        this.logicCardRepository = logicCardRepository;
+        this.langCardRepository = langCardRepository;
+        this.sportCardRepository = sportCardRepository;
     }
 
     /** Опыт из ежедневных дейликов навыка (включает бонус Full Clear). */
@@ -120,9 +132,9 @@ public class SkillService {
                 case "MATH" -> mathCorrect * 2.0 + dailyXp(childId, "MATH") + mathCardRepository.sumXpByChildId(childId);
                 case "READING" -> booksRead * 2.0 + pagesRead / 4.0; // 4 страницы = 1 XP
                 case "HOUSE" -> houseXp(childId, (int) housePositive);
-                case "LOGIC" -> dailyXp(childId, "LOGIC");
-                case "LANG" -> dailyXp(childId, "LANG");
-                case "SPORT" -> dailyXp(childId, "SPORT");
+                case "LOGIC" -> dailyXp(childId, "LOGIC") + logicCardRepository.sumXpByChildId(childId);
+                case "LANG" -> dailyXp(childId, "LANG") + langCardRepository.sumXpByChildId(childId);
+                case "SPORT" -> dailyXp(childId, "SPORT") + sportCardRepository.sumXpByChildId(childId);
                 default -> 0;
             };
 

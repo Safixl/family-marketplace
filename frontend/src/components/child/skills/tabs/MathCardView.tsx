@@ -3,6 +3,7 @@ import { Check, Clock3, Send, X } from 'lucide-react';
 import { api } from '../../../../api/client';
 import { MathCardDayDto, MathCardDto, MathCardSubmitResult, MathChoice } from '../../../../api/types';
 import { errMsg } from '../../../../lib/format';
+import MathManuscript from './MathManuscript';
 import { Spinner } from '../../../ui';
 
 const CHOICES: Array<{ choice: MathChoice; label: string; emoji: string; minutes: number }> = [
@@ -32,6 +33,7 @@ export default function MathCardView({ onDone }: { onDone?: () => void }) {
   const [busy, setBusy] = useState(false);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [result, setResult] = useState<MathCardSubmitResult | null>(null);
+  const [tab, setTab] = useState<'cards' | 'manuscript'>('cards');
   const [, setTick] = useState(0);
 
   const load = useCallback(async () => {
@@ -115,6 +117,21 @@ export default function MathCardView({ onDone }: { onDone?: () => void }) {
 
   return (
     <div className="space-y-3">
+      {/* Вкладки: карточки / манускрипт */}
+      <div className="flex gap-1.5 overflow-x-auto pb-1">
+        {([
+          { id: 'cards', label: '🎴 Карточки' },
+          { id: 'manuscript', label: '📖 Манускрипт' },
+        ] as const).map((t) => (
+          <button key={t.id} onClick={() => setTab(t.id)} className={`rpg-tab ${tab === t.id ? 'rpg-tab-active' : ''}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'manuscript' && <MathManuscript />}
+
+      {tab === 'cards' && (<>
       {limitReached && !active && (
         <div className="rpg-panel p-3 text-sm text-stone-400">
           Лимит на сегодня исчерпан — новые карточки появятся завтра в 9:00
@@ -255,6 +272,7 @@ export default function MathCardView({ onDone }: { onDone?: () => void }) {
           </div>
         );
       })}
+      </>)}
     </div>
   );
 }

@@ -25,6 +25,7 @@ import RequestsTab from './tabs/RequestsTab';
 import SkillAchievementsTab from './tabs/SkillAchievementsTab';
 import StatsTab from './tabs/StatsTab';
 import TaskCardsTab from './tabs/TaskCardsTab';
+import LangCardView from './tabs/LangCardView';
 
 type TabId = 'archive' | 'requests' | 'achievements' | 'history' | 'inventory' | 'stats';
 
@@ -121,6 +122,10 @@ export default function SkillModule({ config, store, progress }: Props) {
           <TaskCardsTab skill="MATH" />
         ) : config.id === 'HOUSE' ? (
           <TaskCardsTab skill="HOUSE" />
+        ) : config.id === 'LOGIC' ? (
+          <TaskCardsTab skill="LOGIC" />
+        ) : config.id === 'LANG' ? (
+          <LangCardView />
         ) : (
           <RequestsTab config={config} store={store} requests={requests} onReload={() => void load()} />
         ))}

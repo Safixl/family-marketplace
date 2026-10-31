@@ -11,6 +11,20 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5433/familymarket}
     username: ${DB_USER:familymarket}
     password: ${DB_PASSWORD:familymarket}
+    hikari:
+      minimum-idle: 2
+      # Защита от «зависших» соединений после сна ОС / перезапуска PostgreSQL:
+      # мёртвые TCP-соединения выбиваются keepalive-пингами и лимитом жизни.
+      connection-timeout: 15000
+      validation-timeout: 5000
+      max-lifetime: 600000
+      keepalive-time: 30000
+      # Логировать соединения, удерживаемые дольше 30 сек (помогает ловить утечки)
+      leak-detection-threshold: 30000
+      data-source-properties:
+        tcpKeepAlive: true
+        # Прерывать JDBC-запрос, висящий дольше 60 сек (секунды для pgjdbc)
+        socketTimeout: 60
   jpa:
     hibernate:
       ddl-auto: validate

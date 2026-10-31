@@ -796,3 +796,278 @@ export interface MathCardDayDto {
   doneToday: number;
   dailyLimit: number;
 }
+
+// ===== Логические карточки (структурное зеркало математики) =====
+
+export type LogicChoice =
+  | 'EASY'      // Легкая
+  | 'MEDIUM'    // Обычная
+  | 'HIGH'      // Высокая
+  | 'HARD'      // Сложная
+  | 'EXTREME'   // Хард
+  | 'OLYMPIAD'; // Олимпиада
+
+export type LogicBaseDifficulty = 'EASY' | 'MEDIUM' | 'HIGH' | 'HARD';
+
+export interface LogicTopicDto {
+  id: number;
+  code: string;
+  name: string;
+  gradeLabel: string;
+  active: boolean;
+  baseDifficulty: LogicBaseDifficulty;
+}
+
+export interface LogicCardTaskDto {
+  id: number;
+  topicCode: string;
+  taskType: string;
+  text: string;
+}
+
+export type LogicCardStatus =
+  | 'CREATED'
+  | 'REQUESTED'
+  | 'APPROVED'
+  | 'IN_PROGRESS'
+  | 'SUCCESS'
+  | 'FAILED';
+
+export interface LogicCardDto {
+  id: number;
+  date: string;
+  level: string;
+  levelLabel: string;
+  levelEmoji: string;
+  minutes: number;
+  description: string;
+  taskCount: number;
+  taskTypes: string[];
+  xpReward: number;
+  maxIqReward: number;
+  status: LogicCardStatus;
+  startedAt: string | null;
+  deadline: string | null;
+  resultPercent: number | null;
+  xpEarned: number;
+  tasks: LogicCardTaskDto[];
+}
+
+export interface LogicCardApprovalDto {
+  cardId: number;
+  childId: number;
+  childName: string;
+  childAvatar: string;
+  level: string;
+  levelLabel: string;
+  levelEmoji: string;
+  minutes: number;
+  taskCount: number;
+  xpReward: number;
+}
+
+export interface LogicCardSubmitResult {
+  percent: number;
+  success: boolean;
+  correct: number;
+  total: number;
+  perTaskXp: number;
+  successReward: number;
+  xpEarned: number;
+}
+
+export interface LogicCardDayDto {
+  cards: LogicCardDto[];
+  doneToday: number;
+  dailyLimit: number;
+}
+
+// ===== Карточки иностранного языка (6 видов заданий) =====
+
+export type LangTaskType =
+  | 'WORD_WALL'       // Стена слов (авто: en → ru)
+  | 'SECRET_STORIES'  // Тайные истории (авто: пропуск en|ru)
+  | 'DECODE'          // Расшифруй послание (ручное, множитель родителя)
+  | 'SPELLING'        // А оно точно так пишется (авто: ru → en)
+  | 'SHARE_SECRET'    // Поделись секретом (ручное)
+  | 'MASTERY';        // Покажи своё мастерство (ручное)
+
+export type LangDifficulty = 'EASY' | 'MEDIUM' | 'HARD';
+
+export interface LangCardSettingDto {
+  taskType: LangTaskType;
+  label: string;
+  emoji: string;
+  manual: boolean;
+  minutes: number;
+  difficulty: LangDifficulty;
+}
+
+export interface LangCardTaskDto {
+  id: number;
+  taskType: LangTaskType;
+  text: string;
+}
+
+export type LangCardStatus =
+  | 'CREATED'
+  | 'IN_PROGRESS'
+  | 'REVIEW'
+  | 'SUCCESS'
+  | 'FAILED';
+
+export interface LangCardDto {
+  id: number;
+  date: string;
+  taskType: LangTaskType;
+  taskTypeLabel: string;
+  taskTypeEmoji: string;
+  manual: boolean;
+  difficulty: LangDifficulty;
+  difficultyLabel: string;
+  minutes: number;
+  baseReward: number;
+  multiplier: number;
+  maxReward: number;
+  status: LangCardStatus;
+  startedAt: string | null;
+  deadline: string | null;
+  submittedAt: string | null;
+  resultPercent: number | null;
+  xpEarned: number;
+  parentComment: string | null;
+  tasks: LangCardTaskDto[];
+}
+
+export interface LangCardDayDto {
+  cards: LangCardDto[];
+  doneToday: number;
+  dailyLimit: number;
+}
+
+export interface LangCardSubmitResult {
+  percent: number;
+  success: boolean;
+  correct: number;
+  total: number;
+  perTaskXp: number;
+  successReward: number;
+  xpEarned: number;
+  sentToParent: boolean;
+}
+
+export interface LangVocabWord {
+  wordId: number;
+  foreign: string;
+  ru: string;
+  status: 'ACTIVE' | 'LEARNED';
+  streak: number;
+  streakTarget: number;
+}
+
+export interface LangParentVocabWord {
+  wordId: number;
+  foreign: string;
+  ru: string;
+  level: number;
+  sortOrder: number;
+  status: 'NONE' | 'ACTIVE' | 'LEARNED';
+  streak: number;
+  streakTarget: number;
+}
+
+export interface LangCardReviewDto {
+  cardId: number;
+  childId: number;
+  childName: string;
+  childAvatar: string;
+  taskType: LangTaskType;
+  taskTypeLabel: string;
+  taskTypeEmoji: string;
+  minutes: number;
+  baseReward: number;
+  taskTexts: string[];
+  childAnswers: string[];
+  submittedAt: string | null;
+}
+
+// ===== Спорт и хобби: направления, дейлик, запросы =====
+
+export interface SportDirectionDto {
+  id: number;
+  name: string;
+  icon: string;
+  isToday: boolean;
+}
+
+export interface SportCardDto {
+  id: number;
+  directionId: number;
+  directionName: string;
+  directionIcon: string;
+  status: 'CREATED' | 'REVIEW' | 'SUCCESS' | 'FAILED';
+  baseReward: number;
+  multiplier: number;
+  maxReward: number;
+  xpEarned: number;
+  parentComment: string | null;
+  submittedAt: string | null;
+  taskTitles: string[];
+  taskDescriptions: string[];
+}
+
+export interface SportDayDto {
+  directions: SportDirectionDto[];
+  card: SportCardDto | null;
+}
+
+export interface SportRequestDto {
+  requestId: number;
+  childId: number;
+  childName: string;
+  childAvatar: string;
+  name: string;
+  comment: string | null;
+  status: 'PENDING' | 'RESOLVED' | 'REJECTED';
+  createdAt: string;
+}
+
+export interface SportTaskDto {
+  id: number;
+  directionId: number;
+  title: string;
+  description: string;
+  gradeMin: number;
+  gradeMax: number;
+  sortOrder: number;
+}
+
+export interface SportDirectionFullDto {
+  id: number;
+  childId: number;
+  name: string;
+  icon: string;
+  status: string;
+  taskCount: number;
+}
+
+export interface SportCardReviewDto {
+  cardId: number;
+  childId: number;
+  childName: string;
+  childAvatar: string;
+  directionName: string;
+  directionIcon: string;
+  baseReward: number;
+  taskTitles: string[];
+  submittedAt: string | null;
+}
+
+export interface SportDirectionFullDto {
+  id: number;
+  childId: number;
+  name: string;
+  icon: string;
+  status: string;
+  taskCount: number;
+}

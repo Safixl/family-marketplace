@@ -5,6 +5,8 @@ import { DailySkillDto, DailyStateDto } from '../../api/types';
 import { errMsg } from '../../lib/format';
 import { EmptyState, Spinner } from '../ui';
 import TaskCardsTab from './skills/tabs/TaskCardsTab';
+import LangCardView from './skills/tabs/LangCardView';
+import SportCardView from './skills/tabs/SportCardView';
 
 /**
  * Экран «Дейлики»: ежедневные задания по навыкам.
@@ -141,7 +143,7 @@ interface CardProps {
   onSport: (skill: string, minutes: number, steps: number) => void;
 }
 
-function DailySkillCard({ skill, answers, busy, onAnswerChange, onSubmitAnswer, onLearn, onSport }: CardProps) {
+function DailySkillCard({ skill, answers, busy, onAnswerChange, onSubmitAnswer, onSport }: CardProps) {
   const isLogic = skill.skill === 'LOGIC';
   const isMath = skill.skill === 'MATH';
   const isLang = skill.skill === 'LANG';
@@ -151,8 +153,6 @@ function DailySkillCard({ skill, answers, busy, onAnswerChange, onSubmitAnswer, 
 
   const [minutes, setMinutes] = useState(0);
   const [steps, setSteps] = useState(0);
-
-  const learnedCount = skill.words.filter((w) => w.learned).length;
 
   return (
     <section className="rpg-panel p-4 sm:p-5">
@@ -211,30 +211,24 @@ function DailySkillCard({ skill, answers, busy, onAnswerChange, onSubmitAnswer, 
         </div>
       )}
 
-      {/* Язык: карточки слов */}
+      {/* Логика: динамические карточки (зеркало математики, до 3 в день) */}
+      {isLogic && (
+        <div className="mt-3">
+          <TaskCardsTab skill="LOGIC" />
+        </div>
+      )}
+
+      {/* Язык: динамические карточки (6 видов заданий, словарь, манускрипт) */}
       {isLang && (
         <div className="mt-3">
-          <div className="grid gap-2 sm:grid-cols-2">
-            {skill.words.map((w) => (
-              <button
-                key={w.id}
-                disabled={busy || w.learned}
-                onClick={() => void onLearn(skill.skill, [w.id])}
-                className={`flex items-center justify-between gap-2 rounded-xl border p-3 text-left text-sm transition ${
-                  w.learned
-                    ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
-                    : 'border-stone-700 bg-stone-900/60 text-stone-200 hover:border-amber-500/40'
-                }`}
-              >
-                <span className="font-bold">{w.word}</span>
-                <span className="text-stone-400">{w.translation}</span>
-                {w.learned && <CheckCircle2 size={16} className="shrink-0 text-emerald-400" />}
-              </button>
-            ))}
-          </div>
-          <div className="mt-2 text-sm text-stone-400">
-            Выучено {learnedCount} из {skill.words.length}. Нажми на карточку, чтобы отметить слово.
-          </div>
+          <LangCardView />
+        </div>
+      )}
+
+      {/* Спорт и хобби: направления + дейлик с проверкой родителем */}
+      {isSport && (
+        <div className="mt-3">
+          <SportCardView />
         </div>
       )}
 

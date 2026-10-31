@@ -728,3 +728,298 @@ INSERT INTO math_topics (code, name, grade_label, sort_order) VALUES
     ('ROOTS', 'Корни', '7-8 класс', 8),
     ('SQUARES_CUBES', 'Квадраты / Кубы', '7-8 класс', 9)
 ON CONFLICT (code) DO NOTHING;
+-- ============================================================
+-- ЛОГИКА: динамические логик-карточки (зеркало математики)
+-- ============================================================
+
+-- Темы логики (расширяемый пул на уровне БД)
+CREATE TABLE IF NOT EXISTS logic_topics (
+    id          BIGSERIAL PRIMARY KEY,
+    code        VARCHAR(32)  NOT NULL UNIQUE,
+    name        VARCHAR(100) NOT NULL,
+    grade_label VARCHAR(50)  NOT NULL,
+    sort_order  INT          NOT NULL DEFAULT 0
+);
+
+-- Настройки тем для родителя (тумблер Active + базовая сложность)
+CREATE TABLE IF NOT EXISTS logic_topic_settings (
+    id              BIGSERIAL PRIMARY KEY,
+    parent_id       BIGINT      NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    topic_id        BIGINT      NOT NULL REFERENCES logic_topics (id) ON DELETE CASCADE,
+    active          BOOLEAN     NOT NULL DEFAULT TRUE,
+    base_difficulty VARCHAR(16) NOT NULL DEFAULT 'MEDIUM', -- EASY/MEDIUM/HIGH/HARD (потолок «Сложный»)
+    CONSTRAINT uq_logic_topic_settings_parent_topic UNIQUE (parent_id, topic_id)
+);
+
+-- Сгенерированная логическая карточка (история для анти-дублей 30 дней)
+CREATE TABLE IF NOT EXISTS logic_cards (
+    id          BIGSERIAL PRIMARY KEY,
+    child_id    BIGINT       NOT NULL REFERENCES children (id) ON DELETE CASCADE,
+    card_date   DATE         NOT NULL,
+    final_level VARCHAR(16)  NOT NULL,                  -- EASY..OLYMPIAD
+    label       VARCHAR(50)  NOT NULL,
+    description VARCHAR(500) NOT NULL,
+    task_count  INT          NOT NULL,
+    task_types  VARCHAR(200) NOT NULL,
+    minutes     INT          NOT NULL,
+    status      VARCHAR(20)  NOT NULL DEFAULT 'CREATED', -- CREATED/REQUESTED/APPROVED/IN_PROGRESS/SUCCESS/FAILED
+    started_at  TIMESTAMPTZ,
+    deadline    TIMESTAMPTZ,
+    submitted_at TIMESTAMPTZ,
+    result_percent INT,
+    xp_reward   INT          NOT NULL DEFAULT 0,        -- награда за успех
+    xp_earned   INT          NOT NULL DEFAULT 0,        -- фактически начислено в навык
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_logic_cards_child_date ON logic_cards (child_id, card_date);
+
+-- Задачи логической карточки
+CREATE TABLE IF NOT EXISTS logic_card_tasks (
+    id         BIGSERIAL PRIMARY KEY,
+    card_id    BIGINT       NOT NULL REFERENCES logic_cards (id) ON DELETE CASCADE,
+    topic_code VARCHAR(32)  NOT NULL,
+    task_type  VARCHAR(16)  NOT NULL,   -- PATTERN / ODD / SYMBOLS / BALANCE / RIDDLE / SEQUENCES
+    text       VARCHAR(500) NOT NULL,
+    answer     VARCHAR(100) NOT NULL
+);
+
+-- Попытки ответов на задачи логической карточки
+CREATE TABLE IF NOT EXISTS logic_card_attempts (
+    id           BIGSERIAL PRIMARY KEY,
+    task_id      BIGINT      NOT NULL REFERENCES logic_card_tasks (id) ON DELETE CASCADE,
+    answer       VARCHAR(100) NOT NULL,
+    correct      BOOLEAN     NOT NULL,
+    attempted_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Статичные олимпиадные шаблоны логики (уровень OLYMPIAD)
+CREATE TABLE IF NOT EXISTS logic_olympiad_cards (
+    id          BIGSERIAL PRIMARY KEY,
+    title       VARCHAR(200) NOT NULL,
+    grade_label VARCHAR(50)  NOT NULL,
+    minutes     INT          NOT NULL DEFAULT 60,
+    CONSTRAINT uq_logic_olympiad_title UNIQUE (title)
+);
+CREATE TABLE IF NOT EXISTS logic_olympiad_tasks (
+    id        BIGSERIAL PRIMARY KEY,
+    card_id   BIGINT       NOT NULL REFERENCES logic_olympiad_cards (id) ON DELETE CASCADE,
+    task_type VARCHAR(16)  NOT NULL,
+    text      VARCHAR(500) NOT NULL,
+    answer    VARCHAR(100) NOT NULL
+);
+
+-- Сид тем логики (идемпотентно)
+INSERT INTO logic_topics (code, name, grade_label, sort_order) VALUES
+    ('PATTERN', 'Закономерности', '1-2 класс', 1),
+    ('ODD', 'Найди лишнее', '1-3 класс', 2),
+    ('RIDDLE', 'Логические загадки', '2-5 класс', 3),
+    ('SYMBOLS', 'Символьная алгебра', '3-5 класс', 4),
+    ('BALANCE', 'Весы и пропорции', '4-6 класс', 5),
+    ('SEQUENCES', 'Последовательности', '5-8 класс', 6)
+ON CONFLICT (code) DO NOTHING;
+
+-- ============================================================
+-- ИНОСТРАННЫЙ ЯЗЫК: карточки с 6 типами заданий + словарь
+-- ============================================================
+
+-- Словарь (сид, порядок sort_order = от самых нужных к менее важным, 1-8 класс)
+-- difficulty_level: 1..6 (группа по классам) — от неё зависит попадание слов по сложности задач
+CREATE TABLE IF NOT EXISTS lang_words (
+    id               BIGSERIAL PRIMARY KEY,
+    lang             VARCHAR(8)   NOT NULL DEFAULT 'en',
+    foreign_text     VARCHAR(100) NOT NULL,
+    ru_text          VARCHAR(100) NOT NULL,
+    difficulty_level INT          NOT NULL DEFAULT 1,
+    sort_order       INT          NOT NULL,
+    CONSTRAINT uq_lang_words UNIQUE (lang, foreign_text, ru_text)
+);
+CREATE INDEX IF NOT EXISTS idx_lang_words_sort ON lang_words (sort_order);
+
+-- Прогресс ребёнка по слову (изучает / изучил, серия верных ответов)
+CREATE TABLE IF NOT EXISTS lang_word_progress (
+    id             BIGSERIAL PRIMARY KEY,
+    child_id       BIGINT      NOT NULL REFERENCES children (id) ON DELETE CASCADE,
+    word_id        BIGINT      NOT NULL REFERENCES lang_words (id) ON DELETE CASCADE,
+    status         VARCHAR(16) NOT NULL DEFAULT 'ACTIVE', -- ACTIVE (изучает) / LEARNED (изучил)
+    correct_streak INT         NOT NULL DEFAULT 0,        -- серия верных ответов подряд (50 = изучил)
+    total_correct  INT         NOT NULL DEFAULT 0,
+    total_attempts INT         NOT NULL DEFAULT 0,
+    activated_at   TIMESTAMPTZ,
+    learned_at     TIMESTAMPTZ,
+    CONSTRAINT uq_lang_word_progress UNIQUE (child_id, word_id)
+);
+
+-- Настройки родителя для каждого вида задач: время и сложность (EASY/MEDIUM/HARD)
+CREATE TABLE IF NOT EXISTS lang_card_settings (
+    id         BIGSERIAL PRIMARY KEY,
+    parent_id  BIGINT      NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    task_type  VARCHAR(32) NOT NULL, -- WORD_WALL / SECRET_STORIES / DECODE / SPELLING / SHARE_SECRET / MASTERY
+    minutes    INT         NOT NULL DEFAULT 20,
+    difficulty VARCHAR(8)  NOT NULL DEFAULT 'EASY',
+    CONSTRAINT uq_lang_card_settings UNIQUE (parent_id, task_type)
+);
+
+-- Логическая карточка языка
+CREATE TABLE IF NOT EXISTS lang_cards (
+    id          BIGSERIAL PRIMARY KEY,
+    child_id    BIGINT       NOT NULL REFERENCES children (id) ON DELETE CASCADE,
+    card_date   DATE         NOT NULL,
+    task_type   VARCHAR(32)  NOT NULL,
+    minutes     INT          NOT NULL,
+    difficulty  VARCHAR(8)   NOT NULL DEFAULT 'EASY',
+    status      VARCHAR(20)  NOT NULL DEFAULT 'CREATED', -- CREATED/IN_PROGRESS/REVIEW/SUCCESS/FAILED
+    started_at  TIMESTAMPTZ,
+    deadline    TIMESTAMPTZ,
+    submitted_at TIMESTAMPTZ,
+    result_percent INT,
+    base_reward INT          NOT NULL DEFAULT 0,   -- базовая награда до множителя родителя
+    multiplier  INT          NOT NULL DEFAULT 1,   -- множитель родителя 0/1/2 (ручные задания)
+    xp_earned   INT          NOT NULL DEFAULT 0,   -- фактически начислено в навык
+    parent_comment VARCHAR(300),
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_lang_cards_child_date ON lang_cards (child_id, card_date);
+
+-- Задачи карточки языка (для SECRET_STORIES answer = "en|ru")
+CREATE TABLE IF NOT EXISTS lang_card_tasks (
+    id         BIGSERIAL PRIMARY KEY,
+    card_id    BIGINT       NOT NULL REFERENCES lang_cards (id) ON DELETE CASCADE,
+    task_type  VARCHAR(32)  NOT NULL,
+    text       VARCHAR(600) NOT NULL,
+    answer     VARCHAR(200) NOT NULL DEFAULT '',
+    word_id    BIGINT       REFERENCES lang_words (id) ON DELETE SET NULL
+);
+
+-- Попытки ответов на авто-задачи
+CREATE TABLE IF NOT EXISTS lang_card_attempts (
+    id           BIGSERIAL PRIMARY KEY,
+    task_id      BIGINT      NOT NULL REFERENCES lang_card_tasks (id) ON DELETE CASCADE,
+    answer       VARCHAR(300) NOT NULL,
+    correct      BOOLEAN     NOT NULL,
+    attempted_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Сид словаря английского (упорядочен от самых нужных к менее важным)
+INSERT INTO lang_words (lang, foreign_text, ru_text, difficulty_level, sort_order) VALUES
+    ('en','hello','привет',1,1), ('en','goodbye','пока',1,2), ('en','yes','да',1,3),
+    ('en','no','нет',1,4), ('en','please','пожалуйста',1,5), ('en','thank you','спасибо',1,6),
+    ('en','sorry','извини(те)',1,7), ('en','mom','мама',1,8), ('en','dad','папа',1,9),
+    ('en','family','семья',1,10), ('en','cat','кот',1,11), ('en','dog','собака',1,12),
+    ('en','house','дом',1,13), ('en','sun','солнце',1,14), ('en','moon','луна',1,15),
+    ('en','water','вода',1,16), ('en','milk','молоко',1,17), ('en','bread','хлеб',1,18),
+    ('en','big','большой',1,19), ('en','small','маленький',1,20), ('en','good','хороший',1,21),
+    ('en','bad','плохой',1,22), ('en','day','день',1,23), ('en','night','ночь',1,24),
+    ('en','friend','друг',1,25), ('en','school','школа',1,26), ('en','book','книга',1,27),
+    ('en','pen','ручка',1,28), ('en','one','один',1,29), ('en','two','два',1,30),
+    ('en','three','три',1,31), ('en','four','четыре',1,32), ('en','five','пять',1,33),
+    ('en','red','красный',1,34), ('en','blue','синий',1,35), ('en','green','зелёный',1,36),
+    ('en','yellow','жёлтый',1,37), ('en','boy','мальчик',1,38), ('en','girl','девочка',1,39),
+    ('en','tree','дерево',1,40), ('en','flower','цветок',1,41),
+    ('en','apple','яблоко',2,42), ('en','egg','яйцо',2,43), ('en','bird','птица',2,44),
+    ('en','fish','рыба',2,45), ('en','ball','мяч',2,46), ('en','toy','игрушка',2,47),
+    ('en','chair','стул',2,48), ('en','table','стол',2,49), ('en','window','окно',2,50),
+    ('en','door','дверь',2,51), ('en','run','бегать',2,52), ('en','jump','прыгать',2,53),
+    ('en','play','играть',2,54), ('en','sing','петь',2,55), ('en','swim','плавать',2,56),
+    ('en','eat','есть',2,57), ('en','drink','пить',2,58), ('en','sleep','спать',2,59),
+    ('en','walk','гулять',2,60), ('en','read','читать',2,61), ('en','write','писать',2,62),
+    ('en','draw','рисовать',2,63), ('en','count','считать',2,64), ('en','my','мой',2,65),
+    ('en','your','твой',2,66), ('en','we','мы',2,67), ('en','they','они',2,68),
+    ('en','cold','холодный',2,69), ('en','hot','горячий',2,70), ('en','happy','счастливый',2,71),
+    ('en','sad','грустный',2,72), ('en','winter','зима',2,73), ('en','spring','весна',2,74),
+    ('en','summer','лето',2,75), ('en','autumn','осень',2,76),
+    ('en','brother','брат',3,77), ('en','sister','сестра',3,78), ('en','grandmother','бабушка',3,79),
+    ('en','grandfather','дедушка',3,80), ('en','breakfast','завтрак',3,81), ('en','lunch','обед',3,82),
+    ('en','dinner','ужин',3,83), ('en','city','город',3,84), ('en','street','улица',3,85),
+    ('en','car','машина',3,86), ('en','bus','автобус',3,87), ('en','train','поезд',3,88),
+    ('en','weather','погода',3,89), ('en','rain','дождь',3,90), ('en','snow','снег',3,91),
+    ('en','wind','ветер',3,92), ('en','like','нравиться',3,93), ('en','want','хотеть',3,94),
+    ('en','know','знать',3,95), ('en','think','думать',3,96), ('en','look','смотреть',3,97),
+    ('en','listen','слушать',3,98), ('en','help','помогать',3,99), ('en','work','работать',3,100),
+    ('en','question','вопрос',3,101), ('en','answer','ответ',3,102), ('en','story','история',3,103),
+    ('en','game','игра',3,104), ('en','music','музыка',3,105), ('en','sport','спорт',3,106),
+    ('en','teacher','учитель',4,107), ('en','doctor','врач',4,108), ('en','kitchen','кухня',4,109),
+    ('en','bedroom','спальня',4,110), ('en','garden','сад',4,111), ('en','market','рынок',4,112),
+    ('en','hospital','больница',4,113), ('en','library','библиотека',4,114),
+    ('en','homework','домашнее задание',4,115), ('en','holiday','праздник',4,116),
+    ('en','present','подарок',4,117), ('en','money','деньги',4,118), ('en','cheap','дешёвый',4,119),
+    ('en','expensive','дорогой',4,120), ('en','beautiful','красивый',4,121),
+    ('en','interesting','интересный',4,122), ('en','fast','быстрый',4,123), ('en','slow','медленный',4,124),
+    ('en','early','ранний',4,125), ('en','late','поздний',4,126), ('en','always','всегда',4,127),
+    ('en','never','никогда',4,128), ('en','often','часто',4,129), ('en','sometimes','иногда',4,130),
+    ('en','journey','путешествие',5,131), ('en','language','язык',5,132), ('en','remember','помнить',5,133),
+    ('en','forget','забывать',5,134), ('en','decide','решать',5,135), ('en','important','важный',5,136),
+    ('en','understand','понимать',5,137), ('en','learn','учиться',5,138), ('en','teach','учить',5,139),
+    ('en','try','пытаться',5,140), ('en','travel','путешествовать',5,141), ('en','fly','летать',5,142),
+    ('en','arrive','прибывать',5,143), ('en','leave','покидать',5,144), ('en','comfortable','удобный',5,145),
+    ('en','successful','успешный',5,146), ('en','experience','опыт',5,147), ('en','knowledge','знание',5,148),
+    ('en','opportunity','возможность',5,149), ('en','advice','совет',5,150),
+    ('en','achieve','достигать',6,151), ('en','development','развитие',6,152),
+    ('en','environment','окружающая среда',6,153), ('en','government','правительство',6,154),
+    ('en','society','общество',6,155), ('en','improve','улучшать',6,156), ('en','increase','увеличивать',6,157),
+    ('en','decrease','уменьшать',6,158), ('en','offer','предлагать',6,159), ('en','suggest','предлагать',6,160),
+    ('en','accept','принимать',6,161), ('en','refuse','отказываться',6,162), ('en','explain','объяснять',6,163),
+    ('en','describe','описывать',6,164), ('en','compare','сравнивать',6,165), ('en','decision','решение',6,166),
+    ('en','purpose','цель',6,167), ('en','instead','вместо',6,168), ('en','although','хотя',6,169),
+    ('en','however','однако',6,170), ('en','therefore','следовательно',6,171), ('en','wisdom','мудрость',6,172),
+    ('en','courage','смелость',6,173), ('en','confidence','уверенность',6,174),
+    ('en','responsibility','ответственность',6,175)
+ON CONFLICT DO NOTHING;
+
+-- ============================================================
+-- СПОРТ И ХОББИ: направления, задания, запросы, дейлик-карточки
+-- ============================================================
+
+-- Направление (дефолтная «Физкультура» + хобби до 6 всего), привязано к ребёнку
+CREATE TABLE IF NOT EXISTS sport_directions (
+    id         BIGSERIAL PRIMARY KEY,
+    child_id   BIGINT       NOT NULL REFERENCES children (id) ON DELETE CASCADE,
+    name       VARCHAR(100) NOT NULL,
+    icon       VARCHAR(8)   NOT NULL DEFAULT '⚽',
+    status     VARCHAR(16)  NOT NULL DEFAULT 'ACTIVE', -- ACTIVE / ARCHIVED
+    created_at TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+-- Задание направления (родитель гибко редактирует текст: подходы, повторения, кг, время)
+CREATE TABLE IF NOT EXISTS sport_tasks (
+    id           BIGSERIAL PRIMARY KEY,
+    direction_id BIGINT       NOT NULL REFERENCES sport_directions (id) ON DELETE CASCADE,
+    title        VARCHAR(300) NOT NULL,
+    description  VARCHAR(500),
+    grade_min    INT          NOT NULL DEFAULT 1, -- класс, с которого упражнение доступно
+    grade_max    INT          NOT NULL DEFAULT 8,
+    sort_order   INT          NOT NULL DEFAULT 0
+);
+
+-- Запрос ребёнка на новое направление (родитель создаёт направление на его основе)
+CREATE TABLE IF NOT EXISTS sport_requests (
+    id         BIGSERIAL PRIMARY KEY,
+    child_id   BIGINT       NOT NULL REFERENCES children (id) ON DELETE CASCADE,
+    name       VARCHAR(100) NOT NULL,
+    comment    VARCHAR(300),
+    status     VARCHAR(16)  NOT NULL DEFAULT 'PENDING', -- PENDING / RESOLVED / REJECTED
+    created_at TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+-- Дейлик-карточка спорта (1 в день, одно направление, проверяет родитель ×0/×1/×2)
+CREATE TABLE IF NOT EXISTS sport_cards (
+    id           BIGSERIAL PRIMARY KEY,
+    child_id     BIGINT      NOT NULL REFERENCES children (id) ON DELETE CASCADE,
+    card_date    DATE        NOT NULL,
+    direction_id BIGINT      NOT NULL REFERENCES sport_directions (id) ON DELETE CASCADE,
+    status       VARCHAR(20) NOT NULL DEFAULT 'CREATED', -- CREATED / REVIEW / SUCCESS / FAILED
+    base_reward  INT         NOT NULL DEFAULT 10,
+    multiplier   INT         NOT NULL DEFAULT 1,
+    xp_earned    INT         NOT NULL DEFAULT 0,
+    parent_comment VARCHAR(300),
+    submitted_at TIMESTAMPTZ,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_sport_card_child_date UNIQUE (child_id, card_date)
+);
+
+-- Задания, попавшие в карточку (снимок на момент генерации)
+CREATE TABLE IF NOT EXISTS sport_card_tasks (
+    id          BIGSERIAL PRIMARY KEY,
+    card_id     BIGINT       NOT NULL REFERENCES sport_cards (id) ON DELETE CASCADE,
+    title       VARCHAR(300) NOT NULL,
+    description VARCHAR(500)
+);

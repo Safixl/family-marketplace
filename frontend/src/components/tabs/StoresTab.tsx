@@ -9,6 +9,9 @@ import HouseCalendar from '../managers/HouseCalendar';
 import TaskCardsManager from '../managers/TaskCardsManager';
 import TasksManager from '../managers/TasksManager';
 import MathCardSettings from '../managers/MathCardSettings';
+import LogicCardSettings from '../managers/LogicCardSettings';
+import LangCardSettings from '../managers/LangCardSettings';
+import SportCardSettings from '../managers/SportCardSettings';
 import ReadingArchive from '../managers/ReadingArchive';
 import { EmptyState, Spinner } from '../ui';
 
@@ -64,7 +67,7 @@ export default function StoresTab({ templateFilter, title }: StoresTabProps) {
   const [activateChildId, setActivateChildId] = useState<string>('');
   const [templateModal, setTemplateModal] = useState(false);
   const [managerFor, setManagerFor] = useState<
-    | { store: StoreDto; type: 'books' | 'tasks' | 'house' | 'cards' | 'mathCard'; skill?: 'MATH' | 'HOUSE' }
+    | { store: StoreDto; type: 'books' | 'tasks' | 'house' | 'cards' | 'mathCard' | 'logicCard' | 'langCard' | 'sportCard'; skill?: 'MATH' | 'HOUSE' }
     | null
   >(null);
 
@@ -423,6 +426,30 @@ export default function StoresTab({ templateFilter, title }: StoresTabProps) {
                         onClick={() => setManagerFor({ store, type: 'mathCard' })}
                       >
                         🧩 Генератор карточек
+                      </button>
+                    )}
+                    {store.templateType === 'LOGIC' && (
+                      <button
+                        className="btn-secondary !px-3 !py-1.5 text-xs"
+                        onClick={() => setManagerFor({ store, type: 'logicCard' })}
+                      >
+                        🧠 Генератор карточек
+                      </button>
+                    )}
+                    {store.templateType === 'LANG' && (
+                      <button
+                        className="btn-secondary !px-3 !py-1.5 text-xs"
+                        onClick={() => setManagerFor({ store, type: 'langCard' })}
+                      >
+                        🌍 Карточки языка
+                      </button>
+                    )}
+                    {store.templateType === 'SPORT' && (
+                      <button
+                        className="btn-secondary !px-3 !py-1.5 text-xs"
+                        onClick={() => setManagerFor({ store, type: 'sportCard' })}
+                      >
+                        ⚽ Спорт и хобби
                       </button>
                     )}
                     {store.templateType === 'HOME' && (
@@ -793,6 +820,15 @@ export default function StoresTab({ templateFilter, title }: StoresTabProps) {
       )}
       {managerFor?.type === 'mathCard' && (
         <MathCardSettings onClose={() => setManagerFor(null)} />
+      )}
+      {managerFor?.type === 'logicCard' && (
+        <LogicCardSettings onClose={() => setManagerFor(null)} />
+      )}
+      {managerFor?.type === 'langCard' && (
+        <LangCardSettings childId={activateChildId ? Number(activateChildId) : undefined} onClose={() => setManagerFor(null)} />
+      )}
+      {managerFor?.type === 'sportCard' && (
+        <SportCardSettings childId={activateChildId ? Number(activateChildId) : undefined} onClose={() => setManagerFor(null)} />
       )}
     </div>
   );
