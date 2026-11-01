@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { HandCoins, Pause, Play, Snowflake } from 'lucide-react';
 import { api } from '../../api/client';
-import { LimitStateDto, LimitTypeState } from '../../api/types';
+import { DungeonStateDto, LimitStateDto, LimitTypeState } from '../../api/types';
 import { errMsg } from '../../lib/format';
 import { Spinner } from '../ui';
 
@@ -34,6 +34,8 @@ export default function LimitsPanel() {
   /** Типы, для которых уже отправлен серверный stop при исчерпании лимита. */
   const stopRef = useRef<Set<string>>(new Set());
 
+  const [dungeon, setDungeon] = useState<DungeonStateDto | null>(null);
+
   const load = useCallback(async () => {
     try {
       const next = await api.get<LimitStateDto>('/child/limits');
@@ -41,6 +43,12 @@ export default function LimitsPanel() {
       setState(next);
     } catch (e) {
       alert(errMsg(e));
+    }
+    // Выносливость героя (рядом с карманными деньгами); тихо игнорируем ошибки
+    try {
+      setDungeon(await api.get<DungeonStateDto>('/child/dungeon'));
+    } catch {
+      setDungeon(null);
     }
   }, []);
 
@@ -152,6 +160,33 @@ export default function LimitsPanel() {
           </div>
         );
       })}
+
+      {/* Выносливость героя (обновляется каждый день в 9:00) */}
+      {dungeon?.character && dungeon.character.status !== 'LOCKED' && (
+        <div className="flex items-center gap-2 border-t border-amber-500/20 pt-2">
+          <span className="w-6 text-center text-lg">⚡</span>
+          <div className="min-w-0 flex-1">
+            <div className="mb-0.5 flex items-center justify-between text-xs">
+              <span className="font-semibold text-amber-100">Выносливость героя</span>
+              <span className="text-amber-200/70">
+                {dungeon.character.stamina}% / {dungeon.character.maxStamina}%
+              </span>
+            </div>
+            <div className="rpg-progress-track h-2.5">
+              <div
+                className="rpg-progress-fill !bg-gradient-to-r !from-lime-500 !to-emerald-400"
+                style={{
+                  width: `${
+                    dungeon.character.maxStamina > 0
+                      ? Math.min(100, Math.round((dungeon.character.stamina / dungeon.character.maxStamina) * 100))
+                      : 0
+                  }%`,
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Карманные деньги */}
       <div className="flex items-center gap-2 border-t border-amber-500/20 pt-2">

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { BookOpen, CalendarDays, CheckCircle2, Sparkles, Swords, Trophy } from 'lucide-react';
+import { BookOpen, CalendarDays, CheckCircle2, ScrollText, Sparkles, Swords, Trophy } from 'lucide-react';
 
 export type HomeWidgetId = 'balances' | 'stats' | 'achievements' | 'orders';
 
@@ -24,6 +24,7 @@ import { EmptyState } from '../ui';
 import ChildHouseView from './ChildHouseView';
 import LevelBar from './rpg/LevelBar';
 import SkillHexagon from './rpg/SkillHexagon';
+import AdventureLog from './rpg/AdventureLog';
 import LimitsPanel from './LimitsPanel';
 
 interface Props {
@@ -165,6 +166,14 @@ export default function ChildHomeTab({
           <ChildHouseView storeId={homeStoreId} />
         </section>
       )}
+
+      {/* Журнал Приключений: таверна, данжи и текстовая трансляция похода героя */}
+      <section className="rpg-panel rpg-panel-gold p-4 sm:p-6">
+        <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-amber-200">
+          <ScrollText size={20} className="text-amber-400" /> Журнал Приключений
+        </h2>
+        <AdventureLog />
+      </section>
 
       {/* Читаю сейчас */}
       {readingBooks.length > 0 && (

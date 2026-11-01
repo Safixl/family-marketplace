@@ -1023,3 +1023,101 @@ CREATE TABLE IF NOT EXISTS sport_card_tasks (
     title       VARCHAR(300) NOT NULL,
     description VARCHAR(500)
 );
+
+-- ============================================================
+-- ПОДЗЕМЕЛЬЯ (Данжи): персонаж, сессии походов, экипировка
+-- Таверна открывается при ранге «Железо» по Чтению И Математике.
+-- ============================================================
+
+-- Персонаж-авантюрист (один на ребёнка)
+-- class: WARRIOR / MAGE / ARCHER (NULL — класс ещё не выбран)
+-- status: LOCKED (обучение) / FREE (свободен) / IN_DUNGEON (в походе) / RESTING (отдых в данже)
+CREATE TABLE IF NOT EXISTS dungeon_characters (
+    child_id           BIGINT PRIMARY KEY REFERENCES children (id) ON DELETE CASCADE,
+    class              VARCHAR(16),
+    status             VARCHAR(20) NOT NULL DEFAULT 'LOCKED',
+    stamina            INT         NOT NULL DEFAULT 100,
+    max_stamina_bonus  INT         NOT NULL DEFAULT 0,  -- +10% за каждый ранг «Порядка в комнате» с Железа
+    last_refresh_day   DATE,                            -- последний день восстановления (лимит 09:00 МСК)
+    victories          INT         NOT NULL DEFAULT 0,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Поход в данж: события рассчитываются наперёд и пишутся в log_json с таймстампами
+-- status: ACTIVE (идёт) / RESTING (герой заснул) / WON (зачистка) / LOST (поражение)
+-- discovered_json: id исследованных развилок/секретов/сундуков; killed_json: убитые монстры
+CREATE TABLE IF NOT EXISTS dungeon_sessions (
+    id             BIGSERIAL PRIMARY KEY,
+    child_id       BIGINT      NOT NULL REFERENCES children (id) ON DELETE CASCADE,
+    dungeon_code   VARCHAR(32) NOT NULL,
+    status         VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    rooms_total    INT         NOT NULL,
+    current_room   INT         NOT NULL DEFAULT 1,
+    tactic_ok      BOOLEAN     NOT NULL DEFAULT FALSE,   -- тактика перед боссом удалась (×2.0)
+    discovered_json TEXT       NOT NULL DEFAULT '[]',
+    killed_json    TEXT        NOT NULL DEFAULT '[]',
+    log_json       TEXT        NOT NULL DEFAULT '[]',
+    reward_coins   NUMERIC(12,2) NOT NULL DEFAULT 0,
+    started_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    finished_at    TIMESTAMPTZ,
+    resume_day     DATE
+);
+CREATE INDEX IF NOT EXISTS idx_dungeon_sessions_child ON dungeon_sessions (child_id);
+
+-- Каталог экипировки (выпадает из сундуков и боссов)
+-- slot: WEAPON / ARMOR / TRINKET; rarity: COMMON / UNCOMMON / RARE / EPIC / LEGENDARY
+CREATE TABLE IF NOT EXISTS equipment_defs (
+    id              BIGSERIAL PRIMARY KEY,
+    code            VARCHAR(40)  NOT NULL UNIQUE,
+    name            VARCHAR(150) NOT NULL,
+    slot            VARCHAR(16)  NOT NULL,
+    rarity          VARCHAR(16)  NOT NULL DEFAULT 'COMMON',
+    stat_multiplier NUMERIC(5,2) NOT NULL DEFAULT 1,
+    icon            VARCHAR(8)   NOT NULL DEFAULT '🗡️',
+    description     VARCHAR(300)
+);
+
+-- Экипировка ребёнка (is_identified — «нераспознанная вещь» до визита к мудрецу)
+CREATE TABLE IF NOT EXISTS child_equipment (
+    id           BIGSERIAL PRIMARY KEY,
+    child_id     BIGINT      NOT NULL REFERENCES children (id) ON DELETE CASCADE,
+    equipment_id BIGINT      NOT NULL REFERENCES equipment_defs (id) ON DELETE CASCADE,
+    is_identified BOOLEAN    NOT NULL DEFAULT FALSE,
+    equipped     BOOLEAN     NOT NULL DEFAULT FALSE,
+    acquired_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_child_equipment_child ON child_equipment (child_id);
+
+-- Прогрессия рангов подземелий: NONE/F/D/C/B/A/S (рекорд игрока)
+ALTER TABLE dungeon_characters ADD COLUMN IF NOT EXISTS max_cleared_rank VARCHAR(4) NOT NULL DEFAULT 'NONE';
+
+-- Сгенерированный поход: ранг квеста и уровень монстров (F:1-10 … S:51-60)
+ALTER TABLE dungeon_sessions ADD COLUMN IF NOT EXISTS rank VARCHAR(4) NOT NULL DEFAULT 'F';
+ALTER TABLE dungeon_sessions ADD COLUMN IF NOT EXISTS monster_level INT NOT NULL DEFAULT 1;
+-- Тема сгенерированного данжа (название и эмодзи выбираются случайно)
+ALTER TABLE dungeon_sessions ADD COLUMN IF NOT EXISTS dungeon_name VARCHAR(150);
+ALTER TABLE dungeon_sessions ADD COLUMN IF NOT EXISTS dungeon_emoji VARCHAR(8);
+
+-- Сид каталога экипировки (идемпотентно)
+INSERT INTO equipment_defs (code, name, slot, rarity, stat_multiplier, icon, description) VALUES
+    ('rusty_sword',     'Ржавый меч',           'WEAPON',  'COMMON',    1.0, '🗡️', 'Лучше, чем ничего'),
+    ('iron_sword',      'Железный меч',         'WEAPON',  'COMMON',    1.3, '⚔️', 'Надёжное оружие ополченца'),
+    ('oak_bow',         'Дубовый лук',          'WEAPON',  'COMMON',    1.2, '🏹', 'Простой, но меткий'),
+    ('apprentice_wand', 'Волшебная палочка ученика', 'WEAPON', 'COMMON', 1.2, '🪄', 'Слегка искрит на концах'),
+    ('steel_spear',     'Стальное копьё',       'WEAPON',  'UNCOMMON',  1.6, '🔱', 'Достаёт дальше, чем кажется'),
+    ('flame_blade',     'Пылающий клинок',      'WEAPON',  'RARE',      2.0, '🔥', 'Разогревает воздух вокруг'),
+    ('storm_bow',       'Лук Гроз',             'WEAPON',  'RARE',      2.0, '🏹', 'Стрелы гудят как ветер'),
+    ('frost_staff',     'Посох Стужи',          'WEAPON',  'EPIC',      2.6, '❄️', 'Иней на деревянной рукояти'),
+    ('dragonfang_blade','Клинок Драконьего Клыка', 'WEAPON', 'LEGENDARY', 3.2, '🐉', 'Легенда подземелий'),
+    ('leather_armor',   'Кожаный доспех',       'ARMOR',   'COMMON',    1.1, '🥼', 'Скрипит, но держит удар'),
+    ('chain_mail',      'Кольчуга',             'ARMOR',   'UNCOMMON',  1.5, '⛓️', 'Звенит на каждом шагу'),
+    ('iron_shield',     'Железный щит',         'ARMOR',   'UNCOMMON',  1.4, '🛡️', 'Крепкий и надёжный в строю'),
+    ('mage_robe',       'Мантия мага',          'ARMOR',   'RARE',      1.8, '🧙', 'Пылает звёздной пылью'),
+    ('dragon_scale',    'Чешуя дракона',        'ARMOR',   'EPIC',      2.4, '🐲', 'Не пробить даже копьём'),
+    ('lucky_charm',     'Счастливый амулет',    'TRINKET', 'COMMON',    1.1, '🍀', 'Тёплый на ощупь'),
+    ('traveler_ring',   'Кольцо странника',     'TRINKET', 'UNCOMMON',  1.4, '💍', 'Ускоряет шаг героя'),
+    ('sages_pendant',   'Кулон мудреца',        'TRINKET', 'RARE',      1.8, '📿', 'Шепчет подсказки на ушко'),
+    ('shadow_cloak',    'Плащ теней',           'TRINKET', 'EPIC',      2.3, '🌑', 'Растворяется в полумраке'),
+    ('champion_medal',  'Медаль чемпиона',      'TRINKET', 'LEGENDARY', 3.0, '🏅', 'Сияет в памяти таверны'),
+    ('speed_boots',     'Сапоги-скороходы',     'TRINKET', 'UNCOMMON',  1.5, '🥾', 'Пыль летит из-под пят')
+ON CONFLICT (code) DO NOTHING;

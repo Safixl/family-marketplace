@@ -1071,3 +1071,70 @@ export interface SportDirectionFullDto {
   status: string;
   taskCount: number;
 }
+// ============================================================
+// Подземелья (данжи) и RPG-механики персонажа
+// ============================================================
+
+export type DungeonCharacterStatus = 'LOCKED' | 'FREE' | 'IN_DUNGEON' | 'RESTING';
+export type DungeonSessionStatus = 'ACTIVE' | 'RESTING' | 'WON' | 'LOST';
+
+export interface DungeonLogEntryDto {
+  at: string;
+  icon: string;
+  text: string;
+}
+
+export type DungeonQuestRank = 'F' | 'D' | 'C' | 'B' | 'A' | 'S';
+
+export interface DungeonCharacterDto {
+  characterClass: 'WARRIOR' | 'MAGE' | 'ARCHER' | null;
+  status: DungeonCharacterStatus;
+  stamina: number;
+  maxStamina: number;
+  victories: number;
+  /** Рекорд игрока: максимальный зачищенный ранг данжа. */
+  maxClearedRank: DungeonQuestRank | 'NONE';
+}
+
+/** Таверна открывается при ранге «Железо» по Чтению И Математике. */
+export interface DungeonUnlockDto {
+  unlocked: boolean;
+  readingOk: boolean;
+  mathOk: boolean;
+  readingRank: string;
+  mathRank: string;
+}
+
+export interface DungeonSessionDto {
+  id: number;
+  dungeonCode: string;
+  rank: DungeonQuestRank;
+  monsterLevel: number;
+  dungeonName: string;
+  dungeonEmoji: string;
+  status: DungeonSessionStatus;
+  currentRoom: number;
+  roomsTotal: number;
+  rewardCoins: number;
+  logs: DungeonLogEntryDto[];
+}
+
+export interface DungeonEquipmentDto {
+  id: number;
+  code: string;
+  name: string;
+  slot: 'WEAPON' | 'ARMOR' | 'TRINKET';
+  rarity: string;
+  statMultiplier: number;
+  icon: string;
+  description: string;
+  identified: boolean;
+  equipped: boolean;
+}
+
+export interface DungeonStateDto {
+  character: DungeonCharacterDto;
+  unlock: DungeonUnlockDto;
+  session: DungeonSessionDto | null;
+  equipment: DungeonEquipmentDto[];
+}
