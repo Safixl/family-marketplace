@@ -25,13 +25,10 @@ public final class DungeonDtos {
             String maxClearedRank) {
     }
 
-    /** Прогресс разблокировки таверны: ранг «Железо» по Чтению И Математике. */
+    /** Прогресс разблокировки таверны: ранг «Железо» по Чтению. */
     public record UnlockDto(
             boolean unlocked,
-            boolean readingOk,
-            boolean mathOk,
-            String readingRank,
-            String mathRank) {
+            String readingRank) {
     }
 
     public record LogEntryDto(String at, String icon, String text) {

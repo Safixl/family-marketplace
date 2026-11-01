@@ -154,12 +154,11 @@ export default function AdventureLog() {
           <Lock size={16} /> Таверна закрыта
         </div>
         <p className="mb-3 text-sm text-stone-400">
-          Герой ещё на обучении. Таверна откроет свои двери, когда по обоим навыкам будет достигнут ранг
+          Герой ещё на обучении. Таверна откроет свои двери, когда по навыку «Чтение» будет достигнут ранг
           «Железо»:
         </p>
         <div className="grid gap-2 sm:grid-cols-2">
-          <UnlockRow label="📚 Чтение" rank={unlock.readingRank} ok={unlock.readingOk} />
-          <UnlockRow label="🧮 Математика" rank={unlock.mathRank} ok={unlock.mathOk} />
+          <UnlockRow label="📚 Чтение" rank={unlock.readingRank} ok={unlock.unlocked} />
         </div>
       </div>
     );

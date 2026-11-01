@@ -1096,13 +1096,10 @@ export interface DungeonCharacterDto {
   maxClearedRank: DungeonQuestRank | 'NONE';
 }
 
-/** Таверна открывается при ранге «Железо» по Чтению И Математике. */
+/** Таверна открывается при ранге «Железо» по навыку «Чтение». */
 export interface DungeonUnlockDto {
   unlocked: boolean;
-  readingOk: boolean;
-  mathOk: boolean;
   readingRank: string;
-  mathRank: string;
 }
 
 export interface DungeonSessionDto {

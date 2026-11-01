@@ -77,18 +77,16 @@ public class DungeonService {
 
         Map<String, Integer> levels = skillLevels(childId);
         int readingIdx = DungeonCatalog.rankIndexForLevel(levels.getOrDefault("READING", 1));
-        int mathIdx = DungeonCatalog.rankIndexForLevel(levels.getOrDefault("MATH", 1));
-        boolean unlocked = readingIdx >= 1 && mathIdx >= 1;
+        // Условие разблокировки: ранг «Железо» по навыку «Чтение»
+        boolean unlocked = readingIdx >= 1;
         if (unlocked && "LOCKED".equals(character.getStatus())) {
-            // Триггер разблокировки: ранг «Железо» по Чтению И Математике
             character.setStatus("FREE");
         }
 
         DungeonDtos.SessionDto sessionDto = session == null ? null : toSessionDto(session);
         return new DungeonDtos.DungeonStateDto(
                 toCharacterDto(character),
-                new DungeonDtos.UnlockDto(unlocked, readingIdx >= 1, mathIdx >= 1,
-                        DungeonCatalog.rankName(readingIdx), DungeonCatalog.rankName(mathIdx)),
+                new DungeonDtos.UnlockDto(unlocked, DungeonCatalog.rankName(readingIdx)),
                 sessionDto,
                 equipment(childId));
     }
@@ -98,7 +96,7 @@ public class DungeonService {
         DungeonCharacter character = ensureCharacter(childId);
         refreshCharacter(character);
         if (!"FREE".equals(character.getStatus())) {
-            throw new BadRequestException("Таверна ещё закрыта: нужен ранг «Железо» по Чтению и Математике");
+            throw new BadRequestException("Таверна ещё закрыта: нужен ранг «Железо» по Чтению");
         }
         if (character.getCharacterClass() != null) {
             throw new BadRequestException("Класс уже выбран");
