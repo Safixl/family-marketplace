@@ -96,6 +96,20 @@ export default function AdventureLog() {
     return session.logs.filter((e) => new Date(e.at).getTime() <= now);
   }, [session, now]);
 
+  /** Таймлайн доиграл до конца: только тогда показываем итог похода. */
+  const revealed = session ? visibleLogs.length >= session.logs.length : true;
+
+  /** Текущая комната по последней «проявленной» записи (не спойлерим финал). */
+  const revealedRoom = useMemo(() => {
+    if (!session) return 1;
+    if (revealed) return session.currentRoom;
+    for (let i = visibleLogs.length - 1; i >= 0; i--) {
+      const m = visibleLogs[i].text.match(/Комнат[аыу]\s+(\d+)/);
+      if (m) return Number(m[1]);
+    }
+    return 1;
+  }, [session, revealed, visibleLogs]);
+
   const nextEntry = useMemo(() => {
     if (!session || session.status !== 'ACTIVE') return null;
     return session.logs.find((e) => new Date(e.at).getTime() > now) ?? null;
@@ -208,7 +222,7 @@ export default function AdventureLog() {
             <div className="text-xs text-stone-400">
               {character.status === 'IN_DUNGEON' && 'Герой в подземелье'}
               {character.status === 'RESTING' && 'Герой отдыхает в подземелье до утра'}
-              {character.status === 'FREE' && 'Герой в городе, готов к походу'}
+              {character.status === 'FREE' && (session && !revealed ? 'Герой возвращается из похода…' : 'Герой в городе, готов к походу')}
             </div>
           </div>
         </div>
@@ -240,24 +254,24 @@ export default function AdventureLog() {
                 Ранг {session.rank} · Ур. {session.monsterLevel}
               </span>
               <span className="text-xs font-normal text-stone-400">
-                Комната {Math.min(session.currentRoom, session.roomsTotal)} из {session.roomsTotal}
+                Комната {Math.min(revealedRoom, session.roomsTotal)} из {session.roomsTotal}
               </span>
             </div>
             <span
               className={`rpg-badge border text-xs ${
-                session.status === 'ACTIVE'
-                  ? 'border-sky-500/40 text-sky-300'
-                  : session.status === 'RESTING'
+                revealed
+                  ? session.status === 'RESTING'
                     ? 'border-indigo-500/40 text-indigo-300'
                     : session.status === 'WON'
                       ? 'border-emerald-500/40 text-emerald-300'
                       : 'border-rose-500/40 text-rose-300'
+                  : 'border-sky-500/40 text-sky-300'
               }`}
             >
-              {session.status === 'ACTIVE' && '⚔️ Поход идёт'}
-              {session.status === 'RESTING' && <><BedDouble size={12} className="mr-1 inline" /> Отдых до 9:00</>}
-              {session.status === 'WON' && '🏆 Зачистено'}
-              {session.status === 'LOST' && '🩸 Поражение'}
+              {!revealed && '⚔️ Поход идёт'}
+              {revealed && session.status === 'RESTING' && <><BedDouble size={12} className="mr-1 inline" /> Отдых до 9:00</>}
+              {revealed && session.status === 'WON' && '🏆 Зачистено'}
+              {revealed && session.status === 'LOST' && '🩸 Поражение'}
             </span>
           </div>
           <div ref={logRef} className="max-h-96 space-y-2 overflow-y-auto px-4 py-3">
@@ -280,8 +294,8 @@ export default function AdventureLog() {
         </div>
       )}
 
-      {/* Поражение: напоминание о сбросе */}
-      {session?.status === 'LOST' && (
+      {/* Поражение: напоминание о сбросе (только после проигрывания таймлайна) */}
+      {session?.status === 'LOST' && revealed && (
         <p className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-xs text-rose-200">
           Данж будет полностью сброшен: монстры воскреснут, сундуки и развилки сгенерируются заново.
         </p>
