@@ -165,13 +165,17 @@ public final class DungeonCatalog {
         return idx * 10 + 10;
     }
 
-    /** Сила обыкновенного монстра по уровню; босс сильнее. */
+    /**
+     * Сила обыкновенного монстра по уровню. Мягкая кривая: герой в снаряжении
+     * (коэффициент ≥1.0) на уровне своего ранга побеждает; «голый» герой (×0.1) — нет.
+     */
     public static double monsterPowerForLevel(int level) {
-        return Math.max(0.35, level * 0.35);
+        return Math.max(0.2, level * 0.18);
     }
 
+    /** Босс заметно сильнее обычных монстров, но берётся тактикой (×2.0 от Логики). */
     public static double bossPowerForLevel(int level) {
-        return Math.max(0.6, level * 0.6);
+        return Math.max(0.3, level * 0.25);
     }
 
     /**

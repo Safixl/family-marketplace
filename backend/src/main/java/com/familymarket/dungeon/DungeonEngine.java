@@ -56,6 +56,7 @@ public class DungeonEngine {
         int stamina;
         int room;
         boolean tacticOk;
+        java.math.BigDecimal rewardCoins = java.math.BigDecimal.ZERO;
         final List<String> discovered;
         final List<Integer> killed;
         final List<EquipmentDef> lootOut;
@@ -227,6 +228,7 @@ public class DungeonEngine {
         s.log("🏆", "Данж «" + dungeon.name() + "» зачищен! Герой возвращается в город, сдаёт квест в Таверне и получает награду: "
                 + (int) dungeon.coins() + " монет.");
         s.advance();
+        s.rewardCoins = BigDecimal.valueOf(dungeon.coins());
         s.outcome = Outcome.WON;
         return false;
     }
@@ -426,6 +428,9 @@ public class DungeonEngine {
     private void persist(DungeonSession session, DungeonCharacter character, Sim s) {
         session.setCurrentRoom(s.room);
         session.setTacticOk(s.tacticOk);
+        if (s.outcome == Outcome.WON) {
+            session.setRewardCoins(s.rewardCoins);
+        }
         session.setDiscoveredJson(toJson(s.discovered));
         session.setKilledJson(toJsonInts(s.killed));
         session.setLogJson(toJsonLog(s.log));

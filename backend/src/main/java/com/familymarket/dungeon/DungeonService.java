@@ -263,7 +263,6 @@ public class DungeonService {
         return characterRepository.findByChildId(childId).orElseGet(() -> {
             DungeonCharacter c = new DungeonCharacter();
             c.setChildId(childId);
-            c.setChild(childRepository.getReferenceById(childId));
             return characterRepository.save(c);
         });
     }

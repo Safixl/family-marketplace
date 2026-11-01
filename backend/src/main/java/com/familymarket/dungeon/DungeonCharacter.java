@@ -1,13 +1,8 @@
 package com.familymarket.dungeon;
 
-import com.familymarket.child.Child;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.MapsId;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import lombok.Getter;
@@ -17,7 +12,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 
 /**
- * Персонаж-авантюрист (один на ребёнка).
+ * Персонаж-авантюрист (один на ребёнка). PK = child_id (один персонаж на ребёнка).
  * status: LOCKED (обучение) / FREE (свободен) / IN_DUNGEON (в походе) / RESTING (отдых в данже).
  */
 @Entity
@@ -29,11 +24,6 @@ public class DungeonCharacter {
     @Id
     @Column(name = "child_id")
     private Long childId;
-
-    @OneToOne(fetch = FetchType.LAZY)
-    @MapsId
-    @JoinColumn(name = "child_id")
-    private Child child;
 
     /** WARRIOR / MAGE / ARCHER (null — класс ещё не выбран). */
     @Column(name = "class", length = 16)
