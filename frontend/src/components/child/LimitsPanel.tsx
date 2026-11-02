@@ -30,6 +30,7 @@ export default function LimitsPanel() {
   const [state, setState] = useState<LimitStateDto | null>(null);
   const [pocketAmount, setPocketAmount] = useState('');
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const tickRef = useRef<number | null>(null);
   /** Типы, для которых уже отправлен серверный stop при исчерпании лимита. */
   const stopRef = useRef<Set<string>>(new Set());
@@ -41,8 +42,9 @@ export default function LimitsPanel() {
       const next = await api.get<LimitStateDto>('/child/limits');
       stopRef.current = new Set();
       setState(next);
+      setError(null);
     } catch (e) {
-      alert(errMsg(e));
+      setError(errMsg(e));
     }
     // Выносливость героя (рядом с карманными деньгами); тихо игнорируем ошибки
     try {
@@ -89,28 +91,30 @@ export default function LimitsPanel() {
 
   const toggle = async (limit: LimitTypeState) => {
     setBusy(true);
+    setError(null);
     try {
       await api.post(`/child/limits/${limit.type}/${limit.running ? 'stop' : 'start'}`);
-      await load();
     } catch (e) {
-      alert(errMsg(e));
+      setError(errMsg(e));
     } finally {
+      // Состояние перезагружаем всегда: даже после ошибки панель показывает актуальное
+      await load();
       setBusy(false);
     }
   };
 
   const requestPocket = async (amount: number) => {
     if (!amount || amount <= 0) {
-      alert('Укажите сумму в рублях');
+      setError('Укажите сумму в рублях');
       return;
     }
     setBusy(true);
+    setError(null);
     try {
       await api.post('/child/pocket/request', { amount });
       setPocketAmount('');
-      alert('Запрос отправлен родителю');
     } catch (e) {
-      alert(errMsg(e));
+      setError(errMsg(e));
     } finally {
       setBusy(false);
     }
@@ -123,6 +127,11 @@ export default function LimitsPanel() {
 
   return (
     <div className="space-y-3">
+      {error && (
+        <div className="rounded-lg border border-rose-500/40 bg-rose-500/15 px-3 py-2 text-xs text-rose-200">
+          {error}
+        </div>
+      )}
       {state.limits.map((l) => {
         const meta = LIMIT_META[l.type] ?? { label: l.type, emoji: '⏱' };
         return (
