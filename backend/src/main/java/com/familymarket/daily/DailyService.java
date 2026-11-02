@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import com.familymarket.daily.DailiesDay;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -144,7 +145,7 @@ public class DailyService {
     public DailyStateDto state(Long childId) {
         Child child = childRepository.findById(childId)
                 .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
-        LocalDate today = LocalDate.now();
+        LocalDate today = DailiesDay.current();
         Long parentId = child.getParent().getId();
         int age = child.getAge() == null ? 7 : child.getAge();
 
@@ -164,7 +165,7 @@ public class DailyService {
     @Transactional
     public DailySkillDto answerLogic(Long childId, DailyAnswerRequest request) {
         Child child = getChild(childId);
-        LocalDate today = LocalDate.now();
+        LocalDate today = DailiesDay.current();
         Store store = storeFor(child, "LOGIC");
         if (store == null) {
             throw new BadRequestException("Магазин логики не настроен");
@@ -192,7 +193,7 @@ public class DailyService {
     @Transactional
     public DailySkillDto learnLang(Long childId, LangLearnRequest request) {
         Child child = getChild(childId);
-        LocalDate today = LocalDate.now();
+        LocalDate today = DailiesDay.current();
         Store store = storeFor(child, "LANG");
         if (store == null) {
             throw new BadRequestException("Магазин языка не настроен");
@@ -220,7 +221,7 @@ public class DailyService {
     @Transactional
     public DailySkillDto logSport(Long childId, SportLogRequest request) {
         Child child = getChild(childId);
-        LocalDate today = LocalDate.now();
+        LocalDate today = DailiesDay.current();
         Store store = storeFor(child, "SPORT");
         if (store == null) {
             throw new BadRequestException("Магазин спорта не настроен");
@@ -245,7 +246,7 @@ public class DailyService {
     @Transactional
     public DailySkillDto answerMath(Long childId, DailyAnswerRequest request) {
         Child child = getChild(childId);
-        LocalDate today = LocalDate.now();
+        LocalDate today = DailiesDay.current();
         Store store = storeFor(child, "MATH");
         if (store == null) {
             throw new BadRequestException("Магазин математики не настроен");
@@ -422,7 +423,7 @@ public class DailyService {
         if (store == null || settings == null) {
             return;
         }
-        LocalDate today = LocalDate.now();
+        LocalDate today = DailiesDay.current();
         if (pagesToday < settings.getPagesTarget()) {
             return;
         }
@@ -476,7 +477,7 @@ public class DailyService {
         if (store == null) {
             return;
         }
-        LocalDate today = LocalDate.now();
+        LocalDate today = DailiesDay.current();
         DailyLog log = dailyLogRepository.findByChildIdAndSkillAndDay(childId, "HOUSE", today)
                 .orElseGet(() -> {
                     DailyLog created = new DailyLog();

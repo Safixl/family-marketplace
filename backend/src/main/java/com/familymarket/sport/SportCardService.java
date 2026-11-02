@@ -456,6 +456,6 @@ public class SportCardService {
     }
 
     private static LocalDate todayDate() {
-        return LocalDate.now(ZoneId.of("Europe/Moscow"));
+        return com.familymarket.daily.DailiesDay.current();
     }
 }
