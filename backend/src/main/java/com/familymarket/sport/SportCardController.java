@@ -61,9 +61,7 @@ public class SportCardController {
 
     @GetMapping("/api/child/sport-requests")
     public List<SportRequestDto> childRequests() {
-        return service.childRequests(CurrentUser.childId()).stream()
-                .map(SportRequestDto::of)
-                .toList();
+        return service.childRequests(CurrentUser.childId());
     }
 
     public record SportGenerateRequest(Long directionId) {
@@ -73,9 +71,7 @@ public class SportCardController {
 
     @GetMapping("/api/parent/sport-requests")
     public List<SportRequestDto> parentRequests() {
-        return service.parentRequests(CurrentUser.parentId()).stream()
-                .map(SportRequestDto::of)
-                .toList();
+        return service.parentRequests(CurrentUser.parentId());
     }
 
     @PostMapping("/api/parent/sport-directions")

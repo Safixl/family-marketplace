@@ -10,6 +10,7 @@ import com.familymarket.daily.DailyLog;
 import com.familymarket.daily.DailyLogRepository;
 import com.familymarket.dto.SportCardDto;
 import com.familymarket.dto.SportCardReviewDto;
+import com.familymarket.dto.SportRequestDto;
 import com.familymarket.dto.SportDirectionDto;
 import com.familymarket.store.Store;
 import com.familymarket.store.StoreRepository;
@@ -226,8 +227,10 @@ public class SportCardService {
     }
 
     @Transactional(readOnly = true)
-    public List<SportRequest> parentRequests(Long parentId) {
-        return requestRepository.findPendingByParent(parentId);
+    public List<SportRequestDto> parentRequests(Long parentId) {
+        return requestRepository.findPendingByParent(parentId).stream()
+                .map(SportRequestDto::of)
+                .toList();
     }
 
     @Transactional
@@ -242,8 +245,11 @@ public class SportCardService {
     }
 
     @Transactional(readOnly = true)
-    public List<SportRequest> childRequests(Long childId) {
-        return requestRepository.findByChildIdOrderByCreatedAtDesc(childId);
+    public List<SportRequestDto> childRequests(Long childId) {
+        // Маппим внутри транзакции: ленивый прокси ребёнка недоступен после её закрытия
+        return requestRepository.findByChildIdOrderByCreatedAtDesc(childId).stream()
+                .map(SportRequestDto::of)
+                .toList();
     }
 
     // ---------- Дейлик-карточка ----------

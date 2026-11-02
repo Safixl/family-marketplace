@@ -20,16 +20,17 @@ export default function SportCardView({ onDone }: { onDone?: () => void }) {
   const [reqComment, setReqComment] = useState('');
 
   const load = useCallback(async () => {
+    // Направления и запросы грузим независимо: ошибка истории запросов
+    // не должна прятать дейлик по физкультуре
     try {
-      const [d, r] = await Promise.all([
-        api.get<SportDayDto>('/child/sport-day'),
-        api.get<SportRequestDto[]>('/child/sport-requests'),
-      ]);
-      setDay(d);
-      setRequests(r);
+      setDay(await api.get<SportDayDto>('/child/sport-day'));
     } catch (e) {
       alert(errMsg(e));
       setDay({ directions: [], card: null });
+    }
+    try {
+      setRequests(await api.get<SportRequestDto[]>('/child/sport-requests'));
+    } catch {
       setRequests([]);
     }
   }, []);
