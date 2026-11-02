@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -83,9 +84,34 @@ public class DungeonService {
             character.setStatus("FREE");
         }
 
+        // ----- Ленивый таймлайн: события «проявляются» по мере наступления времени -----
+        List<DungeonEngine.LogEntry> entries = session == null ? List.of() : DungeonEngine.parseLog(session);
+        boolean timelineDone = timelineFinished(entries);
+
+        if (session != null && timelineDone) {
+            // Финал наступил: выдаём награду/рекорд, если ещё не выданы
+            claimOutcome(childId, session, character);
+            // Продолжение похода после отдыха — когда журнал доигран и настал новый день
+            if ("RESTING".equals(session.getStatus()) && session.getResumeDay() != null
+                    && !session.getResumeDay().isAfter(DungeonEngine.currentLimitDay())) {
+                resumeResting(character, DungeonEngine.currentLimitDay());
+                session = sessionRepository.findFirstByChildIdOrderByStartedAtDesc(childId).orElse(null);
+                entries = session == null ? List.of() : DungeonEngine.parseLog(session);
+                timelineDone = timelineFinished(entries);
+            }
+        }
+
+        String statusOverride = null;
+        Integer staminaOverride = null;
+        if (session != null && !timelineDone) {
+            // Поход ещё «идёт» в журнале: герой в данже, выносливость тратится постепенно
+            statusOverride = "IN_DUNGEON";
+            staminaOverride = lazyStamina(entries, character.getStamina());
+        }
+
         DungeonDtos.SessionDto sessionDto = session == null ? null : toSessionDto(session);
         return new DungeonDtos.DungeonStateDto(
-                toCharacterDto(character),
+                toCharacterDto(character, statusOverride, staminaOverride),
                 new DungeonDtos.UnlockDto(unlocked, DungeonCatalog.rankName(readingIdx)),
                 sessionDto,
                 equipment(childId));
@@ -119,6 +145,14 @@ public class DungeonService {
         refreshCharacter(character);
         if (!"FREE".equals(character.getStatus())) {
             throw new BadRequestException("Герой сейчас не может отправиться в поход");
+        }
+        // Нельзя начать новый поход, пока журнал предыдущего не доигран
+        DungeonSession previous = sessionRepository.findFirstByChildIdOrderByStartedAtDesc(childId).orElse(null);
+        if (previous != null && !timelineFinished(DungeonEngine.parseLog(previous))) {
+            throw new BadRequestException("Предыдущий поход ещё не завершён — следи за журналом приключений");
+        }
+        if (previous != null) {
+            claimOutcome(childId, previous, character);
         }
         if (character.getCharacterClass() == null) {
             throw new BadRequestException("Сначала зарегистрируйся в Таверне и выбери класс");
@@ -168,7 +202,7 @@ public class DungeonService {
                 () -> pickLoot(dungeon.tier()));
         engine.simulate(session, character, ctx, loot, false);
         persistLoot(childId, loot);
-        applyOutcome(childId, session, character);
+        // Награда за зачистку выдаётся позже — когда таймлайн журнала доиграет финал
 
         sessionRepository.save(session);
         characterRepository.save(character);
@@ -200,6 +234,9 @@ public class DungeonService {
         if (session == null || !limitDay.equals(session.getResumeDay())) {
             return;
         }
+        if (!timelineFinished(DungeonEngine.parseLog(session))) {
+            return; // таймлайн ещё играется — герой продолжает путь позже
+        }
         Map<String, Integer> levels = skillLevels(character.getChildId());
         // Данж восстанавливается детерминированно (та же тема/босс, что и при старте)
         DungeonCatalog.DungeonDef dungeon = DungeonCatalog.generateDungeon(
@@ -217,7 +254,7 @@ public class DungeonService {
                 () -> pickLoot(dungeon.tier()));
         engine.simulate(session, character, ctx, loot, true);
         persistLoot(character.getChildId(), loot);
-        applyOutcome(character.getChildId(), session, character);
+        // Награда выдаётся позже — когда доиграет продолжение таймлайна
         sessionRepository.save(session);
         characterRepository.save(character);
     }
@@ -356,13 +393,19 @@ public class DungeonService {
         });
     }
 
-    /** Выдача награды за зачистку: монеты в магазин «Дом» (или первый активный магазин семьи). */
-    private void applyOutcome(Long childId, DungeonSession session, DungeonCharacter character) {
-        if (!"WON".equals(session.getStatus())) {
-            return;
+    /**
+     * Выдача награды за зачистку (после того как таймлайн журнала доиграл финал):
+     * монеты в магазин «Дом» (или первый активный магазин семьи) + рекорд ранга.
+     */
+    private void claimOutcome(Long childId, DungeonSession session, DungeonCharacter character) {
+        if (session.isRewardClaimed() || !"WON".equals(session.getStatus())) {
+            return; // поражение/отдых награды не дают
         }
+        session.setRewardClaimed(true);
+        sessionRepository.save(session);
         character.setVictories(character.getVictories() + 1);
         onDungeonClear(character, session.getRank());
+        characterRepository.save(character);
         Long parentId = childRepository.findParentIdById(childId).orElse(null);
         if (parentId == null || session.getRewardCoins().signum() <= 0) {
             return;
@@ -374,6 +417,40 @@ public class DungeonService {
         if (store != null) {
             balanceService.credit(childId, store.getId(), session.getRewardCoins());
         }
+    }
+
+    /** Таймлайн доигран: время последнего события уже наступило. */
+    private boolean timelineFinished(List<DungeonEngine.LogEntry> entries) {
+        if (entries.isEmpty()) {
+            return true;
+        }
+        try {
+            return !Instant.parse(entries.get(entries.size() - 1).at()).isAfter(Instant.now());
+        } catch (Exception e) {
+            return true;
+        }
+    }
+
+    /**
+     * Выносливость «на сейчас»: остаток по последнему наступившему событию лога
+     * (записи без stamina — старый формат — игнорируются).
+     */
+    private int lazyStamina(List<DungeonEngine.LogEntry> entries, int fallback) {
+        Instant now = Instant.now();
+        int stamina = -1;
+        for (DungeonEngine.LogEntry e : entries) {
+            try {
+                if (Instant.parse(e.at()).isAfter(now)) {
+                    break;
+                }
+            } catch (Exception ex) {
+                continue;
+            }
+            if (e.stamina() > 0) {
+                stamina = e.stamina();
+            }
+        }
+        return stamina >= 0 ? stamina : fallback;
     }
 
     /**
@@ -393,11 +470,11 @@ public class DungeonService {
         return session.getId();
     }
 
-    private DungeonDtos.CharacterDto toCharacterDto(DungeonCharacter character) {
+    private DungeonDtos.CharacterDto toCharacterDto(DungeonCharacter character, String statusOverride, Integer staminaOverride) {
         return new DungeonDtos.CharacterDto(
                 character.getCharacterClass(),
-                character.getStatus(),
-                character.getStamina(),
+                statusOverride != null ? statusOverride : character.getStatus(),
+                staminaOverride != null ? staminaOverride : character.getStamina(),
                 100 + character.getMaxStaminaBonus(),
                 character.getVictories(),
                 character.getMaxClearedRank());
@@ -405,6 +482,8 @@ public class DungeonService {
 
     private DungeonDtos.SessionDto toSessionDto(DungeonSession session) {
         List<DungeonEngine.LogEntry> entries = DungeonEngine.parseLog(session);
+        // Пока таймлайн не доигран — сессия для игрока всё ещё «идёт»
+        String effectiveStatus = timelineFinished(entries) ? session.getStatus() : "ACTIVE";
         return new DungeonDtos.SessionDto(
                 session.getId(),
                 session.getDungeonCode(),
@@ -412,13 +491,13 @@ public class DungeonService {
                 session.getMonsterLevel(),
                 session.getDungeonName() != null ? session.getDungeonName() : session.getDungeonCode(),
                 session.getDungeonEmoji() != null ? session.getDungeonEmoji() : "🗺️",
-                session.getStatus(),
+                effectiveStatus,
                 session.getCurrentRoom(),
                 session.getRoomsTotal(),
                 session.getRewardCoins(),
                 entries.stream()
                         .sorted(Comparator.comparing(DungeonEngine.LogEntry::at))
-                        .map(e -> new DungeonDtos.LogEntryDto(e.at(), e.icon(), e.text()))
+                        .map(e -> new DungeonDtos.LogEntryDto(e.at(), e.icon(), e.text(), e.stamina()))
                         .toList());
     }
 

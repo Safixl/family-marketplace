@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BedDouble, Dices, Hammer, Lock, ScrollText, Swords } from 'lucide-react';
+import { BedDouble, Dices, Lock, ScrollText, Swords } from 'lucide-react';
 import { api } from '../../../api/client';
-import { DungeonEquipmentDto, DungeonStateDto } from '../../../api/types';
+import { DungeonStateDto } from '../../../api/types';
 import { errMsg } from '../../../lib/format';
 import { Spinner } from '../../ui';
 
@@ -9,20 +9,6 @@ const CLASS_META: Record<string, { label: string; emoji: string; hint: string }>
   WARRIOR: { label: 'Воин', emoji: '⚔️', hint: 'Мощь в открытом бою (+15% к атаке)' },
   MAGE: { label: 'Маг', emoji: '🪄', hint: 'Острый ум: +5% к проверкам Логики и Языка' },
   ARCHER: { label: 'Лучник', emoji: '🏹', hint: 'Меткость и скорость (+10% к атаке)' },
-};
-
-const SLOT_LABEL: Record<string, string> = {
-  WEAPON: 'Оружие',
-  ARMOR: 'Броня',
-  TRINKET: 'Аксессуар',
-};
-
-const RARITY_CLASS: Record<string, string> = {
-  COMMON: 'text-stone-300 border-stone-500/40',
-  UNCOMMON: 'text-emerald-300 border-emerald-500/40',
-  RARE: 'text-sky-300 border-sky-500/40',
-  EPIC: 'text-fuchsia-300 border-fuchsia-500/40',
-  LEGENDARY: 'text-amber-300 border-amber-500/40',
 };
 
 /** Цветовые маркеры рангов подземелий: F серый → S золотой. */
@@ -337,13 +323,11 @@ export default function AdventureLog() {
               </button>
             )}
           </div>
-          <EquipmentPanel equipment={state.equipment} busy={busy} onIdentify={(id) => act(() => api.post(`/child/dungeon/equipment/${id}/identify`))} onEquip={(id) => act(() => api.post(`/child/dungeon/equipment/${id}/equip`))} />
+          {/* Трофеи из похода надеваются в Гардеробе («Мой герой») */}
+          <p className="rounded-xl border border-amber-500/20 bg-stone-900/60 px-4 py-2 text-xs text-stone-400">
+            🎒 Найденные в походах вещи надеваются в <span className="text-amber-300">Гардеробе</span> — открой «Мой герой» слева сверху.
+          </p>
         </div>
-      )}
-
-      {/* Снаряжение доступно и в походе (только просмотр) */}
-      {character.status !== 'FREE' && state.equipment.length > 0 && (
-        <EquipmentPanel equipment={state.equipment} busy={busy} onIdentify={() => {}} onEquip={() => {}} readOnly />
       )}
     </div>
   );
@@ -363,97 +347,3 @@ function UnlockRow({ label, rank, ok }: { label: string; rank: string; ok: boole
     </div>
   );
 }
-
-interface EquipmentPanelProps {
-  equipment: DungeonEquipmentDto[];
-  busy: boolean;
-  onIdentify: (id: number) => void;
-  onEquip: (id: number) => void;
-  readOnly?: boolean;
-}
-
-function EquipmentPanel({ equipment, busy, onIdentify, onEquip, readOnly = false }: EquipmentPanelProps) {
-  const known = equipment.filter((e) => e.identified);
-  const unknown = equipment.filter((e) => !e.identified);
-  return (
-    <div>
-      <div className="mb-2 flex items-center gap-2 text-sm font-bold text-amber-200">
-        <Hammer size={15} /> Снаряжение героя
-        <span className="text-xs font-normal text-stone-400">
-          (без экипировки атака ×0.1; с вещами — сумма статов)
-        </span>
-      </div>
-      {equipment.length === 0 ? (
-        <p className="rounded-xl border border-stone-600/40 bg-stone-900/60 px-4 py-3 text-sm text-stone-400">
-          Рюкзак пуст. Снаряжение выпадает из сундуков и боссов в подземельях!
-        </p>
-      ) : (
-        <div className="grid gap-2 sm:grid-cols-2">
-          {unknown.map((item) => (
-            <div
-              key={item.id}
-              className="flex items-center gap-3 rounded-xl border border-stone-600/40 bg-stone-900/60 p-3"
-            >
-              <span className="text-2xl opacity-60">❔</span>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-stone-300">Нераспознанная вещь</div>
-                <div className="text-xs text-stone-500">Мудрец определит, что это</div>
-              </div>
-              {!readOnly && (
-                <button
-                  className="rpg-btn rpg-btn-ghost !px-3 !py-1.5 text-xs"
-                  disabled={busy}
-                  onClick={() => onIdentify(item.id)}
-                >
-                  Определить
-                </button>
-              )}
-            </div>
-          ))}
-          {known.map((item) => (
-            <EquipmentCard key={item.id} item={item} busy={busy} onEquip={onEquip} readOnly={readOnly} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function EquipmentCard({
-  item,
-  busy,
-  onEquip,
-  readOnly,
-}: {
-  item: DungeonEquipmentDto;
-  busy: boolean;
-  onEquip: (id: number) => void;
-  readOnly: boolean;
-}) {
-  return (
-    <div
-      className={`flex items-center gap-3 rounded-xl border bg-stone-900/60 p-3 ${RARITY_CLASS[item.rarity] ?? 'border-stone-600/40 text-stone-300'}`}
-    >
-      <span className="text-2xl">{item.icon}</span>
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-semibold">
-          {item.name}
-          {item.equipped && <span className="ml-2 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] text-emerald-300">надето</span>}
-        </div>
-        <div className="text-xs opacity-80">
-          {SLOT_LABEL[item.slot] ?? item.slot} · ×{item.statMultiplier.toFixed(1)} к атаке
-        </div>
-      </div>
-      {!readOnly && (
-        <button
-          className="rpg-btn rpg-btn-ghost !px-3 !py-1.5 text-xs"
-          disabled={busy}
-          onClick={() => onEquip(item.id)}
-        >
-          {item.equipped ? 'Снять' : 'Надеть'}
-        </button>
-      )}
-    </div>
-  );
-}
-

@@ -1097,6 +1097,8 @@ ALTER TABLE dungeon_sessions ADD COLUMN IF NOT EXISTS monster_level INT NOT NULL
 -- Тема сгенерированного данжа (название и эмодзи выбираются случайно)
 ALTER TABLE dungeon_sessions ADD COLUMN IF NOT EXISTS dungeon_name VARCHAR(150);
 ALTER TABLE dungeon_sessions ADD COLUMN IF NOT EXISTS dungeon_emoji VARCHAR(8);
+-- Награда выдана после проигрывания таймлайна похода
+ALTER TABLE dungeon_sessions ADD COLUMN IF NOT EXISTS reward_claimed BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- Сид каталога экипировки (идемпотентно)
 INSERT INTO equipment_defs (code, name, slot, rarity, stat_multiplier, icon, description) VALUES
@@ -1120,4 +1122,43 @@ INSERT INTO equipment_defs (code, name, slot, rarity, stat_multiplier, icon, des
     ('shadow_cloak',    'Плащ теней',           'TRINKET', 'EPIC',      2.3, '🌑', 'Растворяется в полумраке'),
     ('champion_medal',  'Медаль чемпиона',      'TRINKET', 'LEGENDARY', 3.0, '🏅', 'Сияет в памяти таверны'),
     ('speed_boots',     'Сапоги-скороходы',     'TRINKET', 'UNCOMMON',  1.5, '🥾', 'Пыль летит из-под пят')
+ON CONFLICT (code) DO NOTHING;
+
+-- ============================================================
+-- Классические ячейки экипировки:
+-- HEAD (голова) / BODY (тело) / LEGS (ноги) / GLOVES (перчатки) /
+-- BOOTS (ботинки) / HAND_R (правая рука) / HAND_L (левая рука)
+-- ============================================================
+
+-- Миграция слотов старого каталога под новые ячейки (идемпотентно)
+UPDATE equipment_defs SET slot = 'HAND_R' WHERE code IN ('rusty_sword','iron_sword','oak_bow','apprentice_wand','steel_spear','flame_blade','storm_bow','frost_staff','dragonfang_blade');
+UPDATE equipment_defs SET slot = 'BODY', name = 'Кожаный доспех', icon = '🎽' WHERE code = 'leather_armor';
+UPDATE equipment_defs SET slot = 'BODY' WHERE code IN ('chain_mail','mage_robe','dragon_scale');
+UPDATE equipment_defs SET slot = 'HAND_L' WHERE code = 'iron_shield';
+UPDATE equipment_defs SET slot = 'GLOVES', name = 'Счастливые перчатки', icon = '🧤' WHERE code = 'lucky_charm';
+UPDATE equipment_defs SET slot = 'HAND_L', name = 'Кольцо странника' WHERE code = 'traveler_ring';
+UPDATE equipment_defs SET slot = 'HEAD', name = 'Венец мудреца', icon = '👑' WHERE code = 'sages_pendant';
+UPDATE equipment_defs SET slot = 'BODY', name = 'Плащ теней', icon = '🧥' WHERE code = 'shadow_cloak';
+UPDATE equipment_defs SET slot = 'HEAD', name = 'Медаль чемпиона', icon = '🏅' WHERE code = 'champion_medal';
+UPDATE equipment_defs SET slot = 'BOOTS' WHERE code = 'speed_boots';
+
+-- Дополнительные предметы по ячейкам (идемпотентно)
+INSERT INTO equipment_defs (code, name, slot, rarity, stat_multiplier, icon, description) VALUES
+    ('cloth_hood',      'Тканевый капюшон',       'HEAD',   'COMMON',    1.0, '🧢', 'Простая защита от сквозняков'),
+    ('iron_helm',       'Железный шлем',          'HEAD',   'UNCOMMON',  1.4, '⛑️', 'Плотно сидит на голове'),
+    ('wizard_hat',      'Шляпа волшебника',       'HEAD',   'RARE',      1.8, '🎩', 'Из неё сыплются искры'),
+    ('dragon_crown',    'Корона Драконьего Пика', 'HEAD',   'EPIC',      2.4, '👑', 'Тяжела как сама гора'),
+    ('padded_vest',     'Стёганая куртка',        'BODY',   'COMMON',    1.0, '👕', 'Мягкая и тёплая'),
+    ('night_woven',     'Ткань ночных ткачей',    'BODY',   'RARE',      1.9, '🧥', 'Сшита из лунного света'),
+    ('wool_leggings',   'Шерстяные штаны',        'LEGS',   'COMMON',    1.0, '👖', 'Не жмут при беге'),
+    ('ranger_leggings', 'Штаны следопыта',        'LEGS',   'UNCOMMON',  1.4, '👖', 'Прочные и тихие'),
+    ('star_leggings',   'Штаны Звёздного Патруля','LEGS',   'RARE',      1.8, '✨', 'Светятся в темноте'),
+    ('canvas_gloves',   'Парусиновые рукавицы',   'GLOVES', 'COMMON',    1.0, '🧤', 'Всё держат крепко'),
+    ('gauntlets',       'Латные перчатки',        'GLOVES', 'RARE',      1.9, '🥊', 'Пальцы не согнуть'),
+    ('worn_sandals',    'Поношенные сандалии',    'BOOTS',  'COMMON',    1.0, '👟', 'Зато свои'),
+    ('tracker_boots',   'Сапоги следопыта',       'BOOTS',  'RARE',      1.8, '🥾', 'Следы сами затираются'),
+    ('buckler',         'Малый баклер',           'HAND_L', 'COMMON',    1.1, '🛡️', 'Лёгкий, но ловкий'),
+    ('towershield',     'Башенный щит',           'HAND_L', 'EPIC',      2.5, '🛡️', 'За ним как за стеной'),
+    ('spell_tome',      'Гримуар заклинаний',     'HAND_L', 'RARE',      1.9, '📕', 'Шепчет слова силы'),
+    ('parry_dagger',    'Кинжал для левой руки',  'HAND_L', 'UNCOMMON',  1.5, '🗡️', 'Отвечает на удары')
 ON CONFLICT (code) DO NOTHING;

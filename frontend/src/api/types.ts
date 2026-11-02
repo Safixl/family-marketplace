@@ -1120,7 +1120,7 @@ export interface DungeonEquipmentDto {
   id: number;
   code: string;
   name: string;
-  slot: 'WEAPON' | 'ARMOR' | 'TRINKET';
+  slot: string;
   rarity: string;
   statMultiplier: number;
   icon: string;

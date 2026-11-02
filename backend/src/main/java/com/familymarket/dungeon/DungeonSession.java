@@ -79,6 +79,10 @@ public class DungeonSession {
     @Column(name = "reward_coins", nullable = false, precision = 12, scale = 2)
     private BigDecimal rewardCoins = BigDecimal.ZERO;
 
+    /** Награда (монеты/победа) уже выдана герою — после того как таймлайн доигран. */
+    @Column(name = "reward_claimed", nullable = false)
+    private boolean rewardClaimed = false;
+
     @Column(name = "started_at", nullable = false)
     private Instant startedAt = Instant.now();
 

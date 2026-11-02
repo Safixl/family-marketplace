@@ -31,7 +31,8 @@ public final class DungeonDtos {
             String readingRank) {
     }
 
-    public record LogEntryDto(String at, String icon, String text) {
+    /** Событие таймлайна: stamina — остаток выносливости героя после события. */
+    public record LogEntryDto(String at, String icon, String text, int stamina) {
     }
 
     public record SessionDto(

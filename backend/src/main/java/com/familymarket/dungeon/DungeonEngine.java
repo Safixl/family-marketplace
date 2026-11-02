@@ -36,7 +36,12 @@ public class DungeonEngine {
             Supplier<EquipmentDef> lootPicker) {
     }
 
-    public record LogEntry(String at, String icon, String text) {
+    /**
+     * Событие таймлайна. stamina — остаток выносливости героя ПОСЛЕ этого события:
+     * фронтенд «проявляет» записи по мере наступления времени, и выносливость
+     * тратится постепенно, вместе с журналом.
+     */
+    public record LogEntry(String at, String icon, String text, int stamina) {
     }
 
     public enum Outcome {WON, LOST, RESTING}
@@ -79,7 +84,12 @@ public class DungeonEngine {
         }
 
         void log(String icon, String text) {
-            log.add(new LogEntry(clock.toString(), icon, text));
+            log.add(new LogEntry(clock.toString(), icon, text, stamina));
+        }
+
+        /** Последний таймстамп лога (момент финала похода). */
+        Instant lastAt() {
+            return log.isEmpty() ? Instant.EPOCH : Instant.parse(log.get(log.size() - 1).at());
         }
 
         boolean roll(int chancePercent) {
