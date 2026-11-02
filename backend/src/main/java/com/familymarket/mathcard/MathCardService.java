@@ -173,8 +173,8 @@ public class MathCardService {
         expireOverdue(childId);
 
         LocalDate today = todayDate();
-        long doneToday = cardRepository.countByChildIdAndCardDateAndStatusIn(
-                childId, today, List.of("SUCCESS", "FAILED"));
+        // Лимит по ВСЕМ карточкам дня (включая незавершённые): нельзя перегенерировать
+        long doneToday = cardRepository.countByChildIdAndCardDate(childId, today);
         if (doneToday >= DAILY_LIMIT) {
             throw new BadRequestException("Лимит карточек на день исчерпан (3). Новые появятся завтра в 9:00");
         }
