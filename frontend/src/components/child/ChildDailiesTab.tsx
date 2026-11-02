@@ -100,7 +100,7 @@ function DailySkillCard({ skill }: { skill: DailySkillDto }) {
             </span>
           )}
           <span className="rpg-badge border border-amber-500/30 bg-amber-500/15 text-amber-300">
-            {skill.currencyIcon} {skill.pointsEarned}/{skill.pointsTarget}
+            ✅ {skill.tasksDone ?? 0}/{skill.tasksTotal ?? 0}
           </span>
         </div>
       </div>
