@@ -652,6 +652,9 @@ export interface DailySkillDto {
   stepsLogged: number;
   pointsEarned: number;
   pointsTarget: number;
+  /** Выполненные задания дня (карточки: до 3; спорт/чтение/дом: 1). */
+  tasksDone: number;
+  tasksTotal: number;
   fullClear: boolean;
   completed: boolean;
 }

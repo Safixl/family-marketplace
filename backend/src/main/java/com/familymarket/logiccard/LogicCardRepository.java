@@ -15,6 +15,8 @@ public interface LogicCardRepository extends JpaRepository<LogicCard, Long> {
 
     List<LogicCard> findByChildIdAndCardDateOrderByCreatedAtDesc(Long childId, LocalDate cardDate);
 
+    long countByChildIdAndCardDate(Long childId, LocalDate cardDate);
+
     List<LogicCard> findByChildIdAndCardDateAndStatus(Long childId, LocalDate cardDate, String status);
 
     /** Сколько карточек дня уже завершено (SUCCESS/FAILED) — лимит 3. */

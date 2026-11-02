@@ -41,13 +41,13 @@ export default function ChildDailiesTab() {
     );
   }
 
-  const totalEarned = state.skills.reduce((sum, s) => sum + s.pointsEarned, 0);
-  const totalTarget = state.skills.reduce((sum, s) => sum + s.pointsTarget, 0);
+  const totalDone = state.skills.reduce((sum, s) => sum + (s.tasksDone ?? 0), 0);
+  const totalTasks = state.skills.reduce((sum, s) => sum + (s.tasksTotal ?? 0), 0);
   const allDone = state.skills.every((s) => s.completed);
 
   return (
     <div className="space-y-6">
-      {/* Сводка дня */}
+      {/* Сводка дня: счётчик по заданиям (3 логика + 3 математика + 3 язык + спорт + чтение + дом) */}
       <section className="rpg-panel rpg-panel-gold p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="rpg-title flex items-center gap-2 text-xl">
@@ -60,12 +60,12 @@ export default function ChildDailiesTab() {
           )}
         </div>
         <p className="mt-1 text-sm text-stone-400">
-          {state.day} · заработано {totalEarned} из {totalTarget} баллов за день
+          {state.day} · выполнено {totalDone} из {totalTasks} заданий за день
         </p>
         <div className="mt-3 h-3 overflow-hidden rounded-full bg-stone-800">
           <div
             className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all"
-            style={{ width: `${totalTarget > 0 ? Math.min(100, (totalEarned / totalTarget) * 100) : 0}%` }}
+            style={{ width: `${totalTasks > 0 ? Math.min(100, (totalDone / totalTasks) * 100) : 0}%` }}
           />
         </div>
       </section>
