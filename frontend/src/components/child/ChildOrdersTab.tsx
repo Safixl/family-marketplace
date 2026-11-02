@@ -22,7 +22,7 @@ export default function ChildOrdersTab() {
     void load();
   }, [load]);
 
-  if (error) return <div className="card text-sm text-rose-600">{error}</div>;
+  if (error) return <div className="rounded-xl border border-rose-500/40 p-4 text-sm text-rose-300">{error}</div>;
 
   if (orders === null) return <Spinner label="Загружаем заказы…" />;
 

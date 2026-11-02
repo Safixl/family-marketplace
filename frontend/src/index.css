@@ -104,6 +104,39 @@
   --border: #e2e8f0;
 }
 
+/* Тёмные темы: светлые базовые компоненты (.card/.input) наследуют палитру темы,
+   чтобы не было «засветов» — белых ячеек с тёмным/жёлтым текстом */
+[data-theme='wow'] .card,
+[data-theme='space'] .card {
+  background: var(--card);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+[data-theme='wow'] .input,
+[data-theme='wow'] .label,
+[data-theme='space'] .input,
+[data-theme='space'] .label {
+  border-color: var(--border);
+  color: var(--text);
+}
+
+[data-theme='wow'] .input,
+[data-theme='space'] .input {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme='wow'] .input::placeholder,
+[data-theme='space'] .input::placeholder {
+  color: var(--muted);
+}
+
+[data-theme='wow'] .badge,
+[data-theme='space'] .badge {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
 /* Тёмное фэнтези в стиле World of Warcraft */
 [data-theme='wow'] {
   --bg: #14100c;

@@ -44,9 +44,9 @@ public class Child {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    /** Тема оформления детского интерфейса (rainbow, space, ocean, forest, sunset, minimal). */
+    /** Тема оформления детского интерфейса (wow/RPG — по умолчанию, rainbow, space, ocean, forest, sunset, minimal). */
     @Column(length = 32)
-    private String theme = "rainbow";
+    private String theme = "wow";
 
     /** JSON-массив виджетов главной страницы ребёнка. */
     @Column(name = "home_widgets", length = 500)

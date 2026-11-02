@@ -421,7 +421,10 @@ CREATE INDEX IF NOT EXISTS idx_daily_logs_child ON daily_logs (child_id);
 -- Миграция существующих таблиц (идемпотентно)
 -- Выполняется в конце скрипта, чтобы все таблицы уже существовали
 -- ============================================================
-ALTER TABLE children ADD COLUMN IF NOT EXISTS theme VARCHAR(32) NOT NULL DEFAULT 'rainbow';
+-- Тема по умолчанию — RPG («wow», тёмное фэнтези); существующим с дефолтной «rainbow» тоже включаем
+ALTER TABLE children ADD COLUMN IF NOT EXISTS theme VARCHAR(32) NOT NULL DEFAULT 'wow';
+ALTER TABLE children ALTER COLUMN theme SET DEFAULT 'wow';
+UPDATE children SET theme = 'wow' WHERE theme = 'rainbow';
 ALTER TABLE children ADD COLUMN IF NOT EXISTS home_widgets VARCHAR(500) NOT NULL DEFAULT '["balances","stats","achievements","orders"]';
 ALTER TABLE reading_books ADD COLUMN IF NOT EXISTS child_id BIGINT REFERENCES children (id) ON DELETE CASCADE;
 ALTER TABLE reading_logs ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'APPROVED';

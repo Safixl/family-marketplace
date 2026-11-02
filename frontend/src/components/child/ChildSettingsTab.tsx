@@ -84,7 +84,7 @@ export default function ChildSettingsTab({ profile, settings, onThemeChange, onW
                 <span className="flex-1 font-semibold">{widget.label}</span>
                 <span
                   className={`flex h-6 w-6 items-center justify-center rounded-full ${
-                    active ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-transparent'
+                    active ? 'bg-emerald-500 text-white' : 'bg-black/40 text-transparent'
                   }`}
                 >
                   <Check size={14} />

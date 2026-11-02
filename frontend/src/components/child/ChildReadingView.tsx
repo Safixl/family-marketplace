@@ -122,7 +122,7 @@ export default function ChildReadingView({ store }: Props) {
             {data.pagesToday} из {data.pagesTarget} страниц
           </span>
         </div>
-        <div className="h-3 overflow-hidden rounded-full bg-slate-200">
+        <div className="h-3 overflow-hidden rounded-full bg-black/30">
           <div
             className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all"
             style={{ width: `${data.pagesTarget > 0 ? Math.min(100, (data.pagesToday / data.pagesTarget) * 100) : 0}%` }}
@@ -145,7 +145,7 @@ export default function ChildReadingView({ store }: Props) {
               return (
                 <div key={book.id} className="theme-card rounded-xl border px-3 py-2">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black/30 text-stone-400">
                       <BookOpen size={16} />
                     </div>
                     <div className="min-w-0 flex-1">
