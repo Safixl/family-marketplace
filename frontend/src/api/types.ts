@@ -655,6 +655,9 @@ export interface DailySkillDto {
   /** Выполненные задания дня (карточки: до 3; спорт/чтение/дом: 1). */
   tasksDone: number;
   tasksTotal: number;
+  /** Из них зачтено положительно / отрицательно. */
+  tasksOk: number;
+  tasksFail: number;
   fullClear: boolean;
   completed: boolean;
 }

@@ -4,8 +4,11 @@ import java.util.List;
 
 /**
  * Состояние дейлика одного навыка.
- * pointsEarned/pointsTarget — баллы навыка, tasksDone/tasksTotal — число
- * выполненных заданий дня (карточки: до 3 в день; спорт/чтение/дом — 1 задание).
+ * pointsEarned/pointsTarget — баллы навыка.
+ * tasksDone/tasksTotal — число заданий дня (карточки: до 3; спорт/чтение/дом: 1).
+ * tasksOk/tasksFail — из них зачтено положительно / отрицательно:
+ *   все «+» → зелёная галочка, все «−» → красный крестик, смесь → жёлтый квадратик,
+ *   выполнено не всё → синий восклицательный знак.
  */
 public record DailySkillDto(
         String skill,
@@ -21,6 +24,8 @@ public record DailySkillDto(
         long pointsTarget,
         long tasksDone,
         long tasksTotal,
+        long tasksOk,
+        long tasksFail,
         boolean fullClear,
         boolean completed) {
 }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Check, CheckCircle2, Minus, Pencil, Plus } from 'lucide-react';
+import { dailiesStatus } from '../child/rpg/DailiesStatus';
+import { Check, Minus, Pencil, Plus } from 'lucide-react';
 import { api } from '../../api/client';
 import { OverviewChildDto, QuestDto, SkillId, SkillProgressDto } from '../../api/types';
 import { errMsg, fmtAmount } from '../../lib/format';
@@ -362,20 +363,24 @@ function ChildCard({
             )}
             {child.dailies.map((d) => {
               const meta = skillById(d.skill as SkillId);
+              const status = dailiesStatus(d);
+              const counterCls =
+                status.kind === 'done-ok'
+                  ? 'text-emerald-600'
+                  : status.kind === 'done-fail'
+                    ? 'text-rose-600'
+                    : status.kind === 'mixed'
+                      ? 'text-amber-600'
+                      : 'text-sky-600';
               return (
                 <div key={d.skill} className="flex items-center gap-2 text-sm">
                   <span className="w-6 shrink-0 text-center">{d.icon || meta?.icon}</span>
                   <span className="min-w-0 flex-1 truncate font-medium text-slate-600">{d.name}</span>
-                  <span className="text-xs text-slate-400">
-                    ✅ {d.tasksDone ?? 0}/{d.tasksTotal ?? 0}
-                  </span>
-                  {d.fullClear ? (
+                  <span className={`text-xs font-semibold ${counterCls}`}>{status.counter}</span>
+                  {d.fullClear && (
                     <span className="badge bg-indigo-50 text-indigo-700">Сделано на 100%</span>
-                  ) : d.completed ? (
-                    <CheckCircle2 size={16} className="shrink-0 text-emerald-500" />
-                  ) : (
-                    <span className="badge bg-slate-100 text-slate-400">не сделано</span>
                   )}
+                  {status.node}
                 </div>
               );
             })}

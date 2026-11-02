@@ -4,6 +4,7 @@ import { api } from '../../api/client';
 import { DailySkillDto, DailyStateDto } from '../../api/types';
 import { errMsg } from '../../lib/format';
 import { EmptyState, Spinner } from '../ui';
+import { dailiesStatus } from './rpg/DailiesStatus';
 import TaskCardsTab from './skills/tabs/TaskCardsTab';
 import LangCardView from './skills/tabs/LangCardView';
 import SportCardView from './skills/tabs/SportCardView';
@@ -80,6 +81,7 @@ export default function ChildDailiesTab() {
 // ---------- Карточка одного навыка ----------
 
 function DailySkillCard({ skill }: { skill: DailySkillDto }) {
+  const status = dailiesStatus(skill);
   const isLogic = skill.skill === 'LOGIC';
   const isMath = skill.skill === 'MATH';
   const isLang = skill.skill === 'LANG';
@@ -99,8 +101,18 @@ function DailySkillCard({ skill }: { skill: DailySkillDto }) {
               <CheckCircle2 size={12} /> Full Clear +2 XP
             </span>
           )}
-          <span className="rpg-badge border border-amber-500/30 bg-amber-500/15 text-amber-300">
-            ✅ {skill.tasksDone ?? 0}/{skill.tasksTotal ?? 0}
+          <span
+            className={`rpg-badge border text-xs ${
+              status.kind === 'done-ok'
+                ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
+                : status.kind === 'done-fail'
+                  ? 'border-rose-500/40 bg-rose-500/15 text-rose-300'
+                  : status.kind === 'mixed'
+                    ? 'border-amber-500/40 bg-amber-500/15 text-amber-300'
+                    : 'border-sky-500/40 bg-sky-500/15 text-sky-300'
+            }`}
+          >
+            {status.node} {status.counter}
           </span>
         </div>
       </div>

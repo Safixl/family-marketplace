@@ -313,9 +313,11 @@ public class DailyService {
         for (int i = 0; i < puzzles.size(); i++) {
             tasks.add(new DailyTaskDto(i, "logic", puzzles.get(i).question()));
         }
+        long ok = logicCardRepository.countByChildIdAndCardDateAndStatusIn(childId, day, List.of("SUCCESS"));
+        long fail = logicCardRepository.countByChildIdAndCardDateAndStatusIn(childId, day, List.of("FAILED"));
         return skill("LOGIC", "Логика", "🧩", store, tasks, List.of(), 0, 0,
                 payload.doneIndexes().size(), puzzles.size(), payload.doneIndexes().size() >= puzzles.size(),
-                logicCardRepository.countByChildIdAndCardDate(childId, day), 3);
+                ok + fail, 3, ok, fail);
     }
 
     private DailySkillDto langState(Long childId, Long parentId, int age, LocalDate day) {
@@ -330,9 +332,11 @@ public class DailyService {
             String[] parts = entry.split(":");
             cards.add(new LangWordDto(parts[0], parts[0], parts[1], payload.learned.contains(parts[0])));
         }
+        long ok = langCardRepository.countByChildIdAndCardDateAndStatusIn(childId, day, List.of("SUCCESS"));
+        long fail = langCardRepository.countByChildIdAndCardDateAndStatusIn(childId, day, List.of("FAILED"));
         return skill("LANG", "Иностранный язык", "🌍", store, List.of(), cards, 0, 0,
                 payload.learnedWords().size(), words.size(), payload.learnedWords().size() >= words.size(),
-                langCardRepository.countByChildIdAndCardDate(childId, day), 3);
+                ok + fail, 3, ok, fail);
     }
 
     private DailySkillDto sportState(Long childId, Long parentId, LocalDate day) {
@@ -342,11 +346,12 @@ public class DailyService {
         }
         Payload payload = loadPayload(childId, "SPORT", day);
         long points = sportPoints(payload.minutes, payload.steps);
-        boolean sportDone = sportCardRepository.findByChildIdAndCardDate(childId, day)
-                .map(c -> !"CREATED".equals(c.getStatus()))
-                .orElse(false);
+        String sportStatus = sportCardRepository.findByChildIdAndCardDate(childId, day)
+                .map(c -> c.getStatus()).orElse("NONE");
+        long ok = "SUCCESS".equals(sportStatus) ? 1 : 0;
+        long fail = "FAILED".equals(sportStatus) ? 1 : 0;
         return skill("SPORT", "Спорт и хобби", "⚽", store, List.of(), List.of(),
-                payload.minutes, payload.steps, points, 5, points >= 5, sportDone ? 1 : 0, 1);
+                payload.minutes, payload.steps, points, 5, points >= 5, ok + fail, 1, ok, fail);
     }
 
     private DailySkillDto mathState(Long childId, Long parentId, int age, LocalDate day) {
@@ -358,9 +363,11 @@ public class DailyService {
         int target = 3;
         Payload payload = loadPayload(childId, "MATH", day);
         int done = payload.doneIndexes().size();
+        long ok = mathCardRepository.countByChildIdAndCardDateAndStatusIn(childId, day, List.of("SUCCESS"));
+        long fail = mathCardRepository.countByChildIdAndCardDateAndStatusIn(childId, day, List.of("FAILED"));
         return skill("MATH", "Математика", "🧮", store, List.of(), List.of(), 0, 0,
                 done, target, done >= target,
-                mathCardRepository.countByChildIdAndCardDate(childId, day), 3);
+                ok + fail, 3, ok, fail);
     }
 
     // ---------- Чтение (страницы за день) ----------
@@ -375,7 +382,7 @@ public class DailyService {
         int pages = readingPageMarkRepository.findByChildIdAndDayOrderByCreatedAtAsc(childId, day).isEmpty()
                 ? 0 : pagesToday(childId, day);
         return skill("READING", "Чтение", "📚", store, List.of(), List.of(), 0, 0,
-                pages, target, pages >= target, pages >= target ? 1 : 0, 1);
+                pages, target, pages >= target, pages >= target ? 1 : 0, 1, pages >= target ? 1 : 0, 0);
     }
 
     /** Сумма дельт отметок страниц за день (дейлик чтения). */
@@ -449,11 +456,13 @@ public class DailyService {
         if (store == null) {
             return disabled("HOUSE");
         }
-        boolean done = houseDayRepository.findByStoreIdAndChildIdAndDay(store.getId(), childId, day)
-                .map(d -> d.getRoomScore() > 0 || d.getLivingScore() > 0)
-                .orElse(false);
+        var houseDay = houseDayRepository.findByStoreIdAndChildIdAndDay(store.getId(), childId, day).orElse(null);
+        boolean done = houseDay != null;
+        boolean positive = done && (houseDay.getRoomScore() > 0 || houseDay.getLivingScore() > 0);
+        long ok = positive ? 1 : 0;
+        long fail = done && !positive ? 1 : 0;
         return skill("HOUSE", "Порядок в комнате", "🏠", store, List.of(), List.of(), 0, 0,
-                done ? 1 : 0, 1, done, done ? 1 : 0, 1);
+                ok + fail, 1, done, ok + fail, 1, ok, fail);
     }
 
     /**
@@ -492,16 +501,16 @@ public class DailyService {
     private DailySkillDto skill(String skill, String name, String icon, Store store,
                                 List<DailyTaskDto> tasks, List<LangWordDto> words,
                                 long minutes, long steps, long earned, long target, boolean completed,
-                                long tasksDone, long tasksTotal) {
+                                long tasksDone, long tasksTotal, long tasksOk, long tasksFail) {
         return new DailySkillDto(skill, name, icon,
                 store.getCurrencyName(), store.getCurrencyIcon(),
                 tasks, words, minutes, steps, earned, target,
-                tasksDone, tasksTotal,
+                tasksDone, tasksTotal, tasksOk, tasksFail,
                 completed && target > 0, completed);
     }
 
     private DailySkillDto disabled(String skill) {
-        return new DailySkillDto(skill, "", "", null, null, List.of(), List.of(), 0, 0, 0, 0, 0, 0, false, true);
+        return new DailySkillDto(skill, "", "", null, null, List.of(), List.of(), 0, 0, 0, 0, 0, 0, 0, 0, false, true);
     }
 
     // ---------- Генерация (детерминированная на день) ----------
