@@ -2,6 +2,7 @@ package com.familymarket.sport;
 
 import com.familymarket.achievement.AchievementService;
 import com.familymarket.balance.BalanceService;
+import com.familymarket.notification.NotificationService;
 import com.familymarket.child.Child;
 import com.familymarket.child.ChildRepository;
 import com.familymarket.common.BadRequestException;
@@ -53,6 +54,7 @@ public class SportCardService {
     private final AchievementService achievementService;
     private final StoreRepository storeRepository;
     private final BalanceService balanceService;
+    private final NotificationService notificationService;
     private final SportSeed seed;
 
     public SportCardService(SportDirectionRepository directionRepository,
@@ -65,6 +67,7 @@ public class SportCardService {
                             AchievementService achievementService,
                             StoreRepository storeRepository,
                             BalanceService balanceService,
+                            NotificationService notificationService,
                             SportSeed seed) {
         this.directionRepository = directionRepository;
         this.taskRepository = taskRepository;
@@ -76,6 +79,7 @@ public class SportCardService {
         this.achievementService = achievementService;
         this.storeRepository = storeRepository;
         this.balanceService = balanceService;
+        this.notificationService = notificationService;
         this.seed = seed;
     }
 
@@ -290,12 +294,13 @@ public class SportCardService {
         if (pool.isEmpty()) {
             throw new BadRequestException("В направлении пока нет заданий");
         }
-        // Для физкультуры — упражнения по классу; для хобби — любые задания направления
-        List<SportTask> eligible = "Физкультура".equals(direction.getName())
+        // Для физкультуры — упражнения по классу; для хобби — любые задания направления.
+        // Оборачиваем в mutable-список: .toList() даёт иммутабельный, shuffle падает.
+        List<SportTask> eligible = new ArrayList<>("Физкультура".equals(direction.getName())
                 ? pool.stream().filter(t -> grade >= t.getGradeMin() && grade <= t.getGradeMax()).toList()
-                : pool;
+                : pool);
         if (eligible.isEmpty()) {
-            eligible = pool;
+            eligible = new ArrayList<>(pool);
         }
         Collections.shuffle(eligible);
         int count = Math.min("Физкультура".equals(direction.getName()) ? PE_EXERCISES_PER_CARD : HOBBY_TASKS_PER_CARD,
@@ -334,6 +339,11 @@ public class SportCardService {
         cardRepository.save(card);
         syncDailySport(childId, card.getCardDate());
         achievementService.checkProgress(childId);
+        // Уведомление родителю: дейлик спорта ждёт проверки (×0/×1/×2)
+        notificationService.create(childId, "SPORT_REVIEW",
+                "Спорт-дейлик на проверке",
+                card.getDirection().getName() + " — оцени результат: ×0 / ×1 / ×2",
+                "sport-card", cardId);
         return SportCardDto.of(card, cardTaskRepository.findByCardIdOrderByIdAsc(cardId));
     }
 
@@ -359,6 +369,8 @@ public class SportCardService {
             card.setParentComment(comment.trim());
         }
         cardRepository.save(card);
+        // Уведомление о проверке закрыто — родитель оценил дейлик
+        notificationService.markDoneByRef("sport-card", cardId);
         if (xpEarned > 0) {
             creditSportPoints(card.getChild().getId(), parentId, xpEarned);
             achievementService.checkProgress(card.getChild().getId());

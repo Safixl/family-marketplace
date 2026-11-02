@@ -58,6 +58,35 @@ const TABS: Array<{ id: TabId; label: string; icon: typeof LayoutDashboard }> = 
   { id: 'purchases', label: 'Покупки', icon: ShoppingCart },
 ];
 
+/**
+ * Клик по уведомлению открывает вкладку, где родитель может ответить:
+ * квесты → «Квесты», спорт-дейлик → «Спорт и хобби», чтение → «Чтение» и т.д.
+ */
+function tabForNotification(n: { type: string; payload: string | null }): TabId {
+  switch (n.type) {
+    case 'QUEST':
+      return 'quests';
+    case 'CARD_REVEAL':
+    case 'CARD_HELP': {
+      const p = (n.payload ?? '').toUpperCase();
+      if (p.includes('HOUSE')) return 'house';
+      if (p.includes('LOGIC')) return 'logic';
+      return 'math';
+    }
+    case 'HOUSE_CHECK':
+      return 'house';
+    case 'SPORT_REVIEW':
+      return 'sport';
+    case 'READING_DONE':
+    case 'BOOK_REQUEST':
+      return 'reading';
+    case 'POCKET':
+      return 'children';
+    default:
+      return 'overview';
+  }
+}
+
 export default function ParentDashboard() {
   const { session, logout } = useAuth();
   const [tab, setTab] = useState<TabId>('overview');
@@ -156,7 +185,12 @@ export default function ParentDashboard() {
         </div>
       </main>
 
-      <NotificationPanel open={notifOpen} onClose={() => setNotifOpen(false)} onChanged={refreshNotifCount} />
+      <NotificationPanel
+        open={notifOpen}
+        onClose={() => setNotifOpen(false)}
+        onChanged={refreshNotifCount}
+        onNavigate={(n) => setTab(tabForNotification(n))}
+      />
 
       {/* Нижняя навигация (мобильный) */}
       <nav className="fixed inset-x-0 bottom-0 z-30 flex justify-around border-t border-slate-200 bg-white px-2 py-2 lg:hidden">

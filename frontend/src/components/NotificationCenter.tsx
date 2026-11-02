@@ -67,6 +67,8 @@ function iconFor(type: NotificationDto['type']): string {
       return '📖';
     case 'BOOK_REQUEST':
       return '📚';
+    case 'SPORT_REVIEW':
+      return '🤸';
     default:
       return '⏱';
   }
@@ -87,10 +89,13 @@ export function NotificationPanel({
   open,
   onClose,
   onChanged,
+  onNavigate,
 }: {
   open: boolean;
   onClose: () => void;
   onChanged: () => void;
+  /** Клик по уведомлению — переход на вкладку родителя, где можно ответить. */
+  onNavigate?: (n: NotificationDto) => void;
 }) {
   const [items, setItems] = useState<NotificationDto[]>([]);
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -188,6 +193,17 @@ export function NotificationPanel({
                           <span className="shrink-0 text-[11px] text-slate-400">{timeLabel(n.createdAt)}</span>
                         </div>
                         {n.payload && <p className="mt-0.5 text-xs text-slate-500">{n.payload}</p>}
+                        {onNavigate && !done && (
+                          <button
+                            onClick={() => {
+                              onNavigate(n);
+                              onClose();
+                            }}
+                            className="mt-1.5 flex items-center gap-1 text-xs font-semibold text-indigo-600 transition-colors hover:text-indigo-800"
+                          >
+                            Перейти к разбору →
+                          </button>
+                        )}
                         {action && n.refId != null && (
                           <div className="mt-2 flex flex-wrap gap-2">
                             <button

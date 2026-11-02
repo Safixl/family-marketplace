@@ -669,6 +669,7 @@ export type NotificationType =
   | 'POCKET'
   | 'READING_DONE'
   | 'BOOK_REQUEST'
+  | 'SPORT_REVIEW'
   | 'LIMIT_TV'
   | 'LIMIT_PC'
   | 'LIMIT_CONSOLE'
