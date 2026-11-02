@@ -367,7 +367,7 @@ function ChildCard({
                   <span className="w-6 shrink-0 text-center">{d.icon || meta?.icon}</span>
                   <span className="min-w-0 flex-1 truncate font-medium text-slate-600">{d.name}</span>
                   <span className="text-xs text-slate-400">
-                    {d.pointsEarned}/{d.pointsTarget}
+                    ✅ {d.tasksDone ?? 0}/{d.tasksTotal ?? 0}
                   </span>
                   {d.fullClear ? (
                     <span className="badge bg-indigo-50 text-indigo-700">Сделано на 100%</span>
