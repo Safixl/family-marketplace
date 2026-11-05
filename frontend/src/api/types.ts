@@ -1142,3 +1142,11 @@ export interface DungeonStateDto {
   session: DungeonSessionDto | null;
   equipment: DungeonEquipmentDto[];
 }
+
+/** Шаг 1 регистрации: аккаунт создан, ждём код из письма (или сразу токен в dev-режиме). */
+export interface RegisterResponse {
+  email: string;
+  needsVerification: boolean;
+  token: string | null;
+  user: { id: number; email: string; name: string } | null;
+}

@@ -9,6 +9,13 @@ CREATE TABLE IF NOT EXISTS users (
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 
+-- Подтверждение e-mail и сброс пароля
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT TRUE; -- старые пользователи уже подтверждены
+ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_code VARCHAR(10);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_expires TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token VARCHAR(64);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_expires TIMESTAMPTZ;
+
 CREATE TABLE IF NOT EXISTS children (
     id           BIGSERIAL PRIMARY KEY,
     parent_id    BIGINT      NOT NULL REFERENCES users (id) ON DELETE CASCADE,

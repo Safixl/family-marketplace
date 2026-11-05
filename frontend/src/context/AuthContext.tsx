@@ -1,12 +1,15 @@
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { api, clearSession, loadSession, persistSession, Session } from '../api/client';
-import { AuthResponse, ChildDto } from '../api/types';
+import { AuthResponse, ChildDto, RegisterResponse } from '../api/types';
 
 interface AuthContextValue {
   session: Session | null;
   loading: boolean;
   loginParent: (email: string, password: string) => Promise<void>;
-  registerParent: (name: string, email: string, password: string) => Promise<void>;
+  /** Шаг 1 регистрации: возвращает needsVerification (ждём код из письма). */
+  registerParent: (name: string, email: string, password: string) => Promise<{ needsVerification: boolean }>;
+  /** Шаг 2 регистрации: подтвердить код — вход выполняется автоматически. */
+  verifyParent: (email: string, code: string) => Promise<void>;
   loginChild: (accessKey: string) => Promise<void>;
   logout: () => void;
 }
@@ -40,7 +43,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const registerParent = async (name: string, email: string, password: string) => {
-    const res = await api.post<AuthResponse>('/auth/register', { name, email, password });
+    const res = await api.post<RegisterResponse>('/auth/register', { name, email, password });
+    if (res.needsVerification) {
+      return { needsVerification: true };
+    }
+    if (res.token && res.user) {
+      const next: Session = {
+        type: 'parent',
+        token: res.token,
+        profile: { id: res.user.id, name: res.user.name, email: res.user.email },
+      };
+      persistSession(next);
+      setSession(next);
+    }
+    return { needsVerification: false };
+  };
+
+  const verifyParent = async (email: string, code: string) => {
+    const res = await api.post<AuthResponse>('/auth/verify-email', { email, code });
     const next: Session = {
       type: 'parent',
       token: res.token,
@@ -68,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ session, loading, loginParent, registerParent, loginChild, logout }}>
+    <AuthContext.Provider value={{ session, loading, loginParent, registerParent, verifyParent, loginChild, logout }}>
       {children}
     </AuthContext.Provider>
   );

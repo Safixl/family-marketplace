@@ -35,6 +35,15 @@ spring:
       schema-locations: classpath:db/init.sql
   jackson:
     default-property-inclusion: non_null
+  # SMTP для кодов подтверждения и сброса пароля (при MAIL_ENABLED=false письма не отправляются)
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
 
 app:
   jwt:
@@ -42,6 +51,9 @@ app:
     expiration-ms: ${JWT_EXPIRATION_MS:604800000}
   cors:
     origins: ${CORS_ORIGINS:http://localhost:5173,https://*.cloudpub.ru}
+  mail:
+    enabled: ${MAIL_ENABLED:false}
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
 
 logging:
   level:

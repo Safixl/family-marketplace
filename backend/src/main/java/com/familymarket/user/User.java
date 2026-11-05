@@ -30,6 +30,24 @@ public class User {
     @Column(nullable = false, length = 100)
     private String name;
 
+    /** Email подтверждён кодом из письма. */
+    @Column(name = "email_verified", nullable = false)
+    private boolean emailVerified = false;
+
+    /** Код подтверждения (6 цифр), действует 15 минут. */
+    @Column(name = "verification_code", length = 10)
+    private String verificationCode;
+
+    @Column(name = "verification_expires")
+    private Instant verificationExpires;
+
+    /** Токен сброса пароля (UUID), действует 1 час. */
+    @Column(name = "reset_token", length = 64)
+    private String resetToken;
+
+    @Column(name = "reset_expires")
+    private Instant resetExpires;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 }
