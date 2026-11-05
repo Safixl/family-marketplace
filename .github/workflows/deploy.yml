@@ -1,0 +1,38 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Pull latest code
+        shell: cmd
+        run: |
+          cd /d C:\Users\Dafks\family-marketplace
+          "C:\Users\Dafks\PortableGit\cmd\git.exe" pull --ff-only origin main
+
+      - name: Rebuild and restart containers
+        shell: cmd
+        run: |
+          cd /d C:\Users\Dafks\family-marketplace
+          docker compose up --build -d --remove-orphans
+
+      - name: Cleanup old images
+        shell: cmd
+        run: docker image prune -f
+
+      - name: Health check
+        shell: cmd
+        run: |
+          ping -n 30 127.0.0.1 > nul
+          curl -s -o nul -w "Frontend HTTP: %%{http_code}" http://localhost/
+          echo.
+          docker ps --format "table {{.Names}}\t{{.Status}}"
