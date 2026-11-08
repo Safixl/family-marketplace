@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { dailiesStatus } from '../child/rpg/DailiesStatus';
 import { Check, Minus, Pencil, Plus, Trash2 } from 'lucide-react';
 import { api } from '../../api/client';
-import { CustomLimitInput, OverviewChildDto, QuestDto, SkillId, SkillProgressDto } from '../../api/types';
+import { CustomLimitInput, OverviewChildDto, QuestDto, SkillId } from '../../api/types';
 import { errMsg, fmtAmount } from '../../lib/format';
 import { skillById } from '../../lib/skills';
 import { skillLevelFromXp } from '../../lib/rpg';
@@ -21,6 +21,16 @@ const CUSTOM_TYPE_RE = /^C[1-3]$/;
 const isCustomType = (type: string) => CUSTOM_TYPE_RE.test(type);
 const MAX_CUSTOM = 3;
 
+/** Слоты шаблонов магазинов по кодам навыков (для включения навыка ребёнку). */
+const SKILL_TEMPLATE_SLUG: Record<string, string> = {
+  READING: 'reading',
+  MATH: 'math',
+  HOUSE: 'home',
+  LOGIC: 'logic',
+  LANG: 'lang',
+  SPORT: 'sport',
+};
+
 function fmtDuration(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(totalSeconds));
   const m = Math.floor(s / 60);
@@ -29,7 +39,28 @@ function fmtDuration(totalSeconds: number): string {
   return `${m} мин`;
 }
 
-export default function OverviewTab({ selectedChildId }: { selectedChildId?: number | null } = {}) {
+export default function OverviewTab({
+  selectedChildId,
+  onCreateQuest,
+}: { selectedChildId?: number | null; onCreateQuest?: (childId: number | null) => void } = {}) {
+  /** Навыки, переключаемые тумблером: skill → busy */
+  const [skillBusy, setSkillBusy] = useState<Record<string, boolean>>({});
+
+  const toggleSkill = (childId: number, skill: string, enabled: boolean) => {
+    setSkillBusy((p) => ({ ...p, [skill]: true }));
+    const runIt = async () => {
+      if (enabled) {
+        const slug = SKILL_TEMPLATE_SLUG[skill] ?? skill.toLowerCase();
+        await api.post(`/parent/store-templates/${slug}/activate?childId=${childId}`);
+      } else {
+        await api.del(`/parent/skill-activations/${skill}/child/${childId}`);
+      }
+    };
+    void runIt()
+      .then(() => load())
+      .catch((e) => alert(errMsg(e)))
+      .finally(() => setSkillBusy((p) => ({ ...p, [skill]: false })));
+  };
   const [children, setChildren] = useState<OverviewChildDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -158,6 +189,9 @@ export default function OverviewTab({ selectedChildId }: { selectedChildId?: num
           onPayOut={payOut}
           onToggleLimit={setLimitEnabled}
           onSaveCustom={saveCustomLimits}
+          onCreateQuest={onCreateQuest}
+          onToggleSkill={toggleSkill}
+          skillBusy={skillBusy}
         />
       ))}
     </div>
@@ -179,6 +213,9 @@ function ChildCard({
   onPayOut,
   onToggleLimit,
   onSaveCustom,
+  onCreateQuest,
+  onToggleSkill,
+  skillBusy,
 }: {
   child: OverviewChildDto;
   busy: boolean;
@@ -192,6 +229,9 @@ function ChildCard({
   onPayOut: (child: OverviewChildDto) => void;
   onToggleLimit: (child: OverviewChildDto, type: string, enabled: boolean) => void;
   onSaveCustom: (child: OverviewChildDto, custom: CustomLimitInput[]) => Promise<void>;
+  onCreateQuest?: (childId: number | null) => void;
+  onToggleSkill: (childId: number, skill: string, enabled: boolean) => void;
+  skillBusy: Record<string, boolean>;
 }) {
   const [addingCustom, setAddingCustom] = useState(false);
   const [customName, setCustomName] = useState('');
@@ -510,7 +550,19 @@ function ChildCard({
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Активные квесты */}
         <section className="rounded-2xl border border-slate-200 p-4">
-          <h3 className="mb-3 font-bold text-slate-700">📜 Активные квесты</h3>
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="font-bold text-slate-700">📜 Активные квесты</h3>
+            {onCreateQuest && (
+              <button
+                className="btn-secondary !px-2 !py-1"
+                disabled={busy}
+                title={`Создать квест для ${child.name}`}
+                onClick={() => onCreateQuest(child.id)}
+              >
+                <Plus size={14} />
+              </button>
+            )}
+          </div>
           {child.activeQuests.length === 0 ? (
             <p className="text-sm text-slate-400">Ребёнок пока не взял квесты</p>
           ) : (
@@ -522,41 +574,75 @@ function ChildCard({
           )}
         </section>
 
-        {/* Дейлики дня + навыки */}
+        {/* Дейлики и навыки: единый список — дейлик слева, прокачка по центру, тумблер справа */}
         <section className="rounded-2xl border border-slate-200 p-4">
           <h3 className="mb-3 font-bold text-slate-700">📅 Дейлики и навыки</h3>
-          <div className="space-y-1.5">
-            {child.dailies.length === 0 && (
-              <p className="text-sm text-slate-400">Активные навыки для дейликов не подключены</p>
+          <div className="space-y-2">
+            {child.skills.length === 0 && (
+              <p className="text-sm text-slate-400">Навыки ещё не подключены — включите их тумблером</p>
             )}
-            {child.dailies.map((d) => {
-              const meta = skillById(d.skill as SkillId);
-              const status = dailiesStatus(d);
-              const counterCls =
-                status.kind === 'done-ok'
+            {child.skills.map((s) => {
+              const daily = child.dailies.find((d) => d.skill === s.skill);
+              const status = daily ? dailiesStatus(daily) : null;
+              const counterCls = !status
+                ? 'text-slate-300'
+                : status.kind === 'done-ok'
                   ? 'text-emerald-600'
                   : status.kind === 'done-fail'
                     ? 'text-rose-600'
                     : status.kind === 'mixed'
                       ? 'text-amber-600'
                       : 'text-sky-600';
+              const enabled = !!daily;
+              const lvl = skillLevelFromXp(s.xp);
               return (
-                <div key={d.skill} className="flex items-center gap-2 text-sm">
-                  <span className="w-6 shrink-0 text-center">{d.icon || meta?.icon}</span>
-                  <span className="min-w-0 flex-1 truncate font-medium text-slate-600">{d.name}</span>
-                  <span className={`text-xs font-semibold ${counterCls}`}>{status.counter}</span>
-                  {d.fullClear && (
-                    <span className="badge bg-indigo-50 text-indigo-700">Сделано на 100%</span>
-                  )}
-                  {status.node}
+                <div key={s.skill} className={`flex items-center gap-2 ${enabled ? '' : 'opacity-55'}`}>
+                  {/* Слева: выполненные дейлики дня */}
+                  <span
+                    className={`w-16 shrink-0 text-right text-xs font-semibold ${counterCls}`}
+                    title={status ? 'Дейлик на сегодня' : 'Навык выключен — дейликов нет'}
+                  >
+                    {status ? status.counter : '—'}
+                  </span>
+                  {/* Центр: название навыка и прокачка */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between gap-2 text-xs">
+                      <span className="min-w-0 truncate font-semibold text-slate-600">
+                        <span className="mr-1">{s.icon}</span>
+                        {s.name}
+                        {daily?.fullClear && <span className="ml-1 badge bg-indigo-50 text-indigo-700">100%</span>}
+                        {status?.node}
+                      </span>
+                      <span className="shrink-0 text-slate-400">Ур. {lvl.level} · {s.xp} XP</span>
+                    </div>
+                    <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-sky-400 to-indigo-500"
+                        style={{ width: `${Math.min(100, s.progress)}%` }}
+                      />
+                    </div>
+                  </div>
+                  {/* Справа: тумблер включения навыка */}
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={enabled}
+                    disabled={busy || !!skillBusy[s.skill]}
+                    onClick={() => onToggleSkill(child.id, s.skill, !enabled)}
+                    title={enabled ? 'Выключить навык (дейлики перестанут создаваться)' : 'Включить навык'}
+                    className={`relative h-5 w-9 shrink-0 rounded-full transition ${
+                      skillBusy[s.skill] ? 'opacity-50' : ''
+                    } ${enabled ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${
+                        enabled ? 'left-[18px]' : 'left-0.5'
+                      }`}
+                    />
+                  </button>
                 </div>
               );
             })}
-          </div>
-          <div className="mt-3 border-t border-slate-100 pt-3">
-            {child.skills.map((s) => (
-              <SkillRow key={s.skill} s={s} />
-            ))}
           </div>
         </section>
       </div>
@@ -591,27 +677,6 @@ function QuestRow({ q }: { q: QuestDto }) {
         <span className="badge bg-amber-50 text-amber-700">в работе</span>
       )}
     </li>
-  );
-}
-
-function SkillRow({ s }: { s: SkillProgressDto }) {
-  const lvl = skillLevelFromXp(s.xp);
-  return (
-    <div className="flex items-center gap-2 py-0.5">
-      <span className="w-6 shrink-0 text-center">{s.icon}</span>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-baseline justify-between gap-2 text-xs">
-          <span className="truncate font-medium text-slate-600">{s.name}</span>
-          <span className="shrink-0 text-slate-400">Ур. {lvl.level} · {s.xp} XP</span>
-        </div>
-        <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-sky-400 to-indigo-500"
-            style={{ width: `${Math.min(100, s.progress)}%` }}
-          />
-        </div>
-      </div>
-    </div>
   );
 }
 

@@ -5,6 +5,7 @@ import com.familymarket.dto.SkillActivationDto;
 import com.familymarket.dto.StoreDto;
 import com.familymarket.dto.StoreTemplateDto;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -39,5 +40,11 @@ public class StoreTemplateController {
     @GetMapping("/api/parent/skill-activations")
     public List<SkillActivationDto> activations() {
         return storeTemplateService.activations(CurrentUser.parentId());
+    }
+
+    /** Выключить навык ребёнку: дейлики навыка перестают создаваться, магазин остаётся. */
+    @DeleteMapping("/api/parent/skill-activations/{skill}/child/{childId}")
+    public void deactivate(@PathVariable String skill, @PathVariable Long childId) {
+        storeTemplateService.deactivateSkill(CurrentUser.parentId(), childId, skill);
     }
 }

@@ -94,6 +94,16 @@ public class StoreTemplateService {
         return store;
     }
 
+    /** Выключение навыка: удаляем активацию (магазин навыка остаётся у родителя). */
+    @Transactional
+    public void deactivateSkill(Long parentId, Long childId, String skill) {
+        childRepository.findByIdAndParentId(childId, parentId)
+                .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
+        String normalized = skill == null ? "" : skill.trim().toUpperCase();
+        skillActivationRepository.findByChildIdAndSkill(childId, normalized)
+                .ifPresent(skillActivationRepository::delete);
+    }
+
     /** Список активированных ребёнку навыков (для вкладок навыков и обзора). */
     @Transactional(readOnly = true)
     public List<SkillActivationDto> activations(Long parentId) {

@@ -77,7 +77,16 @@ const QUEST_FILTERS: Array<{ id: QuestFilter; label: string }> = [
  * [валюта магазина + общий XP], одобряет или отклоняет заявки детей.
  * Вкладки: В Разработке / Доступные / Активные / Завершенные / Дейлики.
  */
-export default function QuestsTab({ selectedChildId }: { selectedChildId?: number | null } = {}) {
+export default function QuestsTab({
+  selectedChildId,
+  createRequest,
+  onCreateConsumed,
+}: {
+  selectedChildId?: number | null;
+  /** Запрос на открытие формы создания квеста из «Профиля ребенка». */
+  createRequest?: { childId: number | null; seq: number } | null;
+  onCreateConsumed?: () => void;
+} = {}) {
   const [quests, setQuests] = useState<QuestDto[]>([]);
   const [submissions, setSubmissions] = useState<QuestSubmissionDto[]>([]);
   const [children, setChildren] = useState<ChildDto[]>([]);
@@ -120,6 +129,16 @@ export default function QuestsTab({ selectedChildId }: { selectedChildId?: numbe
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Открытие формы создания квеста по кнопке «+» в «Профиле ребенка»
+  useEffect(() => {
+    if (createRequest) {
+      setEditing(null);
+      setForm({ ...EMPTY_FORM, childId: createRequest.childId != null ? String(createRequest.childId) : '' });
+      setModalOpen(true);
+      onCreateConsumed?.();
+    }
+  }, [createRequest, onCreateConsumed]);
 
   const openCreate = () => {
     setEditing(null);

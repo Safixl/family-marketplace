@@ -136,6 +136,13 @@ export default function ParentDashboard() {
     void loadChildren();
   }, [loadChildren]);
 
+  /** Запрос на создание квеста из «Профиля ребенка» (seq — чтобы повторный клик снова открывал форму). */
+  const [questCreate, setQuestCreate] = useState<{ childId: number | null; seq: number } | null>(null);
+  const startQuestCreate = useCallback((childId: number | null) => {
+    setTab('quests');
+    setQuestCreate((prev) => ({ childId, seq: (prev?.seq ?? 0) + 1 }));
+  }, []);
+
   return (
     <div className="min-h-screen bg-slate-100">
       {/* Сайдбар (десктоп) */}
@@ -216,7 +223,7 @@ export default function ParentDashboard() {
               </label>
             </div>
           )}
-          {tab === 'overview' && <OverviewTab selectedChildId={selectedChildId} />}
+          {tab === 'overview' && <OverviewTab selectedChildId={selectedChildId} onCreateQuest={startQuestCreate} />}
           {tab === 'children' && <ChildrenTab onChanged={handleChildrenChanged} />}
           {tab === 'reading' && <StoresTab templateFilter="READING" title="📚 Чтение" selectedChildId={selectedChildId} />}
           {tab === 'math' && <StoresTab templateFilter="MATH" title="🧮 Математика" selectedChildId={selectedChildId} />}
@@ -227,7 +234,13 @@ export default function ParentDashboard() {
           {tab === 'other' && <StoresTab templateFilter="NONE" title="📦 Прочее" selectedChildId={selectedChildId} />}
           {tab === 'achievements' && <AchievementsTab selectedChildId={selectedChildId} />}
           {tab === 'purchases' && <PurchasesTab selectedChildId={selectedChildId} />}
-          {tab === 'quests' && <QuestsTab selectedChildId={selectedChildId} />}
+          {tab === 'quests' && (
+            <QuestsTab
+              selectedChildId={selectedChildId}
+              createRequest={questCreate}
+              onCreateConsumed={() => setQuestCreate(null)}
+            />
+          )}
           {tab === 'seasonal' && <SeasonalTab />}
         </div>
       </main>
