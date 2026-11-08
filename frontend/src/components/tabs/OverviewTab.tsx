@@ -591,6 +591,8 @@ function ChildCard({
             {child.skills.map((s) => {
               const daily = child.dailies.find((d) => d.skill === s.skill);
               const status = daily ? dailiesStatus(daily) : null;
+              // Включённость навыка — по активациям (у «Хозяйственности» дейликов дня нет)
+              const enabled = child.activatedSkills.includes(s.skill);
               const counterCls = !status
                 ? 'text-slate-300'
                 : status.kind === 'done-ok'
@@ -600,7 +602,6 @@ function ChildCard({
                     : status.kind === 'mixed'
                       ? 'text-amber-600'
                       : 'text-sky-600';
-              const enabled = !!daily;
               const lvl = skillLevelFromXp(s.xp);
               return (
                 <div key={s.skill} className={`flex items-center gap-2 ${enabled ? '' : 'opacity-55'}`}>

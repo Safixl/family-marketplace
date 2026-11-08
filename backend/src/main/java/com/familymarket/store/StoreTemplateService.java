@@ -82,16 +82,22 @@ public class StoreTemplateService {
         Store store = activate(parentId, slug);
         Child child = childRepository.findByIdAndParentId(childId, parentId)
                 .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
-        skillActivationRepository.findByChildIdAndSkill(childId, store.getTemplateType())
+        String skill = skillCodeFor(store.getTemplateType());
+        skillActivationRepository.findByChildIdAndSkill(childId, skill)
                 .orElseGet(() -> {
                     SkillActivation activation = new SkillActivation();
                     activation.setChild(child);
-                    activation.setSkill(store.getTemplateType());
+                    activation.setSkill(skill);
                     activation.setStore(store);
                     activation.setCreatedAt(Instant.now());
                     return skillActivationRepository.save(activation);
                 });
         return store;
+    }
+
+    /** Код навыка для типа шаблонного магазина (у магазина «Дом» тип HOME, а навык — HOUSE). */
+    private String skillCodeFor(String templateType) {
+        return "HOME".equals(templateType) ? "HOUSE" : templateType;
     }
 
     /** Выключение навыка: удаляем активацию (магазин навыка остаётся у родителя). */
@@ -100,7 +106,10 @@ public class StoreTemplateService {
         childRepository.findByIdAndParentId(childId, parentId)
                 .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
         String normalized = skill == null ? "" : skill.trim().toUpperCase();
-        skillActivationRepository.findByChildIdAndSkill(childId, normalized)
+        // Удаляем и вариант «HOUSE», и legacy «HOME» (магазин «Дом»)
+        skillActivationRepository.findByChildIdAndSkill(childId, "HOME".equals(normalized) ? "HOUSE" : normalized)
+                .ifPresent(skillActivationRepository::delete);
+        skillActivationRepository.findByChildIdAndSkill(childId, "HOME")
                 .ifPresent(skillActivationRepository::delete);
     }
 

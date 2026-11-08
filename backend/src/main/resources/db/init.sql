@@ -464,6 +464,9 @@ ALTER TABLE child_limits ADD COLUMN IF NOT EXISTS settings TEXT;
 ALTER TABLE children ADD COLUMN IF NOT EXISTS birth_date DATE;
 UPDATE children SET birth_date = DATE '2020-01-01' WHERE birth_date IS NULL;
 
+-- Нормализация кода навыка «Хозяйственность»: у магазина «Дом» тип HOME, а навык — HOUSE
+UPDATE skill_activations SET skill = 'HOUSE' WHERE skill = 'HOME';
+
 -- Расход лимита по дням: used_seconds — потрачено, extended_seconds — одноразовые
 -- увеличения на сегодня (могут превышать базовый лимит), running — идёт ли счётчик.
 CREATE TABLE IF NOT EXISTS limit_usage (
