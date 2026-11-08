@@ -1,8 +1,7 @@
 package com.familymarket.dto;
 
-/**
- * Базовые лимиты ребёнка (для родителя): минуты в день + карманные деньги в неделю.
- */
+import java.util.List;
+
 public record ChildLimitsDto(
         Long childId,
         int tvMinutes,
@@ -10,6 +9,10 @@ public record ChildLimitsDto(
         int consoleMinutes,
         int phoneMinutes,
         int tabletMinutes,
-        int pocketWeekly
+        int pocketWeekly,
+        /** Выключенные родителем стандартные типы лимитов. */
+        List<String> disabledTypes,
+        /** Кастомные лимиты (до 3). */
+        List<CustomLimitDto> customLimits
 ) {
 }

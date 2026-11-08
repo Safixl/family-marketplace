@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { dailiesStatus } from '../child/rpg/DailiesStatus';
-import { Check, Minus, Pencil, Plus } from 'lucide-react';
+import { Check, Minus, Pencil, Plus, Trash2 } from 'lucide-react';
 import { api } from '../../api/client';
-import { OverviewChildDto, QuestDto, SkillId, SkillProgressDto } from '../../api/types';
+import { CustomLimitInput, OverviewChildDto, QuestDto, SkillId, SkillProgressDto } from '../../api/types';
 import { errMsg, fmtAmount } from '../../lib/format';
 import { skillById } from '../../lib/skills';
 import { skillLevelFromXp } from '../../lib/rpg';
@@ -15,6 +15,11 @@ const LIMIT_META: Record<string, { label: string; emoji: string }> = {
   PHONE: { label: 'Телефон', emoji: '📱' },
   TABLET: { label: 'Планшет', emoji: '📟' },
 };
+
+/** Кастомные лимиты хранятся в слотах C1..C3. */
+const CUSTOM_TYPE_RE = /^C[1-3]$/;
+const isCustomType = (type: string) => CUSTOM_TYPE_RE.test(type);
+const MAX_CUSTOM = 3;
 
 function fmtDuration(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(totalSeconds));
@@ -96,6 +101,22 @@ export default function OverviewTab() {
       await api.post(`/parent/children/${child.id}/pocket/pay-out`);
     });
 
+  /** Вкл/выкл стандартного лимита (переключатель в «Обзоре»). */
+  const setLimitEnabled = (child: OverviewChildDto, type: string, enabled: boolean) =>
+    run(async () => {
+      const disabledTypes = child.limits.limits
+        .filter((l) => !isCustomType(l.type))
+        .filter((l) => (l.type === type ? !enabled : !l.enabled))
+        .map((l) => l.type);
+      await api.put(`/parent/children/${child.id}/limits`, { disabledTypes });
+    });
+
+  /** Сохранение полного списка кастомных лимитов ребёнка. */
+  const saveCustomLimits = (child: OverviewChildDto, custom: CustomLimitInput[]) =>
+    run(async () => {
+      await api.put(`/parent/children/${child.id}/limits`, { customLimits: custom });
+    });
+
   if (loading) return <Spinner label="Собираем обзор…" />;
 
   if (error) return <div className="card text-sm text-rose-600">{error}</div>;
@@ -124,6 +145,8 @@ export default function OverviewTab() {
           onApplyDelta={applyCustomDelta}
           onSaveLimit={saveLimit}
           onPayOut={payOut}
+          onToggleLimit={setLimitEnabled}
+          onSaveCustom={saveCustomLimits}
         />
       ))}
     </div>
@@ -143,6 +166,8 @@ function ChildCard({
   onApplyDelta,
   onSaveLimit,
   onPayOut,
+  onToggleLimit,
+  onSaveCustom,
 }: {
   child: OverviewChildDto;
   busy: boolean;
@@ -154,7 +179,16 @@ function ChildCard({
   onApplyDelta: (child: OverviewChildDto, storeId: number) => void;
   onSaveLimit: (child: OverviewChildDto, type: string, field: 'tvMinutes' | 'pcMinutes' | 'consoleMinutes' | 'phoneMinutes' | 'tabletMinutes' | 'pocketWeekly') => void;
   onPayOut: (child: OverviewChildDto) => void;
+  onToggleLimit: (child: OverviewChildDto, type: string, enabled: boolean) => void;
+  onSaveCustom: (child: OverviewChildDto, custom: CustomLimitInput[]) => Promise<void>;
 }) {
+  const [addingCustom, setAddingCustom] = useState(false);
+  const [customName, setCustomName] = useState('');
+  const [customMinutes, setCustomMinutes] = useState('');
+
+  const customList: CustomLimitInput[] = child.limits.limits
+    .filter((l) => isCustomType(l.type))
+    .map((l) => ({ id: l.type, name: l.label ?? l.type, minutes: l.baseMinutes, enabled: l.enabled }));
   const levelPercent = Math.min(100, Math.round((child.level.ratio ?? 0) * 100));
   const questsDone = child.activeQuests.filter((q) => q.childStatus === 'SUBMITTED').length;
   const questsActive = child.activeQuests.filter((q) => q.childStatus === 'ACTIVE').length;
@@ -265,32 +299,81 @@ function ChildCard({
           </div>
           <div className="space-y-2">
             {child.limits.limits.map((l) => {
-              const meta = LIMIT_META[l.type] ?? { label: l.type, emoji: '⏱' };
+              const meta = isCustomType(l.type)
+                ? { label: l.label ?? l.type, emoji: '🧩' }
+                : LIMIT_META[l.type] ?? { label: l.type, emoji: '⏱' };
               const field = limitField(l.type);
               const lKey = `${child.id}:${l.type}`;
+              const maxSeconds = Math.max(1, l.baseMinutes * 60 + l.extendedSeconds);
+              const toggleLimit = () => {
+                if (isCustomType(l.type)) {
+                  void onSaveCustom(
+                    child,
+                    customList.map((c) => (c.id === l.type ? { ...c, enabled: !c.enabled } : c)),
+                  );
+                } else {
+                  onToggleLimit(child, l.type, !l.enabled);
+                }
+              };
+              const saveMinutes = () => {
+                if (isCustomType(l.type)) {
+                  const raw = limitInputs[lKey]?.trim();
+                  const value = Number(raw);
+                  if (!raw || !Number.isFinite(value) || value < 0) {
+                    alert('Введите неотрицательное число');
+                    return;
+                  }
+                  void onSaveCustom(
+                    child,
+                    customList.map((c) => (c.id === l.type ? { ...c, minutes: value } : c)),
+                  ).then(() => setLimitInputs((p) => ({ ...p, [lKey]: '' })));
+                } else {
+                  onSaveLimit(child, l.type, field);
+                }
+              };
               return (
-                <div key={l.type} className="flex items-center gap-2">
+                <div key={l.type} className={`flex items-center gap-2 ${l.enabled ? '' : 'opacity-50'}`}>
                   <span className="w-6 shrink-0 text-center text-base">{meta.emoji}</span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2 text-xs">
                       <span className="font-semibold text-slate-600">
                         {meta.label}
+                        {!l.enabled ? ' · выключен' : ''}
                         {l.frozen ? ' ❄️' : ''}
                         {l.running ? ' ▶' : ''}
                       </span>
                       <span className="text-slate-500">
-                        осталось {fmtDuration(l.remainingSeconds)} · {l.baseMinutes} мин
+                        {l.enabled ? `осталось ${fmtDuration(l.remainingSeconds)} · ` : ''}
+                        {l.baseMinutes} мин
                       </span>
                     </div>
-                    <div className="mt-0.5 h-2 overflow-hidden rounded-full bg-slate-100">
-                      <div
-                        className={`h-full rounded-full ${l.running ? 'bg-rose-400' : 'bg-emerald-400'}`}
-                        style={{
-                          width: `${Math.min(100, Math.round((l.remainingSeconds / Math.max(1, l.baseMinutes * 60 + l.extendedSeconds)) * 100))}%`,
-                        }}
-                      />
-                    </div>
+                    {l.enabled ? (
+                      <div className="mt-0.5 h-2 overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className={`h-full rounded-full ${l.running ? 'bg-rose-400' : 'bg-emerald-400'}`}
+                          style={{ width: `${Math.min(100, Math.round((l.remainingSeconds / maxSeconds) * 100))}%` }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="mt-0.5 h-2 rounded-full bg-slate-200" />
+                    )}
                   </div>
+                  {/* Переключатель вкл/выкл лимита */}
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={l.enabled}
+                    disabled={busy}
+                    onClick={toggleLimit}
+                    title={l.enabled ? 'Выключить лимит (ребёнок его не увидит)' : 'Включить лимит'}
+                    className={`relative h-5 w-9 shrink-0 rounded-full transition ${l.enabled ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${
+                        l.enabled ? 'left-[18px]' : 'left-0.5'
+                      }`}
+                    />
+                  </button>
                   <input
                     className="input !w-16 !py-1 text-right"
                     type="number"
@@ -303,10 +386,22 @@ function ChildCard({
                     className="btn-secondary !px-2 !py-1"
                     disabled={busy}
                     title="Сохранить лимит в минутах"
-                    onClick={() => onSaveLimit(child, l.type, field)}
+                    onClick={saveMinutes}
                   >
                     <Pencil size={13} />
                   </button>
+                  {isCustomType(l.type) && (
+                    <button
+                      className="btn-secondary !px-2 !py-1 text-rose-600 hover:!bg-rose-50"
+                      disabled={busy}
+                      title="Удалить кастомный лимит"
+                      onClick={() =>
+                        void onSaveCustom(child, customList.filter((c) => c.id !== l.type))
+                      }
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -335,6 +430,68 @@ function ChildCard({
                 <Pencil size={13} />
               </button>
             </div>
+
+            {/* Кастомные лимиты: плюсик для добавления (до 3) */}
+            {customList.length < MAX_CUSTOM && !addingCustom && (
+              <button
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 py-2 text-xs font-semibold text-slate-500 transition hover:border-slate-400 hover:text-slate-700"
+                disabled={busy}
+                onClick={() => {
+                  setAddingCustom(true);
+                  setCustomName('');
+                  setCustomMinutes('');
+                }}
+              >
+                <Plus size={13} /> Добавить свой лимит ({customList.length}/{MAX_CUSTOM})
+              </button>
+            )}
+            {addingCustom && (
+              <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <input
+                  className="input w-full"
+                  placeholder="Название лимита (напр. Лего)"
+                  maxLength={40}
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                />
+                <div className="flex items-center gap-2">
+                  <input
+                    className="input !w-24"
+                    type="number"
+                    min="0"
+                    placeholder="мин/день"
+                    value={customMinutes}
+                    onChange={(e) => setCustomMinutes(e.target.value)}
+                  />
+                  <button
+                    className="btn-primary !px-3 !py-1 text-xs"
+                    disabled={busy}
+                    onClick={() => {
+                      const name = customName.trim();
+                      if (!name) {
+                        alert('Введите название лимита');
+                        return;
+                      }
+                      const used = customList.map((c) => c.id);
+                      const slot = ['C1', 'C2', 'C3'].find((s) => !used.includes(s));
+                      if (!slot) {
+                        alert('Максимум 3 кастомных лимита');
+                        return;
+                      }
+                      void onSaveCustom(child, [
+                        ...customList,
+                        { id: slot, name, minutes: Math.max(0, Number(customMinutes) || 0), enabled: true },
+                      ]).then(() => setAddingCustom(false));
+                    }}
+                  >
+                    Добавить
+                  </button>
+                  <button className="btn-secondary !px-3 !py-1 text-xs" onClick={() => setAddingCustom(false)}>
+                    Отмена
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </section>
       </div>

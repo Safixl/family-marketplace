@@ -6,6 +6,8 @@ import com.familymarket.common.BadRequestException;
 import com.familymarket.common.NotFoundException;
 import com.familymarket.dto.ChildLimitsDto;
 import com.familymarket.dto.ChildLimitsUpdateRequest;
+import com.familymarket.dto.CustomLimitDto;
+import com.familymarket.dto.CustomLimitInput;
 import com.familymarket.dto.LimitEventDto;
 import com.familymarket.dto.LimitStateDto;
 import com.familymarket.dto.LimitTypeState;
@@ -26,13 +28,19 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class LimitService {
 
     private static final ZoneId ZONE = ZoneId.of("Europe/Moscow");
     private static final List<String> TIME_LIMIT_TYPES = List.of("TV", "PC", "CONSOLE", "PHONE", "TABLET");
+    /** Слоты кастомных лимитов. */
+    private static final List<String> CUSTOM_TYPES = List.of("C1", "C2", "C3");
+    /** Максимум кастомных лимитов на ребёнка. */
+    private static final int MAX_CUSTOM_LIMITS = 3;
 
     private final ChildLimitRepository childLimitRepository;
     private final LimitUsageRepository limitUsageRepository;
@@ -96,6 +104,12 @@ public class LimitService {
                 });
     }
 
+    /** Настройки лимитов (никогда не null). */
+    private LimitSettings settings(ChildLimit cl) {
+        LimitSettings s = cl.getSettings();
+        return s == null ? new LimitSettings() : s;
+    }
+
     private int baseMinutes(ChildLimit cl, String type) {
         return switch (type) {
             case "TV" -> cl.getTvMinutes();
@@ -103,7 +117,7 @@ public class LimitService {
             case "CONSOLE" -> cl.getConsoleMinutes();
             case "PHONE" -> cl.getPhoneMinutes();
             case "TABLET" -> cl.getTabletMinutes();
-            default -> 0;
+            default -> customLimit(settings(cl), type).map(LimitSettings.CustomLimit::getMinutes).orElse(0);
         };
     }
 
@@ -114,16 +128,56 @@ public class LimitService {
             case "CONSOLE" -> cl.setConsoleMinutes(value);
             case "PHONE" -> cl.setPhoneMinutes(value);
             case "TABLET" -> cl.setTabletMinutes(value);
-            default -> throw new BadRequestException("Неизвестный тип лимита: " + type);
+            default -> {
+                LimitSettings s = settings(cl);
+                LimitSettings.CustomLimit c = customLimit(s, type)
+                        .orElseThrow(() -> new BadRequestException("Неизвестный тип лимита: " + type));
+                c.setMinutes(value);
+                cl.setSettings(s);
+            }
         }
     }
 
-    private String normalizeType(String type) {
+    private java.util.Optional<LimitSettings.CustomLimit> customLimit(LimitSettings settings, String type) {
+        return settings.getCustom().stream().filter(c -> type.equals(c.getId())).findFirst();
+    }
+
+    /** Валидация типа из запроса: стандартный или кастомный слот этого ребёнка. */
+    private String normalizeType(ChildLimit cl, String type) {
+        String t = type.trim().toUpperCase();
+        if (TIME_LIMIT_TYPES.contains(t) || customLimit(settings(cl), t).isPresent()) {
+            return t;
+        }
+        throw new BadRequestException("Неизвестный тип лимита: " + type);
+    }
+
+    /** Валидация типа для эффектов товаров/уведомлений: только стандартные. */
+    private String normalizeStandardType(String type) {
         String t = type.trim().toUpperCase();
         if (!TIME_LIMIT_TYPES.contains(t)) {
             throw new BadRequestException("Неизвестный тип лимита: " + type);
         }
         return t;
+    }
+
+    /** Название лимита для уведомлений и логов. */
+    private String labelOf(ChildLimit cl, String type) {
+        return switch (type) {
+            case "TV" -> "ТВ";
+            case "PC" -> "Компьютер";
+            case "CONSOLE" -> "Консоль";
+            case "PHONE" -> "Телефон";
+            case "TABLET" -> "Планшет";
+            default -> customLimit(settings(cl), type).map(LimitSettings.CustomLimit::getName).orElse(type);
+        };
+    }
+
+    /** Включён ли лимит (стандартный — по списку disabled, кастомный — по своему флагу). */
+    private boolean isEnabled(LimitSettings settings, String type) {
+        if (TIME_LIMIT_TYPES.contains(type)) {
+            return !settings.getDisabled().contains(type);
+        }
+        return customLimit(settings, type).map(LimitSettings.CustomLimit::isEnabled).orElse(false);
     }
 
     // ---------- Родитель ----------
@@ -133,8 +187,10 @@ public class LimitService {
         childRepository.findByIdAndParentId(childId, parentId)
                 .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
         ChildLimit cl = childLimitRepository.findById(childId).orElseGet(ChildLimit::new);
+        LimitSettings st = settings(cl);
         return new ChildLimitsDto(childId, cl.getTvMinutes(), cl.getPcMinutes(), cl.getConsoleMinutes(),
-                cl.getPhoneMinutes(), cl.getTabletMinutes(), cl.getPocketWeekly());
+                cl.getPhoneMinutes(), cl.getTabletMinutes(), cl.getPocketWeekly(),
+                List.copyOf(st.getDisabled()), toCustomDtos(st));
     }
 
     @Transactional
@@ -149,9 +205,63 @@ public class LimitService {
         if (request.phoneMinutes() != null) cl.setPhoneMinutes(request.phoneMinutes());
         if (request.tabletMinutes() != null) cl.setTabletMinutes(request.tabletMinutes());
         if (request.pocketWeekly() != null) cl.setPocketWeekly(request.pocketWeekly());
+
+        LimitSettings st = settings(cl);
+        if (request.disabledTypes() != null) {
+            Set<String> disabled = new HashSet<>();
+            for (String t : request.disabledTypes()) {
+                disabled.add(normalizeStandardType(t));
+            }
+            st.setDisabled(disabled);
+        }
+        if (request.customLimits() != null) {
+            st.setCustom(applyCustomLimits(request.customLimits()));
+        }
+        cl.setSettings(st);
+
         cl.setUpdatedAt(Instant.now());
         childLimitRepository.save(cl);
         return getChildLimits(parentId, childId);
+    }
+
+    private List<CustomLimitDto> toCustomDtos(LimitSettings st) {
+        return st.getCustom().stream()
+                .map(c -> new CustomLimitDto(c.getId(), c.getName(), c.getMinutes(), c.isEnabled()))
+                .toList();
+    }
+
+    /** Валидация и нормализация списка кастомных лимитов от родителя (максимум 3, слоты C1..C3). */
+    private List<LimitSettings.CustomLimit> applyCustomLimits(List<CustomLimitInput> inputs) {
+        if (inputs.size() > MAX_CUSTOM_LIMITS) {
+            throw new BadRequestException("Кастомных лимитов может быть не больше " + MAX_CUSTOM_LIMITS);
+        }
+        List<LimitSettings.CustomLimit> result = new ArrayList<>();
+        for (CustomLimitInput in : inputs) {
+            String name = in.name() == null ? "" : in.name().trim();
+            if (name.isEmpty()) {
+                throw new BadRequestException("Укажите название лимита");
+            }
+            int minutes = in.minutes() == null ? 0 : Math.max(0, in.minutes());
+            boolean enabled = in.enabled() == null || in.enabled();
+            String id = resolveCustomId(in.id(), result);
+            result.add(new LimitSettings.CustomLimit(id, name, minutes, enabled));
+        }
+        return result;
+    }
+
+    /** Подбор слота C1..C3: сохраняем переданный валидный id, иначе первый свободный. */
+    private String resolveCustomId(String id, List<LimitSettings.CustomLimit> existing) {
+        Set<String> taken = existing.stream().map(LimitSettings.CustomLimit::getId)
+                .collect(java.util.stream.Collectors.toSet());
+        if (id != null && CUSTOM_TYPES.contains(id.trim().toUpperCase()) && !taken.contains(id.trim().toUpperCase())) {
+            return id.trim().toUpperCase();
+        }
+        for (String slot : CUSTOM_TYPES) {
+            if (!taken.contains(slot)) {
+                return slot;
+            }
+        }
+        throw new BadRequestException("Кастомных лимитов может быть не больше " + MAX_CUSTOM_LIMITS);
     }
 
     // ---------- Ребенок ----------
@@ -159,21 +269,47 @@ public class LimitService {
     @Transactional
     public LimitStateDto getState(Long childId) {
         ChildLimit cl = childLimitRepository.findById(childId).orElseGet(ChildLimit::new);
+        LimitSettings st = settings(cl);
         Instant now = Instant.now();
         LocalDate day = limitDay(now);
         List<LimitTypeState> limits = new ArrayList<>();
         for (String type : TIME_LIMIT_TYPES) {
+            int base = baseMinutes(cl, type);
+            boolean enabled = isEnabled(st, type);
+            if (!enabled) {
+                // Выключенный лимит: счётчики не читаем, ребёнок его не видит
+                limits.add(new LimitTypeState(type, base, 0, 0, base * 60, false, false, false, null));
+                continue;
+            }
             autoStopIfExceeded(childId, type); // исчерпанный таймер останавливается сам
             LimitUsage usage = usageFor(childId, type, day);
             int used = usage.getUsedSeconds();
             if (usage.isRunning() && usage.getStartedAt() != null) {
                 used += (int) Math.max(0, Duration.between(usage.getStartedAt(), now).getSeconds());
             }
-            int remaining = Math.max(0, baseMinutes(cl, type) * 60 + usage.getExtendedSeconds() - used);
+            int remaining = Math.max(0, base * 60 + usage.getExtendedSeconds() - used);
             boolean frozen = limitFreezeRepository.findByChildIdAndLimitType(childId, type)
                     .map(LimitFreeze::isFrozen).orElse(false);
-            limits.add(new LimitTypeState(type, baseMinutes(cl, type), used, usage.getExtendedSeconds(),
-                    remaining, usage.isRunning(), frozen));
+            limits.add(new LimitTypeState(type, base, used, usage.getExtendedSeconds(),
+                    remaining, usage.isRunning(), frozen, true, null));
+        }
+        for (LimitSettings.CustomLimit c : st.getCustom()) {
+            int base = c.getMinutes();
+            if (!c.isEnabled()) {
+                limits.add(new LimitTypeState(c.getId(), base, 0, 0, base * 60, false, false, false, c.getName()));
+                continue;
+            }
+            autoStopIfExceeded(childId, c.getId());
+            LimitUsage usage = usageFor(childId, c.getId(), day);
+            int used = usage.getUsedSeconds();
+            if (usage.isRunning() && usage.getStartedAt() != null) {
+                used += (int) Math.max(0, Duration.between(usage.getStartedAt(), now).getSeconds());
+            }
+            int remaining = Math.max(0, base * 60 + usage.getExtendedSeconds() - used);
+            boolean frozen = limitFreezeRepository.findByChildIdAndLimitType(childId, c.getId())
+                    .map(LimitFreeze::isFrozen).orElse(false);
+            limits.add(new LimitTypeState(c.getId(), base, used, usage.getExtendedSeconds(),
+                    remaining, usage.isRunning(), frozen, true, c.getName()));
         }
         LocalDate weekStart = weekStart(now);
         BigDecimal spent = pocketDisbursementRepository.findByChildIdAndWeekStart(childId, weekStart)
@@ -187,7 +323,11 @@ public class LimitService {
 
     @Transactional
     public void startTimer(Long childId, String type) {
-        String t = normalizeType(type);
+        ChildLimit cl = childLimitRepository.findById(childId).orElseGet(ChildLimit::new);
+        String t = normalizeType(cl, type);
+        if (!isEnabled(settings(cl), t)) {
+            throw new BadRequestException("Лимит отключён родителем");
+        }
         if (limitFreezeRepository.findByChildIdAndLimitType(childId, t)
                 .map(LimitFreeze::isFrozen).orElse(false)) {
             throw new BadRequestException("Лимит заморожен родителем");
@@ -195,7 +335,6 @@ public class LimitService {
         autoStopIfExceeded(childId, t);
         LimitUsage usage = usageFor(childId, t, limitDay(Instant.now()));
         if (!usage.isRunning()) {
-            ChildLimit cl = childLimitRepository.findById(childId).orElseGet(ChildLimit::new);
             int limitSeconds = baseMinutes(cl, t) * 60 + usage.getExtendedSeconds();
             if (limitSeconds > 0 && usage.getUsedSeconds() >= limitSeconds) {
                 throw new BadRequestException("Лимит на сегодня исчерпан");
@@ -209,11 +348,11 @@ public class LimitService {
 
     @Transactional
     public void stopTimer(Long childId, String type) {
-        String t = normalizeType(type);
+        ChildLimit cl = childLimitRepository.findById(childId).orElseGet(ChildLimit::new);
+        String t = normalizeType(cl, type);
         LimitUsage usage = usageFor(childId, t, limitDay(Instant.now()));
         if (usage.isRunning() && usage.getStartedAt() != null) {
             int seconds = (int) Math.max(0, Duration.between(usage.getStartedAt(), Instant.now()).getSeconds());
-            ChildLimit cl = childLimitRepository.findById(childId).orElseGet(ChildLimit::new);
             int limitSeconds = baseMinutes(cl, t) * 60 + usage.getExtendedSeconds();
             int usedBefore = usage.getUsedSeconds();
             usage.setUsedSeconds(usedBefore + seconds);
@@ -222,7 +361,7 @@ public class LimitService {
             usage.setStartedAt(null);
             limitUsageRepository.save(usage);
             recordEvent(childId, t, "STOP", seconds);
-            notifyLimitExceeded(childId, t, usedBefore, usedAfter, limitSeconds);
+            notifyLimitExceeded(childId, t, labelOf(cl, t), usedBefore, usedAfter, limitSeconds);
         }
     }
 
@@ -249,30 +388,19 @@ public class LimitService {
             usage.setStartedAt(null);
             limitUsageRepository.save(usage);
             recordEvent(childId, type, "STOP", elapsed);
-            notifyLimitExceeded(childId, type, usedBefore, usedAfter, limitSeconds);
+            notifyLimitExceeded(childId, type, labelOf(cl, type), usedBefore, usedAfter, limitSeconds);
             return true;
         }
         return false;
     }
 
     /** Уведомление родителю при пересечении дневного лимита (один раз за пересечение). */
-    private void notifyLimitExceeded(Long childId, String type, int usedBefore, int usedAfter, int limitSeconds) {
+    private void notifyLimitExceeded(Long childId, String type, String label, int usedBefore, int usedAfter, int limitSeconds) {
         if (limitSeconds > 0 && usedBefore < limitSeconds && usedAfter >= limitSeconds) {
             notificationService.create(childId, "LIMIT_" + type,
-                    "Лимит «" + limitLabel(type) + "» на сегодня исчерпан",
+                    "Лимит «" + label + "» на сегодня исчерпан",
                     "Время на устройстве закончилось", "limit", childId);
         }
-    }
-
-    private String limitLabel(String type) {
-        return switch (type) {
-            case "TV" -> "ТВ";
-            case "PC" -> "Компьютер";
-            case "CONSOLE" -> "Консоль";
-            case "PHONE" -> "Телефон";
-            case "TABLET" -> "Планшет";
-            default -> type;
-        };
     }
 
     private void recordEvent(Long childId, String type, String action, int seconds) {
@@ -291,7 +419,8 @@ public class LimitService {
     public void setFrozen(Long parentId, Long childId, String type, boolean frozen) {
         childRepository.findByIdAndParentId(childId, parentId)
                 .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
-        String t = normalizeType(type);
+        ChildLimit cl = childLimitRepository.findById(childId).orElseGet(ChildLimit::new);
+        String t = normalizeType(cl, type);
         LimitFreeze freeze = limitFreezeRepository.findByChildIdAndLimitType(childId, t)
                 .orElseGet(() -> {
                     LimitFreeze f = new LimitFreeze();
@@ -371,7 +500,7 @@ public class LimitService {
                 ext.setAmount(ext.getAmount().add(BigDecimal.valueOf(value)));
                 pocketExtensionRepository.save(ext);
             } else {
-                String t = normalizeType(limit);
+                String t = normalizeStandardType(limit);
                 LimitUsage usage = usageFor(childId, t, limitDay(Instant.now()));
                 usage.setExtendedSeconds(usage.getExtendedSeconds() + value * 60);
                 limitUsageRepository.save(usage);
@@ -382,7 +511,7 @@ public class LimitService {
             if ("POCKET".equals(limit)) {
                 cl.setPocketWeekly(cl.getPocketWeekly() + value);
             } else {
-                String t = normalizeType(limit);
+                String t = normalizeStandardType(limit);
                 setBaseMinutes(cl, t, baseMinutes(cl, t) + value);
             }
             cl.setUpdatedAt(Instant.now());

@@ -234,6 +234,17 @@ export interface LimitTypeState {
   remainingSeconds: number;
   running: boolean;
   frozen: boolean;
+  /** Включён ли лимит родителем (выключенные видны только родителю). */
+  enabled: boolean;
+  /** Название кастомного лимита (для стандартных — null). */
+  label?: string | null;
+}
+
+export interface CustomLimitInput {
+  id?: string | null;
+  name: string;
+  minutes: number;
+  enabled: boolean;
 }
 
 export interface LimitEventDto {

@@ -2,6 +2,7 @@ package com.familymarket.limit;
 
 import com.familymarket.child.Child;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
@@ -48,6 +49,11 @@ public class ChildLimit {
 
     @Column(name = "pocket_weekly", nullable = false)
     private int pocketWeekly;
+
+    /** Расширенные настройки: выключенные типы и кастомные лимиты (JSON). */
+    @Column(name = "settings", columnDefinition = "TEXT")
+    @Convert(converter = LimitSettingsConverter.class)
+    private LimitSettings settings;
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;

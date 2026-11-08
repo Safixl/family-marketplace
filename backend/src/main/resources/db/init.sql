@@ -453,8 +453,11 @@ CREATE TABLE IF NOT EXISTS child_limits (
     phone_minutes   INT NOT NULL DEFAULT 0,
     tablet_minutes  INT NOT NULL DEFAULT 0,
     pocket_weekly   INT NOT NULL DEFAULT 0,
+    settings        TEXT,
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- Настройки лимитов (выключенные типы + кастомные лимиты) для баз, созданных ранее
+ALTER TABLE child_limits ADD COLUMN IF NOT EXISTS settings TEXT;
 
 -- Расход лимита по дням: used_seconds — потрачено, extended_seconds — одноразовые
 -- увеличения на сегодня (могут превышать базовый лимит), running — идёт ли счётчик.

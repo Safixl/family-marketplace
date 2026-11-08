@@ -132,8 +132,12 @@ export default function LimitsPanel() {
           {error}
         </div>
       )}
-      {state.limits.map((l) => {
-        const meta = LIMIT_META[l.type] ?? { label: l.type, emoji: '⏱' };
+      {state.limits
+        .filter((l) => l.enabled)
+        .map((l) => {
+        const meta = l.label
+          ? { label: l.label, emoji: '🧩' }
+          : LIMIT_META[l.type] ?? { label: l.type, emoji: '⏱' };
         return (
           <div key={l.type} className="flex items-center gap-2">
             <span className="w-6 text-center text-lg">{meta.emoji}</span>
