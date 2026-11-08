@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { UserRound } from 'lucide-react';
 import {
   BookOpen,
   Calculator,
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
+import { ChildDto } from '../api/types';
 import AchievementsTab from './tabs/AchievementsTab';
 import { NotificationBell, NotificationPanel } from './NotificationCenter';
 import ChildrenTab from './tabs/ChildrenTab';
@@ -43,7 +45,7 @@ type TabId =
   | 'seasonal';
 
 const TABS: Array<{ id: TabId; label: string; icon: typeof LayoutDashboard }> = [
-  { id: 'overview', label: 'Обзор', icon: LayoutDashboard },
+  { id: 'overview', label: 'Профиль ребенка', icon: LayoutDashboard },
   { id: 'children', label: 'Дети', icon: Users },
   { id: 'reading', label: 'Чтение', icon: BookOpen },
   { id: 'math', label: 'Математика', icon: Calculator },
@@ -92,7 +94,27 @@ export default function ParentDashboard() {
   const [tab, setTab] = useState<TabId>('overview');
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifCount, setNotifCount] = useState(0);
+  /** Список детей и выбранный ребёнок — все вкладки показывают его профиль. */
+  const [children, setChildren] = useState<ChildDto[]>([]);
+  const [selectedChildId, setSelectedChildId] = useState<number | null>(null);
   const profile = session?.type === 'parent' ? session.profile : null;
+
+  const loadChildren = useCallback(async () => {
+    try {
+      const list = await api.get<ChildDto[]>('/parent/children');
+      setChildren(list);
+      setSelectedChildId((prev) => {
+        if (prev != null && list.some((c) => c.id === prev)) return prev;
+        return list.length > 0 ? list[0].id : null;
+      });
+    } catch {
+      // тихо — селектор просто не появится
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadChildren();
+  }, [loadChildren]);
 
   const refreshNotifCount = useCallback(async () => {
     try {
@@ -108,6 +130,11 @@ export default function ParentDashboard() {
     const timer = setInterval(() => void refreshNotifCount(), 15000);
     return () => clearInterval(timer);
   }, [refreshNotifCount]);
+
+  /** Обновить список детей после действий во вкладке «Дети» (создание/удаление). */
+  const handleChildrenChanged = useCallback(() => {
+    void loadChildren();
+  }, [loadChildren]);
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -169,18 +196,38 @@ export default function ParentDashboard() {
       {/* Контент */}
       <main className="px-4 pb-24 pt-6 sm:px-6 lg:ml-64 lg:pb-10">
         <div className="mx-auto max-w-6xl">
-          {tab === 'overview' && <OverviewTab />}
-          {tab === 'children' && <ChildrenTab />}
-          {tab === 'reading' && <StoresTab templateFilter="READING" title="📚 Чтение" />}
-          {tab === 'math' && <StoresTab templateFilter="MATH" title="🧮 Математика" />}
-          {tab === 'logic' && <StoresTab templateFilter="LOGIC" title="🧩 Логика" />}
-          {tab === 'lang' && <StoresTab templateFilter="LANG" title="🌍 Иностранный язык" />}
-          {tab === 'sport' && <StoresTab templateFilter="SPORT" title="⚽ Спорт и хобби" />}
-          {tab === 'house' && <StoresTab templateFilter="HOME" title="🏠 Хозяйственность" />}
-          {tab === 'other' && <StoresTab templateFilter="NONE" title="📦 Прочее" />}
-          {tab === 'achievements' && <AchievementsTab />}
-          {tab === 'purchases' && <PurchasesTab />}
-          {tab === 'quests' && <QuestsTab />}
+          {/* Селектор выбранного ребёнка — сверху справа, виден на всех вкладках */}
+          {children.length > 0 && (
+            <div className="sticky top-0 z-20 -mx-1 mb-4 flex items-center justify-end bg-slate-100/95 px-1 py-2 backdrop-blur lg:top-2">
+              <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 shadow-sm">
+                <UserRound size={16} className="text-indigo-500" />
+                <span className="hidden text-xs font-semibold text-slate-500 sm:inline">Профиль:</span>
+                <select
+                  className="max-w-[180px] cursor-pointer bg-transparent text-sm font-bold text-slate-700 outline-none"
+                  value={selectedChildId ?? ''}
+                  onChange={(e) => setSelectedChildId(Number(e.target.value))}
+                >
+                  {children.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.avatarEmoji} {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
+          {tab === 'overview' && <OverviewTab selectedChildId={selectedChildId} />}
+          {tab === 'children' && <ChildrenTab onChanged={handleChildrenChanged} />}
+          {tab === 'reading' && <StoresTab templateFilter="READING" title="📚 Чтение" selectedChildId={selectedChildId} />}
+          {tab === 'math' && <StoresTab templateFilter="MATH" title="🧮 Математика" selectedChildId={selectedChildId} />}
+          {tab === 'logic' && <StoresTab templateFilter="LOGIC" title="🧩 Логика" selectedChildId={selectedChildId} />}
+          {tab === 'lang' && <StoresTab templateFilter="LANG" title="🌍 Иностранный язык" selectedChildId={selectedChildId} />}
+          {tab === 'sport' && <StoresTab templateFilter="SPORT" title="⚽ Спорт и хобби" selectedChildId={selectedChildId} />}
+          {tab === 'house' && <StoresTab templateFilter="HOME" title="🏠 Хозяйственность" selectedChildId={selectedChildId} />}
+          {tab === 'other' && <StoresTab templateFilter="NONE" title="📦 Прочее" selectedChildId={selectedChildId} />}
+          {tab === 'achievements' && <AchievementsTab selectedChildId={selectedChildId} />}
+          {tab === 'purchases' && <PurchasesTab selectedChildId={selectedChildId} />}
+          {tab === 'quests' && <QuestsTab selectedChildId={selectedChildId} />}
           {tab === 'seasonal' && <SeasonalTab />}
         </div>
       </main>

@@ -14,13 +14,17 @@ const FILTERS: Array<{ id: Filter; label: string }> = [
   { id: 'REJECTED', label: 'Отклонены' },
 ];
 
-export default function PurchasesTab() {
+export default function PurchasesTab({ selectedChildId }: { selectedChildId?: number | null } = {}) {
   const [filter, setFilter] = useState<Filter>('ALL');
   const [purchases, setPurchases] = useState<PurchaseDto[]>([]);
   const [activations, setActivations] = useState<InventoryItemDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  /** Показываем покупки выбранного в шапке ребёнка (когда он выбран). */
+  const visiblePurchases = selectedChildId != null ? purchases.filter((p) => p.childId === selectedChildId) : purchases;
+  const visibleActivations = selectedChildId != null ? activations.filter((a) => a.childId === selectedChildId) : activations;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -89,13 +93,13 @@ export default function PurchasesTab() {
       </div>
 
       {/* Запросы на активацию товаров из инвентаря */}
-      {activations.length > 0 && (
+      {visibleActivations.length > 0 && (
         <div className="card border-amber-200 bg-amber-50/60">
           <div className="mb-2 flex items-center gap-2 text-sm font-bold text-amber-800">
-            <PackageCheck size={16} /> Запросы на активацию товаров ({activations.length})
+            <PackageCheck size={16} /> Запросы на активацию товаров ({visibleActivations.length})
           </div>
           <div className="space-y-2">
-            {activations.map((item) => (
+            {visibleActivations.map((item) => (
               <div key={item.id} className="flex flex-wrap items-center gap-3 rounded-xl bg-white px-3 py-2">
                 <div className="text-xl">{item.childAvatar}</div>
                 <div className="min-w-0 flex-1">
@@ -129,11 +133,11 @@ export default function PurchasesTab() {
         </div>
       )}
 
-      {purchases.length === 0 ? (
+      {visiblePurchases.length === 0 ? (
         <EmptyState title="Покупок нет" hint="Заказы детей появятся здесь" />
       ) : (
         <div className="space-y-3">
-          {purchases.map((purchase) => (
+          {visiblePurchases.map((purchase) => (
             <div key={purchase.id} className="card flex flex-wrap items-center gap-3">
               <div className="text-2xl">{purchase.childAvatar}</div>
               <div className="min-w-0 flex-1">

@@ -77,7 +77,7 @@ const QUEST_FILTERS: Array<{ id: QuestFilter; label: string }> = [
  * [валюта магазина + общий XP], одобряет или отклоняет заявки детей.
  * Вкладки: В Разработке / Доступные / Активные / Завершенные / Дейлики.
  */
-export default function QuestsTab() {
+export default function QuestsTab({ selectedChildId }: { selectedChildId?: number | null } = {}) {
   const [quests, setQuests] = useState<QuestDto[]>([]);
   const [submissions, setSubmissions] = useState<QuestSubmissionDto[]>([]);
   const [children, setChildren] = useState<ChildDto[]>([]);
@@ -123,7 +123,7 @@ export default function QuestsTab() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, childId: selectedChildId != null ? String(selectedChildId) : '' });
     setModalOpen(true);
   };
 
@@ -217,11 +217,16 @@ export default function QuestsTab() {
     }
   };
 
-  const filtered = statusFilter === 'ALL' ? submissions : submissions.filter((s) => s.status === statusFilter);
-  const pendingCount = submissions.filter((s) => s.status === 'PENDING').length;
+  /** Заявки выбранного ребёнка (когда профиль выбран в шапке). */
+  const scopedSubmissions = selectedChildId != null ? submissions.filter((s) => s.childId === selectedChildId) : submissions;
+  const filtered = statusFilter === 'ALL' ? scopedSubmissions : scopedSubmissions.filter((s) => s.status === statusFilter);
+  const pendingCount = scopedSubmissions.filter((s) => s.status === 'PENDING').length;
+
+  /** Квесты выбранного ребёнка: общие (без привязки) + персональные для него. */
+  const scopedQuests = selectedChildId != null ? quests.filter((q) => q.childId == null || q.childId === selectedChildId) : quests;
 
   // Группировка квестов по вкладкам
-  const filteredQuests = quests.filter((q) => {
+  const filteredQuests = scopedQuests.filter((q) => {
     switch (questFilter) {
       case 'draft':
         return !q.active;
@@ -278,14 +283,14 @@ export default function QuestsTab() {
           {QUEST_FILTERS.map((f) => {
             const count =
               f.id === 'draft'
-                ? quests.filter((q) => !q.active).length
+                ? scopedQuests.filter((q) => !q.active).length
                 : f.id === 'available'
-                  ? quests.filter((q) => q.active && !q.repeatable && q.activeChildren === 0 && q.doneChildren === 0).length
+                  ? scopedQuests.filter((q) => q.active && !q.repeatable && q.activeChildren === 0 && q.doneChildren === 0).length
                   : f.id === 'active'
-                    ? quests.filter((q) => q.activeChildren > 0).length
+                    ? scopedQuests.filter((q) => q.activeChildren > 0).length
                     : f.id === 'completed'
-                      ? quests.filter((q) => q.doneChildren > 0 && !q.repeatable).length
-                      : quests.filter((q) => q.active && q.repeatable).length;
+                      ? scopedQuests.filter((q) => q.doneChildren > 0 && !q.repeatable).length
+                      : scopedQuests.filter((q) => q.active && q.repeatable).length;
             return (
               <button
                 key={f.id}

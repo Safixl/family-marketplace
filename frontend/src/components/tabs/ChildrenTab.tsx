@@ -16,7 +16,7 @@ interface FormState {
 
 const EMPTY_FORM: FormState = { name: '', avatarEmoji: '😊', active: true, age: '' };
 
-export default function ChildrenTab() {
+export default function ChildrenTab({ onChanged }: { onChanged?: () => void } = {}) {
   const [children, setChildren] = useState<ChildDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +92,7 @@ export default function ChildrenTab() {
       }
       setModalOpen(false);
       await load();
+      onChanged?.();
     } catch (e) {
       alert(errMsg(e));
     } finally {
@@ -117,6 +118,7 @@ export default function ChildrenTab() {
         active: !child.active,
       });
       setChildren((prev) => prev.map((c) => (c.id === child.id ? updated : c)));
+      onChanged?.();
     } catch (e) {
       alert(errMsg(e));
     }

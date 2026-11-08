@@ -29,7 +29,7 @@ function fmtDuration(totalSeconds: number): string {
   return `${m} мин`;
 }
 
-export default function OverviewTab() {
+export default function OverviewTab({ selectedChildId }: { selectedChildId?: number | null } = {}) {
   const [children, setChildren] = useState<OverviewChildDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -130,9 +130,20 @@ export default function OverviewTab() {
     );
   }
 
+  /** Выбранный в шапке ребёнок: показываем только его профиль. */
+  const visible = selectedChildId != null ? children.filter((c) => c.id === selectedChildId) : children;
+  if (visible.length === 0) {
+    return (
+      <EmptyState
+        title="Ребёнок не найден"
+        hint="Возможно, профиль был удалён — выберите другого ребёнка в селекторе сверху"
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {children.map((child) => (
+      {visible.map((child) => (
         <ChildCard
           key={child.id}
           child={child}

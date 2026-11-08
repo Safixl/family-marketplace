@@ -60,7 +60,7 @@ const TARGET_OPTIONS: Array<{ value: string; label: string; unit: string }> = [
   { value: 'HOME_PURCHASES', label: 'Выкупить товаров в магазине Дом', unit: 'товаров' },
 ];
 
-export default function AchievementsTab() {
+export default function AchievementsTab({ selectedChildId }: { selectedChildId?: number | null } = {}) {
   const [achievements, setAchievements] = useState<AchievementDto[]>([]);
   const [children, setChildren] = useState<ChildDto[]>([]);
   const [stores, setStores] = useState<StoreDto[]>([]);
@@ -223,7 +223,8 @@ export default function AchievementsTab() {
 
   const openGrant = (achievement: AchievementDto) => {
     setGrantFor(achievement);
-    setGrantChildId('');
+    // По умолчанию выдаём ребёнку, выбранному в шапке
+    setGrantChildId(selectedChildId != null ? String(selectedChildId) : '');
   };
 
   const grant = async () => {

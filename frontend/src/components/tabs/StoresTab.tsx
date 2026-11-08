@@ -51,9 +51,11 @@ interface StoresTabProps {
   templateFilter?: string;
   /** Заголовок вкладки */
   title?: string;
+  /** Ребёнок, выбранный в шапке: дефолт для подключения навыка и менеджеров */
+  selectedChildId?: number | null;
 }
 
-export default function StoresTab({ templateFilter, title }: StoresTabProps) {
+export default function StoresTab({ templateFilter, title, selectedChildId }: StoresTabProps) {
   const [stores, setStores] = useState<StoreDto[]>([]);
   const [productsByStore, setProductsByStore] = useState<Record<number, ProductDto[]>>({});
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
@@ -94,7 +96,13 @@ export default function StoresTab({ templateFilter, title }: StoresTabProps) {
       setTemplates(templateList);
       setChildren(childList.filter((c) => c.active));
       setActivations(activationList);
-      setActivateChildId((prev) => prev || String(childList.find((c) => c.active)?.id ?? ''));
+      setActivateChildId((prev) => {
+        if (prev) return prev;
+        if (selectedChildId != null && childList.some((c) => c.id === selectedChildId)) {
+          return String(selectedChildId);
+        }
+        return String(childList.find((c) => c.active)?.id ?? '');
+      });
     } catch (e) {
       setError(errMsg(e));
     } finally {
@@ -105,6 +113,13 @@ export default function StoresTab({ templateFilter, title }: StoresTabProps) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Смена ребёнка в шапке: селектор подключения навыка следует за выбором
+  useEffect(() => {
+    if (selectedChildId != null) {
+      setActivateChildId(String(selectedChildId));
+    }
+  }, [selectedChildId]);
 
   /** Активировать навык конкретному ребёнку (магазин шаблона включается идемпотентно). */
   const activateTemplate = async (slug: string) => {
