@@ -256,7 +256,7 @@ export default function ChildHouseView({ storeId }: Props) {
                     🔥 Это день {selStreak} стрика — за уборку начисляется бонус +{selStreak} XP к навыку!
                   </div>
                 )}
-                <DayInfo label="Порядок в комнате">
+                <DayInfo label="Хозяйственность">
                   {(() => {
                     const r = ROOM_RATINGS.find((x) => x.value === selectedDay.d!.roomScore);
                     return r ? (

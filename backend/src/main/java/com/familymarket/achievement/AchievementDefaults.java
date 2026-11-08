@@ -446,7 +446,7 @@ public final class AchievementDefaults {
         out.add(a);
     }
 
-    /** Стартовый комплект достижений навыка «Порядок в комнате». */
+    /** Стартовый комплект достижений навыка «Хозяйственность». */
     public static List<Achievement> house(User parent) {
         List<Achievement> out = new ArrayList<>();
 
@@ -522,7 +522,7 @@ public final class AchievementDefaults {
         return out;
     }
 
-    /** Вариант addLevels для навыка «Порядок в комнате». */
+    /** Вариант addLevels для навыка «Хозяйственность». */
     private static void addLevelsHouse(List<Achievement> out, User parent, String name, String description, String icon,
                                       String targetType, String groupKey, int[] values, String[] stepNames, String unit) {
         for (int i = 0; i < values.length; i++) {

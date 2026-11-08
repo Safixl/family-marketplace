@@ -462,7 +462,7 @@ public class DailyService {
         boolean positive = done && (houseDay.getRoomScore() > 0 || houseDay.getLivingScore() > 0);
         long ok = positive ? 1 : 0;
         long fail = done && !positive ? 1 : 0;
-        return skill("HOUSE", "Порядок в комнате", "🏠", store, List.of(), List.of(), 0, 0,
+        return skill("HOUSE", "Хозяйственность", "🏠", store, List.of(), List.of(), 0, 0,
                 ok + fail, 1, done, ok + fail, 1, ok, fail);
     }
 

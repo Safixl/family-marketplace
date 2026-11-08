@@ -38,7 +38,7 @@ const SKILL_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'LOGIC', label: '🧩 Логика' },
   { value: 'LANG', label: '🌍 Иностранный язык' },
   { value: 'SPORT', label: '⚽ Спорт и хобби' },
-  { value: 'HOUSE', label: '🏠 Порядок в комнате' },
+  { value: 'HOUSE', label: '🏠 Хозяйственность' },
 ];
 
 const TARGET_OPTIONS: Array<{ value: string; label: string; unit: string }> = [
@@ -55,7 +55,7 @@ const TARGET_OPTIONS: Array<{ value: string; label: string; unit: string }> = [
   { value: 'LOGIC_STREAK', label: 'Дейлики логики без пропусков (дней)', unit: 'дней' },
   { value: 'LANG_STREAK', label: 'Дейлики языка без пропусков (дней)', unit: 'дней' },
   { value: 'SPORT_STREAK', label: 'Активность без пропусков (дней)', unit: 'дней' },
-  { value: 'HOUSE_CLEAN_STREAK', label: 'Порядок в комнате (дней подряд)', unit: 'дней' },
+  { value: 'HOUSE_CLEAN_STREAK', label: 'Хозяйственность (дней подряд)', unit: 'дней' },
   { value: 'HOUSE_HELP_STREAK', label: 'Помощь по дому (дней подряд)', unit: 'дней' },
   { value: 'HOME_PURCHASES', label: 'Выкупить товаров в магазине Дом', unit: 'товаров' },
 ];
@@ -305,7 +305,7 @@ export default function AchievementsTab() {
               <option value="ALL">Все навыки</option>
               <option value="READING">📚 Чтение</option>
               <option value="MATH">🧮 Математика</option>
-              <option value="HOUSE">🏠 Порядок в комнате</option>
+              <option value="HOUSE">🏠 Хозяйственность</option>
               <option value="NONE">Без навыка</option>
             </select>
             <select
@@ -330,7 +330,7 @@ export default function AchievementsTab() {
                 : skill === 'MATH'
                   ? '🧮 Математика'
                   : skill === 'HOUSE'
-                    ? '🏠 Порядок в комнате'
+                    ? '🏠 Хозяйственность'
                     : '🏅 Без навыка';
             return (
               <section key={skill}>

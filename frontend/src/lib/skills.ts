@@ -308,7 +308,7 @@ export const SKILLS: SkillConfig[] = [
   },
   {
     id: 'HOUSE',
-    name: 'Порядок в комнате',
+    name: 'Хозяйственность',
     icon: '🏠',
     color: '#4ade80',
     gradient: 'from-green-400 to-emerald-600',
@@ -317,7 +317,7 @@ export const SKILLS: SkillConfig[] = [
     archiveEmpty: 'Отмеченные дни появятся здесь',
     requestTitle: 'Помощь по дому',
     requestPlaceholder: 'Карточки помощи по дому с бонусом в календарь',
-    statsTitle: 'Статистика по порядку в комнате',
+    statsTitle: 'Статистика по хозяйственности',
     loadArchive: async () => [],
     loadRequests: async () => [],
     loadStats: async (progress) => ({

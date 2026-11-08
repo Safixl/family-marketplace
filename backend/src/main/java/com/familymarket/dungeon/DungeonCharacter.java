@@ -37,7 +37,7 @@ public class DungeonCharacter {
     @Column(nullable = false)
     private int stamina = 100;
 
-    /** Постоянный бонус к максимальной выносливости (ранги «Порядка в комнате»). */
+    /** Постоянный бонус к максимальной выносливости (ранги «Хозяйственности»). */
     @Column(name = "max_stamina_bonus", nullable = false)
     private int maxStaminaBonus = 0;
 

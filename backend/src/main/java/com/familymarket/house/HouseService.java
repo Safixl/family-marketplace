@@ -260,7 +260,7 @@ public class HouseService {
                 .map(HouseDayDto::points)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // Текущий стрик «Порядка в комнате»: серия подтверждённых дней подряд,
+        // Текущий стрик «Хозяйственности»: серия подтверждённых дней подряд,
         // оканчивающаяся сегодня (или вчера — стрик ещё можно сохранить сегодня).
         int currentStreak = 0;
         LocalDate streakEnd = null;

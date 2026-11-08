@@ -50,7 +50,7 @@ const TABS: Array<{ id: TabId; label: string; icon: typeof LayoutDashboard }> = 
   { id: 'logic', label: 'Логика', icon: Puzzle },
   { id: 'lang', label: 'Иностранный язык', icon: Globe2 },
   { id: 'sport', label: 'Спорт и хобби', icon: Dumbbell },
-  { id: 'house', label: 'Порядок в комнате', icon: Home },
+  { id: 'house', label: 'Хозяйственность', icon: Home },
   { id: 'other', label: 'Прочее', icon: Package },
   { id: 'quests', label: 'Квесты', icon: ScrollText },
   { id: 'seasonal', label: 'Сезоны', icon: Sparkles },
@@ -176,7 +176,7 @@ export default function ParentDashboard() {
           {tab === 'logic' && <StoresTab templateFilter="LOGIC" title="🧩 Логика" />}
           {tab === 'lang' && <StoresTab templateFilter="LANG" title="🌍 Иностранный язык" />}
           {tab === 'sport' && <StoresTab templateFilter="SPORT" title="⚽ Спорт и хобби" />}
-          {tab === 'house' && <StoresTab templateFilter="HOME" title="🏠 Порядок в комнате" />}
+          {tab === 'house' && <StoresTab templateFilter="HOME" title="🏠 Хозяйственность" />}
           {tab === 'other' && <StoresTab templateFilter="NONE" title="📦 Прочее" />}
           {tab === 'achievements' && <AchievementsTab />}
           {tab === 'purchases' && <PurchasesTab />}

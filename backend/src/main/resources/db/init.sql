@@ -1172,3 +1172,6 @@ INSERT INTO equipment_defs (code, name, slot, rarity, stat_multiplier, icon, des
     ('spell_tome',      'Гримуар заклинаний',     'HAND_L', 'RARE',      1.9, '📕', 'Шепчет слова силы'),
     ('parry_dagger',    'Кинжал для левой руки',  'HAND_L', 'UNCOMMON',  1.5, '🗡️', 'Отвечает на удары')
 ON CONFLICT (code) DO NOTHING;
+
+-- Ребрендинг навыка «Порядок в комнате» → «Хозяйственность»: обновляем описания существующих магазинов
+UPDATE stores SET description = REPLACE(description, 'порядок в комнате', 'хозяйственность') WHERE description LIKE '%порядок в комнате%';

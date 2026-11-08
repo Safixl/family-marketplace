@@ -306,7 +306,7 @@ public class DungeonService {
 
     /**
      * Восстановление выносливости: лимит обновляется каждый день ровно в 09:00 МСК.
-     * Максимум = 100% + 10% за каждый ранг «Порядка в комнаты» начиная с «Железа».
+     * Максимум = 100% + 10% за каждый ранг «Хозяйственности» начиная с «Железа».
      */
     private void refreshCharacter(DungeonCharacter character) {
         Map<String, Integer> levels = skillLevels(character.getChildId());

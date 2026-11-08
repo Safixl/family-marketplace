@@ -43,7 +43,7 @@ public class SkillService {
             new SkillMeta("LOGIC", "Логика", "🧩"),
             new SkillMeta("LANG", "Иностранный язык", "🌍"),
             new SkillMeta("SPORT", "Спорт и хобби", "⚽"),
-            new SkillMeta("HOUSE", "Порядок в комнате", "🏠"));
+            new SkillMeta("HOUSE", "Хозяйственность", "🏠"));
 
     private final ChildRepository childRepository;
     private final AchievementRepository achievementRepository;
@@ -147,7 +147,7 @@ public class SkillService {
     }
 
     /**
-     * XP навыка «Порядок в комнате»: 1 подтверждённый рум (порядок или помощь) = 1 XP
+     * XP навыка «Хозяйственность»: 1 подтверждённый рум (порядок или помощь) = 1 XP
      * + бонус стрика (день 2 → +2, день 5 → +5, … день 31 → +31; максимум 31)
      * + на поддержании стрика 31 дополнительно 1 рум в день.
      * Стрик сбрасывается на 1, если день без подтверждений.
@@ -156,7 +156,7 @@ public class SkillService {
         if (housePositive <= 0) {
             return 0;
         }
-        // [0]=порядок в комнате, [1]=помощь по дому — по датам
+        // [0]=хозяйственность, [1]=помощь по дому — по датам
         Map<LocalDate, int[]> byDay = new TreeMap<>();
         for (HouseDay d : houseDayRepository.findByChildIdOrderByDayAsc(childId)) {
             if (d.getRoomScore() <= 0 && d.getLivingScore() <= 0) {

@@ -13,7 +13,7 @@ public interface HouseDayRepository extends JpaRepository<HouseDay, Long> {
     List<HouseDay> findByStoreIdAndChildIdAndDayBetweenOrderByDayAsc(Long storeId, Long childId,
                                                                     LocalDate from, LocalDate to);
 
-    /** Все дни ребёнка по порядку дат (для расчёта стрика «Порядок в комнате»). */
+    /** Все дни ребёнка по порядку дат (для расчёта стрика «Хозяйственность»). */
     List<HouseDay> findByChildIdOrderByDayAsc(Long childId);
 
     Optional<HouseDay> findByStoreIdAndChildIdAndDay(Long storeId, Long childId, LocalDate day);

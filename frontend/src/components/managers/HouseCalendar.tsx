@@ -292,7 +292,7 @@ export default function HouseCalendar({ store, onClose }: Props) {
         <Modal title={`Оценка за ${editDay}`} onClose={() => setEditDay(null)}>
           <div className="space-y-4">
             <div>
-              <label className="label">Порядок в комнате</label>
+              <label className="label">Хозяйственность</label>
               <div className="flex flex-wrap gap-1.5">
                 {ROOM_RATINGS.map((r) => (
                   <button
