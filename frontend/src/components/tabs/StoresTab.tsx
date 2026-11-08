@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { BookOpen, CalendarDays, CheckCircle2, ChevronDown, ChevronUp, Package, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { api } from '../../api/client';
-import { ChildDto, ProductDto, SkillActivationDto, StoreDto, StoreTemplateDto } from '../../api/types';
+import { ProductDto, SkillActivationDto, StoreDto } from '../../api/types';
 import { errMsg, fmtAmount } from '../../lib/format';
 import Modal from '../Modal';
 import BooksManager from '../managers/BooksManager';
@@ -63,11 +63,9 @@ export default function StoresTab({ templateFilter, title, selectedChildId }: St
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const [templates, setTemplates] = useState<StoreTemplateDto[]>([]);
-  const [children, setChildren] = useState<ChildDto[]>([]);
   const [activations, setActivations] = useState<SkillActivationDto[]>([]);
-  const [activateChildId, setActivateChildId] = useState<string>('');
-  const [templateModal, setTemplateModal] = useState(false);
+  /** Ребёнок для менеджеров, привязанных к профилю (карточки языка/спорта). */
+  const childId = selectedChildId ?? undefined;
   const [managerFor, setManagerFor] = useState<
     | { store: StoreDto; type: 'books' | 'tasks' | 'house' | 'cards' | 'mathCard' | 'logicCard' | 'langCard' | 'sportCard'; skill?: 'MATH' | 'HOUSE' }
     | null
@@ -86,23 +84,12 @@ export default function StoresTab({ templateFilter, title, selectedChildId }: St
     setLoading(true);
     setError(null);
     try {
-      const [storeList, templateList, childList, activationList] = await Promise.all([
+      const [storeList, activationList] = await Promise.all([
         api.get<StoreDto[]>('/parent/stores'),
-        api.get<StoreTemplateDto[]>('/parent/store-templates'),
-        api.get<ChildDto[]>('/parent/children'),
         api.get<SkillActivationDto[]>('/parent/skill-activations'),
       ]);
       setStores(storeList);
-      setTemplates(templateList);
-      setChildren(childList.filter((c) => c.active));
       setActivations(activationList);
-      setActivateChildId((prev) => {
-        if (prev) return prev;
-        if (selectedChildId != null && childList.some((c) => c.id === selectedChildId)) {
-          return String(selectedChildId);
-        }
-        return String(childList.find((c) => c.active)?.id ?? '');
-      });
     } catch (e) {
       setError(errMsg(e));
     } finally {
@@ -113,34 +100,6 @@ export default function StoresTab({ templateFilter, title, selectedChildId }: St
   useEffect(() => {
     void load();
   }, [load]);
-
-  // Смена ребёнка в шапке: селектор подключения навыка следует за выбором
-  useEffect(() => {
-    if (selectedChildId != null) {
-      setActivateChildId(String(selectedChildId));
-    }
-  }, [selectedChildId]);
-
-  /** Активировать навык конкретному ребёнку (магазин шаблона включается идемпотентно). */
-  const activateTemplate = async (slug: string) => {
-    if (!activateChildId) {
-      alert('Выберите ребёнка, для которого активируется навык');
-      return;
-    }
-    setBusy(true);
-    try {
-      await api.post(`/parent/store-templates/${slug}/activate?childId=${activateChildId}`);
-      setTemplateModal(false);
-      const activatedFor = children.find((c) => String(c.id) === activateChildId);
-      const name = activatedFor ? `${activatedFor.avatarEmoji} ${activatedFor.name}` : `ребёнка #${activateChildId}`;
-      alert(`Навык активирован для ${name}`);
-      await load();
-    } catch (e) {
-      alert(errMsg(e));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const loadProducts = async (storeId: number) => {
     try {
@@ -338,16 +297,11 @@ export default function StoresTab({ templateFilter, title, selectedChildId }: St
             </div>
           )}
         </div>
-        <div className="flex gap-2">
-          <button className="btn-primary" onClick={() => setTemplateModal(true)}>
-            <Sparkles size={18} /> {templateFilter ? 'Активировать навык' : 'Из шаблона'}
+        {!templateFilter && (
+          <button className="btn-secondary" onClick={openStoreCreate}>
+            <Plus size={18} /> Создать магазин
           </button>
-          {!templateFilter && (
-            <button className="btn-secondary" onClick={openStoreCreate}>
-              <Plus size={18} /> Создать магазин
-            </button>
-          )}
-        </div>
+        )}
       </div>
 
       {visibleStores.length === 0 ? (
@@ -750,73 +704,6 @@ export default function StoresTab({ templateFilter, title, selectedChildId }: St
         </Modal>
       )}
 
-      {/* Модалка шаблонов / активации навыка */}
-      {templateModal && (
-        <Modal
-          title={templateFilter ? 'Активация навыка для ребёнка' : 'Готовые магазины'}
-          onClose={() => setTemplateModal(false)}
-          wide
-        >
-          <div className="space-y-3">
-            <p className="text-sm text-slate-500">
-              {templateFilter
-                ? 'Выберите ребёнка — навык включится именно для него. Готовый магазин с валютой и товарами создастся автоматически.'
-                : 'Выберите ребёнка — шаблонный магазин с товарами создастся и закрепится за выбранным ребёнком.'}
-            </p>
-            {children.length === 0 ? (
-              <div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-700">
-                Сначала создайте ребёнка во вкладке «Дети».
-              </div>
-            ) : (
-              <div>
-                <label className="label">Ребёнок</label>
-                <select
-                  className="input"
-                  value={activateChildId}
-                  onChange={(e) => setActivateChildId(e.target.value)}
-                >
-                  {children.map((c) => (
-                    <option key={c.id} value={String(c.id)}>
-                      {c.avatarEmoji} {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-            {templates
-              .filter((t) => !templateFilter || templateFilter === 'NONE' || t.type === templateFilter)
-              .map((t) => {
-                const store = stores.find((s) => s.templateType === t.type);
-                const isOn = activations.some((a) => a.skill === t.type && String(a.childId) === activateChildId);
-                return (
-                  <div key={t.slug} className="flex items-start gap-3 rounded-2xl border border-slate-200 p-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-100 to-fuchsia-100 text-2xl">
-                      {t.currencyIcon}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="font-bold">{t.name}</div>
-                      <p className="text-sm text-slate-500">{t.description}</p>
-                      <div className="mt-1 text-xs font-medium text-indigo-600">
-                        Валюта: {t.currencyIcon} {t.currencyName}
-                      </div>
-                      {store && (
-                        <div className="mt-0.5 text-xs text-slate-400">магазин настроен → {store.name}</div>
-                      )}
-                    </div>
-                    <button
-                      className={isOn ? 'btn-secondary' : 'btn-primary'}
-                      disabled={busy || children.length === 0}
-                      onClick={() => void activateTemplate(t.slug)}
-                    >
-                      {isOn ? 'Активировать ещё раз' : 'Активировать'}
-                    </button>
-                  </div>
-                );
-              })}
-          </div>
-        </Modal>
-      )}
-
       {/* Архив чтения ребёнка — внизу вкладки «Чтение» */}
       {templateFilter === 'READING' && <ReadingArchive />}
 
@@ -840,10 +727,10 @@ export default function StoresTab({ templateFilter, title, selectedChildId }: St
         <LogicCardSettings onClose={() => setManagerFor(null)} />
       )}
       {managerFor?.type === 'langCard' && (
-        <LangCardSettings childId={activateChildId ? Number(activateChildId) : undefined} onClose={() => setManagerFor(null)} />
+        <LangCardSettings childId={childId} onClose={() => setManagerFor(null)} />
       )}
       {managerFor?.type === 'sportCard' && (
-        <SportCardSettings childId={activateChildId ? Number(activateChildId) : undefined} onClose={() => setManagerFor(null)} />
+        <SportCardSettings childId={childId} onClose={() => setManagerFor(null)} />
       )}
     </div>
   );

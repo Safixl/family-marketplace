@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
-import { ChildDto } from '../api/types';
+import { ChildDto, SkillActivationDto } from '../api/types';
 import AchievementsTab from './tabs/AchievementsTab';
 import { NotificationBell, NotificationPanel } from './NotificationCenter';
 import ChildrenTab from './tabs/ChildrenTab';
@@ -60,6 +60,16 @@ const TABS: Array<{ id: TabId; label: string; icon: typeof LayoutDashboard }> = 
   { id: 'purchases', label: 'Покупки', icon: ShoppingCart },
 ];
 
+/** Вкладка навыка → код навыка (вкладка видна только когда навык активирован ребёнку). */
+const TAB_SKILL: Partial<Record<TabId, string>> = {
+  reading: 'READING',
+  math: 'MATH',
+  logic: 'LOGIC',
+  lang: 'LANG',
+  sport: 'SPORT',
+  house: 'HOUSE',
+};
+
 /**
  * Клик по уведомлению открывает вкладку, где родитель может ответить:
  * квесты → «Квесты», спорт-дейлик → «Спорт и хобби», чтение → «Чтение» и т.д.
@@ -97,6 +107,8 @@ export default function ParentDashboard() {
   /** Список детей и выбранный ребёнок — все вкладки показывают его профиль. */
   const [children, setChildren] = useState<ChildDto[]>([]);
   const [selectedChildId, setSelectedChildId] = useState<number | null>(null);
+  /** Активированные навыки детей — вкладки навыков видны только для активированных. */
+  const [activations, setActivations] = useState<SkillActivationDto[]>([]);
   const profile = session?.type === 'parent' ? session.profile : null;
 
   const loadChildren = useCallback(async () => {
@@ -115,6 +127,22 @@ export default function ParentDashboard() {
   useEffect(() => {
     void loadChildren();
   }, [loadChildren]);
+
+  const loadActivations = useCallback(async () => {
+    try {
+      setActivations(await api.get<SkillActivationDto[]>('/parent/skill-activations'));
+    } catch {
+      // тихо — вкладки навыков просто не появятся до перезагрузки
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadActivations();
+  }, [loadActivations]);
+
+  /** Коды навыков, активированных выбранному ребёнку. */
+  const activeSkillCodes =
+    selectedChildId == null ? [] : activations.filter((a) => a.childId === selectedChildId).map((a) => a.skill);
 
   const refreshNotifCount = useCallback(async () => {
     try {
@@ -143,6 +171,27 @@ export default function ParentDashboard() {
     setQuestCreate((prev) => ({ childId, seq: (prev?.seq ?? 0) + 1 }));
   }, []);
 
+  /** Вкладки, доступные для выбранного ребёнка (навыковые — только при активации). */
+  const visibleTabs = TABS.filter((t) => {
+    const skill = TAB_SKILL[t.id];
+    return !skill || activeSkillCodes.includes(skill);
+  });
+
+  // Выбранный ребёнок без активированного навыка → уходим с навыковой вкладки
+  useEffect(() => {
+    const skill = TAB_SKILL[tab];
+    if (skill && !activeSkillCodes.includes(skill)) {
+      setTab('overview');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, selectedChildId, activations]);
+
+  /** Обновление активаций после включения/выключения навыка в «Профиле ребенка». */
+  const handleSkillsChanged = useCallback(() => {
+    void loadActivations();
+    void loadChildren();
+  }, [loadActivations, loadChildren]);
+
   return (
     <div className="min-h-screen bg-slate-100">
       {/* Сайдбар (десктоп) */}
@@ -157,7 +206,7 @@ export default function ParentDashboard() {
           </div>
         </div>
         <nav className="flex-1 space-y-1">
-          {TABS.map((t) => {
+        {visibleTabs.map((t) => {
             const Icon = t.icon;
             return (
               <button
@@ -223,7 +272,9 @@ export default function ParentDashboard() {
               </label>
             </div>
           )}
-          {tab === 'overview' && <OverviewTab selectedChildId={selectedChildId} onCreateQuest={startQuestCreate} />}
+          {tab === 'overview' && (
+            <OverviewTab selectedChildId={selectedChildId} onCreateQuest={startQuestCreate} onSkillsChanged={handleSkillsChanged} />
+          )}
           {tab === 'children' && <ChildrenTab onChanged={handleChildrenChanged} />}
           {tab === 'reading' && <StoresTab templateFilter="READING" title="📚 Чтение" selectedChildId={selectedChildId} />}
           {tab === 'math' && <StoresTab templateFilter="MATH" title="🧮 Математика" selectedChildId={selectedChildId} />}
@@ -254,7 +305,7 @@ export default function ParentDashboard() {
 
       {/* Нижняя навигация (мобильный) */}
       <nav className="fixed inset-x-0 bottom-0 z-30 flex justify-around border-t border-slate-200 bg-white px-2 py-2 lg:hidden">
-        {TABS.map((t) => {
+        {visibleTabs.map((t) => {
           const Icon = t.icon;
           return (
             <button

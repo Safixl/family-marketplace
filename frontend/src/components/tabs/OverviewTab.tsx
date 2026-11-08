@@ -42,7 +42,13 @@ function fmtDuration(totalSeconds: number): string {
 export default function OverviewTab({
   selectedChildId,
   onCreateQuest,
-}: { selectedChildId?: number | null; onCreateQuest?: (childId: number | null) => void } = {}) {
+  onSkillsChanged,
+}: {
+  selectedChildId?: number | null;
+  onCreateQuest?: (childId: number | null) => void;
+  /** Вызывается после включения/выключения навыка тумблером. */
+  onSkillsChanged?: () => void;
+} = {}) {
   /** Навыки, переключаемые тумблером: skill → busy */
   const [skillBusy, setSkillBusy] = useState<Record<string, boolean>>({});
 
@@ -58,6 +64,7 @@ export default function OverviewTab({
     };
     void runIt()
       .then(() => load())
+      .then(() => onSkillsChanged?.())
       .catch((e) => alert(errMsg(e)))
       .finally(() => setSkillBusy((p) => ({ ...p, [skill]: false })));
   };
