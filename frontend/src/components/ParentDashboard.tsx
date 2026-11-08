@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { UserRound } from 'lucide-react';
+import { Check, ChevronDown, Plus } from 'lucide-react';
 import {
   BookOpen,
   Calculator,
@@ -45,8 +45,8 @@ type TabId =
   | 'seasonal';
 
 const TABS: Array<{ id: TabId; label: string; icon: typeof LayoutDashboard }> = [
-  { id: 'overview', label: 'Профиль ребенка', icon: LayoutDashboard },
   { id: 'children', label: 'Дети', icon: Users },
+  { id: 'overview', label: 'Профиль ребенка', icon: LayoutDashboard },
   { id: 'reading', label: 'Чтение', icon: BookOpen },
   { id: 'math', label: 'Математика', icon: Calculator },
   { id: 'logic', label: 'Логика', icon: Puzzle },
@@ -171,11 +171,26 @@ export default function ParentDashboard() {
     setQuestCreate((prev) => ({ childId, seq: (prev?.seq ?? 0) + 1 }));
   }, []);
 
-  /** Вкладки, доступные для выбранного ребёнка (навыковые — только при активации). */
-  const visibleTabs = TABS.filter((t) => {
+  /** Запрос на создание ребёнка из кнопки «Дети» (seq — чтобы повторный клик снова открывал форму). */
+  const [childCreate, setChildCreate] = useState<{ seq: number } | null>(null);
+  const startChildCreate = useCallback(() => {
+    setTab('children');
+    setChildCreate((prev) => ({ seq: (prev?.seq ?? 0) + 1 }));
+  }, []);
+
+  /** Вкладки, доступные для выбранного ребёнка (навыковые — только при активации).
+   *  Пока детей нет — доступна только вкладка «Дети». */
+  const visibleTabs = (children.length === 0 ? TABS.filter((t) => t.id === 'children') : TABS).filter((t) => {
     const skill = TAB_SKILL[t.id];
     return !skill || activeSkillCodes.includes(skill);
   });
+
+  // Нет детей (или их ещё не загрузили) → открываем вкладку «Дети»
+  useEffect(() => {
+    if (children.length === 0) {
+      setTab('children');
+    }
+  }, [children.length]);
 
   // Выбранный ребёнок без активированного навыка → уходим с навыковой вкладки
   useEffect(() => {
@@ -206,20 +221,31 @@ export default function ParentDashboard() {
           </div>
         </div>
         <nav className="flex-1 space-y-1">
-        {visibleTabs.map((t) => {
-            const Icon = t.icon;
-            return (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
-                  tab === t.id ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                }`}
-              >
-                <Icon size={18} /> {t.label}
-              </button>
-            );
-          })}
+          <ChildPicker
+            childrenList={children}
+            selectedChildId={selectedChildId}
+            tabActive={tab === 'children'}
+            variant="sidebar"
+            onOpenTab={() => setTab('children')}
+            onSelect={(id) => setSelectedChildId(id)}
+            onCreate={startChildCreate}
+          />
+          {visibleTabs
+            .filter((t) => t.id !== 'children')
+            .map((t) => {
+              const Icon = t.icon;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setTab(t.id)}
+                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+                    tab === t.id ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  }`}
+                >
+                  <Icon size={18} /> {t.label}
+                </button>
+              );
+            })}
         </nav>
         <div className="border-t border-slate-800 pt-4">
           <div className="mb-2 flex items-center justify-between px-2">
@@ -236,11 +262,20 @@ export default function ParentDashboard() {
       </aside>
 
       {/* Шапка (мобильный) */}
-      <header className="sticky top-0 z-30 flex items-center justify-between bg-slate-900 px-4 py-3 lg:hidden">
+      <header className="sticky top-0 z-30 flex items-center justify-between gap-2 bg-slate-900 px-4 py-3 lg:hidden">
         <div className="flex items-center gap-2 text-white">
           <Zap size={20} className="text-indigo-400" />
           <span className="font-bold">Дейлики</span>
         </div>
+        <ChildPicker
+          childrenList={children}
+          selectedChildId={selectedChildId}
+          tabActive={tab === 'children'}
+          variant="mobile"
+          onOpenTab={() => setTab('children')}
+          onSelect={(id) => setSelectedChildId(id)}
+          onCreate={startChildCreate}
+        />
         <div className="flex items-center gap-1">
           <NotificationBell count={notifCount} onClick={() => setNotifOpen(true)} />
           <button onClick={logout} className="rounded-xl p-2 text-slate-300 hover:bg-slate-800" title="Выйти">
@@ -252,30 +287,16 @@ export default function ParentDashboard() {
       {/* Контент */}
       <main className="px-4 pb-24 pt-6 sm:px-6 lg:ml-64 lg:pb-10">
         <div className="mx-auto max-w-6xl">
-          {/* Селектор выбранного ребёнка — сверху справа, виден на всех вкладках */}
-          {children.length > 0 && (
-            <div className="sticky top-0 z-20 -mx-1 mb-4 flex items-center justify-end bg-slate-100/95 px-1 py-2 backdrop-blur lg:top-2">
-              <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 shadow-sm">
-                <UserRound size={16} className="text-indigo-500" />
-                <span className="hidden text-xs font-semibold text-slate-500 sm:inline">Профиль:</span>
-                <select
-                  className="max-w-[180px] cursor-pointer bg-transparent text-sm font-bold text-slate-700 outline-none"
-                  value={selectedChildId ?? ''}
-                  onChange={(e) => setSelectedChildId(Number(e.target.value))}
-                >
-                  {children.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.avatarEmoji} {c.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          )}
           {tab === 'overview' && (
             <OverviewTab selectedChildId={selectedChildId} onCreateQuest={startQuestCreate} onSkillsChanged={handleSkillsChanged} />
           )}
-          {tab === 'children' && <ChildrenTab onChanged={handleChildrenChanged} />}
+          {tab === 'children' && (
+            <ChildrenTab
+              onChanged={handleChildrenChanged}
+              createRequest={childCreate}
+              onCreateConsumed={() => setChildCreate(null)}
+            />
+          )}
           {tab === 'reading' && <StoresTab templateFilter="READING" title="📚 Чтение" selectedChildId={selectedChildId} />}
           {tab === 'math' && <StoresTab templateFilter="MATH" title="🧮 Математика" selectedChildId={selectedChildId} />}
           {tab === 'logic' && <StoresTab templateFilter="LOGIC" title="🧩 Логика" selectedChildId={selectedChildId} />}
@@ -320,6 +341,121 @@ export default function ParentDashboard() {
           );
         })}
       </nav>
+    </div>
+  );
+}
+
+/**
+ * Кнопка «Дети»: левая часть — переход во вкладку «Дети»,
+ * правая — выбранный ребёнок (при >1 детях по клику открывается список выбора
+ * с пунктом «+ Добавить ребёнка»).
+ */
+function ChildPicker({
+  childrenList,
+  selectedChildId,
+  tabActive,
+  variant,
+  onOpenTab,
+  onSelect,
+  onCreate,
+}: {
+  childrenList: ChildDto[];
+  selectedChildId: number | null;
+  tabActive: boolean;
+  variant: 'sidebar' | 'mobile';
+  onOpenTab: () => void;
+  onSelect: (id: number) => void;
+  onCreate: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = childrenList.find((c) => c.id === selectedChildId) ?? null;
+  const compact = variant === 'mobile';
+
+  return (
+    <div className="relative">
+      <div
+        className={`flex overflow-hidden rounded-xl ${
+          compact ? 'bg-slate-800/70' : tabActive ? 'bg-indigo-600' : 'bg-slate-800/60'
+        }`}
+      >
+        {/* Левая часть: переход во вкладку «Дети» */}
+        <button
+          onClick={() => {
+            setOpen(false);
+            onOpenTab();
+          }}
+          className={`flex items-center gap-2 px-3 py-2 font-medium transition-colors ${
+            compact ? 'text-white' : 'flex-1 gap-3 px-3 py-2.5 text-sm'
+          } ${tabActive || compact ? 'text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}
+        >
+          <Users size={compact ? 14 : 18} /> Дети
+        </button>
+        {/* Правая часть: выбранный ребёнок (выбор открывается, если детей больше 1) */}
+        {selected && (
+          childrenList.length > 1 ? (
+            <button
+              onClick={() => setOpen((v) => !v)}
+              className={`flex items-center gap-1.5 border-l border-slate-700/60 px-2.5 transition-colors ${
+                compact ? 'py-1.5 text-white' : 'py-2.5 text-sm text-slate-200 hover:bg-slate-800'
+              }`}
+              title="Выбрать ребёнка"
+            >
+              <span className={`truncate ${compact ? 'max-w-[90px]' : 'max-w-[110px]'}`}>
+                {selected.avatarEmoji} {selected.name}
+              </span>
+              <ChevronDown size={compact ? 12 : 14} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+            </button>
+          ) : (
+            <span
+              className={`flex items-center gap-1.5 border-l border-slate-700/60 px-2.5 ${
+                compact ? 'py-1.5 text-white' : 'py-2.5 text-sm text-slate-200'
+              }`}
+            >
+              <span className={`truncate ${compact ? 'max-w-[90px]' : 'max-w-[110px]'}`}>
+                {selected.avatarEmoji} {selected.name}
+              </span>
+            </span>
+          )
+        )}
+      </div>
+
+      {/* Выпадающий список: выбор ребёнка + добавление нового */}
+      {open && (
+        <>
+          <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />
+          <div
+            className={`absolute top-full z-30 mt-1 rounded-xl border border-slate-700 bg-slate-800 p-1.5 shadow-2xl ${
+              compact ? 'right-0 w-56' : 'left-0 right-0'
+            }`}
+          >
+            {childrenList.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => {
+                  onSelect(c.id);
+                  setOpen(false);
+                }}
+                className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                  c.id === selectedChildId ? 'bg-indigo-600 text-white' : 'text-slate-200 hover:bg-slate-700'
+                }`}
+              >
+                <span>{c.avatarEmoji}</span>
+                <span className="min-w-0 flex-1 truncate text-left">{c.name}</span>
+                {c.id === selectedChildId && <Check size={14} />}
+              </button>
+            ))}
+            <button
+              onClick={() => {
+                setOpen(false);
+                onCreate();
+              }}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-amber-300 transition-colors hover:bg-slate-700"
+            >
+              <Plus size={14} /> Добавить ребёнка
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

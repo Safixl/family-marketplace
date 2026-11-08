@@ -16,7 +16,16 @@ interface FormState {
 
 const EMPTY_FORM: FormState = { name: '', avatarEmoji: '😊', active: true, birthDate: '' };
 
-export default function ChildrenTab({ onChanged }: { onChanged?: () => void } = {}) {
+export default function ChildrenTab({
+  onChanged,
+  createRequest,
+  onCreateConsumed,
+}: {
+  onChanged?: () => void;
+  /** Запрос на открытие формы создания ребёнка из кнопки «Дети» в меню. */
+  createRequest?: { seq: number } | null;
+  onCreateConsumed?: () => void;
+} = {}) {
   const [children, setChildren] = useState<ChildDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +63,16 @@ export default function ChildrenTab({ onChanged }: { onChanged?: () => void } = 
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Открытие формы создания ребёнка по «+» в кнопке «Дети»
+  useEffect(() => {
+    if (createRequest) {
+      setEditing(null);
+      setForm(EMPTY_FORM);
+      setModalOpen(true);
+      onCreateConsumed?.();
+    }
+  }, [createRequest, onCreateConsumed]);
 
   const openCreate = () => {
     setEditing(null);
