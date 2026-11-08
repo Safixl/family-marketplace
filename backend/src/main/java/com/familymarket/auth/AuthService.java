@@ -20,9 +20,9 @@ import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 /**
- * Регистрация с подтверждением e-mail кодом из письма, вход и сброс пароля.
- * Если почта не настроена (app.mail.enabled=false) — режим разработки:
- * регистрация подтверждается автоматически, токены сброса пишутся в лог.
+ * Регистрация без подтверждения e-mail (аккаунт активен сразу), вход и сброс пароля.
+ * Коды подтверждения больше не выдаются; эндпоинты verify/resend сохранены для совместимости.
+ * Ссылки сброса пароля при выключенной почте (app.mail.enabled=false) пишутся в лог.
  */
 @Service
 public class AuthService {
@@ -46,7 +46,7 @@ public class AuthService {
         this.mailService = mailService;
     }
 
-    /** Шаг 1 регистрации: создать аккаунт (неподтверждённый) и отправить код на почту. */
+    /** Регистрация без подтверждения e-mail: аккаунт сразу активен, токен возвращается сразу. */
     @Transactional
     public RegisterResponse register(RegisterRequest request) {
         String email = request.email().trim().toLowerCase();
@@ -57,17 +57,10 @@ public class AuthService {
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         user.setName(request.name().trim());
-        user.setEmailVerified(false);
+        user.setEmailVerified(true);
         user.setCreatedAt(Instant.now());
         userRepository.save(user);
 
-        if (mailService.isEnabled()) {
-            issueVerificationCode(user);
-            return new RegisterResponse(email, true, null, null);
-        }
-        // Режим разработки без SMTP: подтверждаем автоматически
-        user.setEmailVerified(true);
-        userRepository.save(user);
         AuthResponse res = toResponse(user);
         return new RegisterResponse(email, false, res.token(), res.user());
     }
@@ -104,7 +97,7 @@ public class AuthService {
         issueVerificationCode(user);
     }
 
-    /** Вход: только для подтверждённых аккаунтов. */
+    /** Вход: подтверждение e-mail не требуется (старые неподтверждённые аккаунты активируются автоматически). */
     @Transactional
     public AuthResponse login(LoginRequest request) {
         String email = request.email().trim().toLowerCase();
@@ -114,10 +107,10 @@ public class AuthService {
             throw new BadRequestException("Неверный email или пароль");
         }
         if (!user.isEmailVerified()) {
-            issueVerificationCode(user);
+            user.setEmailVerified(true);
+            user.setVerificationCode(null);
+            user.setVerificationExpires(null);
             userRepository.save(user);
-            throw new BadRequestException(
-                    "Email не подтверждён — мы отправили новый код на почту. Введите его, чтобы завершить регистрацию");
         }
         return toResponse(user);
     }

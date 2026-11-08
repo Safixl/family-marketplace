@@ -147,10 +147,10 @@ export default function LoginScreen() {
               textShadow: '0 2px 12px rgba(0,0,0,0.6)',
             }}
           >
-            FAMILY MARKETPLACE
+            ДЕЙЛИКИ
           </h1>
           <p className="mt-2 text-sm text-amber-200/60" style={{ fontFamily: 'Georgia, serif' }}>
-            RPG-прокачка навыков · Подземелья · Квесты Гейм-Мастера
+            OFF-RPG · Прокача навыков ребенка · Играй и развивай
           </p>
         </div>
 
@@ -304,7 +304,7 @@ export default function LoginScreen() {
                       onClick={() => switchForm('register')}
                       className="block w-full font-semibold text-amber-500/90 transition hover:text-amber-300"
                     >
-                      Нет аккаунта? Создать героя
+                      Нет аккаунта? Зарегистрироваться
                     </button>
                     <button
                       type="button"
