@@ -14,6 +14,8 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.Period;
 
 @Entity
 @Table(name = "children")
@@ -52,7 +54,15 @@ public class Child {
     @Column(name = "home_widgets", length = 500)
     private String homeWidgets = "[\"balances\",\"stats\",\"achievements\",\"orders\"]";
 
-    /** Возраст ребёнка (5-16): влияет на сложность дейликов и масштаб цен. */
-    @Column
-    private Integer age;
+    /** Дата рождения: возраст вычисляется автоматически. */
+    @Column(name = "birth_date")
+    private LocalDate birthDate;
+
+    /** Возраст (полных лет) — вычисляется из даты рождения, влияет на сложность дейликов. */
+    public Integer getAge() {
+        if (birthDate == null) {
+            return null;
+        }
+        return Period.between(birthDate, LocalDate.now()).getYears();
+    }
 }

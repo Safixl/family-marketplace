@@ -3,9 +3,13 @@ package com.familymarket.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+import java.time.LocalDate;
+
 public record ChildUpsertRequest(
         @NotBlank(message = "Укажите имя ребенка") @Size(max = 100, message = "Имя слишком длинное") String name,
-        @Size(max = 16, message = "Эмодзи слишком длинный") String avatarEmoji,
+        String avatarEmoji,
         Boolean active,
-        Integer age) {
+        /** Дата рождения: возраст вычисляется автоматически. */
+        LocalDate birthDate
+) {
 }

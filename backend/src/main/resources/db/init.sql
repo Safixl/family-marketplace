@@ -459,6 +459,11 @@ CREATE TABLE IF NOT EXISTS child_limits (
 -- Настройки лимитов (выключенные типы + кастомные лимиты) для баз, созданных ранее
 ALTER TABLE child_limits ADD COLUMN IF NOT EXISTS settings TEXT;
 
+-- Дата рождения ребёнка: возраст вычисляется автоматически.
+-- Существующим детям ставится дефолт 01.01.2020 (родитель может поменять во вкладке «Дети»).
+ALTER TABLE children ADD COLUMN IF NOT EXISTS birth_date DATE;
+UPDATE children SET birth_date = DATE '2020-01-01' WHERE birth_date IS NULL;
+
 -- Расход лимита по дням: used_seconds — потрачено, extended_seconds — одноразовые
 -- увеличения на сегодня (могут превышать базовый лимит), running — идёт ли счётчик.
 CREATE TABLE IF NOT EXISTS limit_usage (

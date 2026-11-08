@@ -15,7 +15,10 @@ export interface ChildDto {
   avatarEmoji: string;
   accessKey: string;
   active: boolean;
+  /** Возраст вычисляется автоматически из даты рождения. */
   age: number | null;
+  /** Дата рождения в формате YYYY-MM-DD. */
+  birthDate: string | null;
   createdAt: string;
 }
 

@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.security.SecureRandom;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 
@@ -71,7 +72,8 @@ public class ChildService {
         child.setAvatarEmoji(blankToDefault(request.avatarEmoji(), "😊"));
         child.setAccessKey(generateKey());
         child.setActive(true);
-        child.setAge(request.age());
+        // Дата рождения обязательна для расчёта возраста: старым клиентам — дефолт 01.01.2020
+        child.setBirthDate(request.birthDate() != null ? request.birthDate() : LocalDate.of(2020, 1, 1));
         child.setCreatedAt(Instant.now());
         return childRepository.save(child);
     }
@@ -86,8 +88,8 @@ public class ChildService {
         if (request.active() != null) {
             child.setActive(request.active());
         }
-        if (request.age() != null) {
-            child.setAge(request.age());
+        if (request.birthDate() != null) {
+            child.setBirthDate(request.birthDate());
         }
         return childRepository.save(child);
     }

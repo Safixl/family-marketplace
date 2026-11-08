@@ -11,10 +11,10 @@ interface FormState {
   name: string;
   avatarEmoji: string;
   active: boolean;
-  age: string;
+  birthDate: string;
 }
 
-const EMPTY_FORM: FormState = { name: '', avatarEmoji: '😊', active: true, age: '' };
+const EMPTY_FORM: FormState = { name: '', avatarEmoji: '😊', active: true, birthDate: '' };
 
 export default function ChildrenTab({ onChanged }: { onChanged?: () => void } = {}) {
   const [children, setChildren] = useState<ChildDto[]>([]);
@@ -67,7 +67,7 @@ export default function ChildrenTab({ onChanged }: { onChanged?: () => void } = 
       name: child.name,
       avatarEmoji: child.avatarEmoji,
       active: child.active,
-      age: child.age != null ? String(child.age) : '',
+      birthDate: child.birthDate ?? '',
     });
     setModalOpen(true);
   };
@@ -83,7 +83,7 @@ export default function ChildrenTab({ onChanged }: { onChanged?: () => void } = 
         name: form.name.trim(),
         avatarEmoji: form.avatarEmoji.trim() || '😊',
         active: form.active,
-        age: form.age ? Number(form.age) : null,
+        birthDate: form.birthDate || null,
       };
       if (editing) {
         await api.put(`/parent/children/${editing.id}`, body);
@@ -199,7 +199,9 @@ export default function ChildrenTab({ onChanged }: { onChanged?: () => void } = 
                   <div>
                     <div className="font-bold">{child.name}</div>
                     <div className="text-xs text-slate-500">
-                      {child.age != null ? `возраст ${child.age} лет · ` : ''}создан {fmtDate(child.createdAt)}
+                      {child.age != null ? `${child.age} лет · ` : ''}
+                      {child.birthDate ? `д.р. ${fmtDate(child.birthDate)} · ` : ''}
+                      создан {fmtDate(child.createdAt)}
                     </div>
                   </div>
                 </div>
@@ -357,18 +359,15 @@ export default function ChildrenTab({ onChanged }: { onChanged?: () => void } = 
               />
             </div>
             <div>
-              <label className="label">Возраст (5–16)</label>
+              <label className="label">Дата рождения</label>
               <input
-                type="number"
-                min={5}
-                max={16}
+                type="date"
                 className="input"
-                value={form.age}
-                onChange={(e) => setForm({ ...form, age: e.target.value })}
-                placeholder="Например, 9"
+                value={form.birthDate}
+                onChange={(e) => setForm({ ...form, birthDate: e.target.value })}
               />
               <p className="mt-1 text-xs text-slate-400">
-                От возраста зависит сложность ежедневных дейликов (задачи, карточки слов, примеры)
+                Возраст вычисляется автоматически из даты рождения и влияет на сложность дейликов
               </p>
             </div>
             <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
