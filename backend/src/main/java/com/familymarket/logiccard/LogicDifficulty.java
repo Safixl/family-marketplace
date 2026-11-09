@@ -13,7 +13,9 @@ public enum LogicDifficulty {
     HIGH("Высокий", "🔵", 40, 0, 3, 25),
     HARD("Сложный", "🟣", 45, 0, 4, 50),
     EXTREME("Хард", "🔴", 50, 0, 5, 75),
-    OLYMPIAD("Олимпиада", "🟠", 60, 1, 10, 125);
+    OLYMPIAD("Олимпиада", "🟠", 60, 1, 10, 125),
+    /** Особая карточка «Работа над ошибками»: без таймера и наград, после 3/3 дня. */
+    REVIEW("Работа над ошибками", "📝", 0, 0, 0, 0);
 
     private final String label;
     private final String emoji;
@@ -76,6 +78,7 @@ public enum LogicDifficulty {
             }
             case EXTREME -> EXTREME;
             case OLYMPIAD -> OLYMPIAD;
+            case REVIEW -> REVIEW;
         };
     }
 }

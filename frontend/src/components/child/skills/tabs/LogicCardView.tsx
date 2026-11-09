@@ -171,15 +171,21 @@ export default function LogicCardView({ onDone }: { onDone?: () => void }) {
                   <span className="rpg-badge border border-stone-600/40 bg-stone-600/15 text-stone-300">
                     {card.taskCount} задач
                   </span>
-                  <span className="rpg-badge border border-amber-500/40 bg-amber-500/15 text-amber-300">
-                    <Clock3 size={11} /> {card.minutes} мин
-                  </span>
-                  <span className="rpg-badge border border-sky-500/40 bg-sky-500/15 text-sky-300">
-                    ⚡ +{card.xpReward} XP за успех
-                  </span>
-                  <span className="rpg-badge border border-violet-500/40 bg-violet-500/15 text-violet-300">
-                    🧠 до {card.maxIqReward} IQ-коин за карточку
-                  </span>
+                  {card.minutes > 0 && (
+                    <span className="rpg-badge border border-amber-500/40 bg-amber-500/15 text-amber-300">
+                      <Clock3 size={11} /> {card.minutes} мин
+                    </span>
+                  )}
+                  {card.xpReward > 0 && (
+                    <span className="rpg-badge border border-sky-500/40 bg-sky-500/15 text-sky-300">
+                      ⚡ +{card.xpReward} XP за успех
+                    </span>
+                  )}
+                  {card.maxIqReward > 0 && (
+                    <span className="rpg-badge border border-violet-500/40 bg-violet-500/15 text-violet-300">
+                      🧠 до {card.maxIqReward} IQ-коин за карточку
+                    </span>
+                  )}
                   {card.taskTypes.map((t) => (
                     <span key={t} className="rpg-badge border border-stone-700/40 bg-stone-700/15 text-stone-400">
                       {TYPE_LABELS[t] ?? t}
@@ -218,6 +224,11 @@ export default function LogicCardView({ onDone }: { onDone?: () => void }) {
               {card.status === 'APPROVED' && (
                 <button className="rpg-btn" disabled={busy} onClick={() => void act(card, 'start')}>
                   ▶ Начать задачу
+                </button>
+              )}
+              {card.level === 'REVIEW' && card.status === 'SUCCESS' && (
+                <button className="rpg-btn" disabled={busy} onClick={() => void act(card, 'start')}>
+                  🔁 Прорешать снова
                 </button>
               )}
             </div>

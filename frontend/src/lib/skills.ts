@@ -146,8 +146,8 @@ export const SKILLS: SkillConfig[] = [
     storeTemplate: 'MATH',
     archiveTitle: 'Архив решённых задач',
     archiveEmpty: 'Решённые задачи появятся здесь',
-    requestTitle: 'Карточки с заданиями',
-    requestPlaceholder: 'Карточки с заданиями разной сложности и наградами',
+    requestTitle: 'Карточки',
+    requestPlaceholder: 'Ежедневные карточки: выбери сложность, возьми задачу и реши её',
     statsTitle: 'Статистика по математике',
     loadArchive: async () => {
       try {

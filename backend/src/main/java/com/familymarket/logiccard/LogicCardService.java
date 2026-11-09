@@ -8,6 +8,8 @@ import com.familymarket.common.BadRequestException;
 import com.familymarket.common.NotFoundException;
 import com.familymarket.daily.DailyLog;
 import com.familymarket.daily.DailyLogRepository;
+import com.familymarket.dto.LogicCardAdminDayDto;
+import com.familymarket.dto.LogicCardAdminDto;
 import com.familymarket.dto.LogicCardApprovalDto;
 import com.familymarket.dto.LogicCardDayDto;
 import com.familymarket.dto.LogicCardDto;
@@ -28,8 +30,10 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -43,7 +47,7 @@ import java.util.Set;
 @Service
 public class LogicCardService {
 
-    private static final int TASK_COUNT[] = {6, 8, 10, 10, 12, 0}; // EASY..OLYMPIAD (0 — из шаблона)
+    private static final int TASK_COUNT[] = {6, 8, 10, 10, 12, 0, 0}; // EASY..OLYMPIAD, REVIEW (0 — из шаблона)
     private static final int SUCCESS_PERCENT = 80;
     private static final int DAILY_LIMIT = 3;
     /** День стартует в 9:00 (МСК) — как в лимитах и математических карточках. */
@@ -151,12 +155,15 @@ public class LogicCardService {
     public LogicCardDayDto listToday(Long childId) {
         expireOverdue(childId);
         LocalDate today = todayDate();
-        long doneToday = cardRepository.countByChildIdAndCardDateAndStatusIn(
-                childId, today, List.of("SUCCESS", "FAILED"));
+        long doneToday = cardRepository.countByChildIdAndCardDateAndFinalLevelNotAndStatusIn(
+                childId, today, "REVIEW", List.of("SUCCESS", "FAILED"));
         // После лимита показываем завершённые карточки (статусы и награды), не взятые скрываются
         List<LogicCard> dayCards = cardRepository.findByChildIdAndCardDateOrderByCreatedAtDesc(childId, today);
         if (doneToday >= DAILY_LIMIT) {
-            dayCards = dayCards.stream().filter(c -> "SUCCESS".equals(c.getStatus()) || "FAILED".equals(c.getStatus())).toList();
+            dayCards = dayCards.stream()
+                    .filter(c -> "SUCCESS".equals(c.getStatus()) || "FAILED".equals(c.getStatus())
+                            || "REVIEW".equals(c.getFinalLevel()))
+                    .toList();
         }
         List<LogicCardDto> cards = dayCards.stream()
                 .sorted(Comparator.comparingInt(c -> LogicDifficulty.valueOf(c.getFinalLevel()).ordinal()))
@@ -174,11 +181,6 @@ public class LogicCardService {
         expireOverdue(childId);
 
         LocalDate today = todayDate();
-        // Лимит по ВСЕМ карточкам дня (включая незавершённые): нельзя перегенерировать
-        long doneToday = cardRepository.countByChildIdAndCardDate(childId, today);
-        if (doneToday >= DAILY_LIMIT) {
-            throw new BadRequestException("Лимит карточек на день исчерпан (3). Новые появятся завтра в 9:00");
-        }
         // Пока карточка решается — другие не создаём, отдаём активную
         List<LogicCard> active = cardRepository.findByChildIdAndCardDateAndStatus(childId, today, "IN_PROGRESS");
         if (!active.isEmpty()) {
@@ -186,12 +188,19 @@ public class LogicCardService {
             return LogicCardDto.of(inProgress, taskRepository.findByCardIdOrderByIdAsc(inProgress.getId()), true);
         }
 
+        // Карточка выбранной сложности уже есть в дневном плане — возвращаем её
         LogicDifficulty finalLevel = resolveFinal(childId, parentId, choice);
         LogicCard existing = cardRepository
                 .findFirstByChildIdAndCardDateAndFinalLevelOrderByIdDesc(childId, today, finalLevel.name())
                 .orElse(null);
         if (existing != null) {
             return LogicCardDto.of(existing, taskRepository.findByCardIdOrderByIdAsc(existing.getId()), includeTasks(existing));
+        }
+
+        // Лимит по ВСЕМ карточкам дня (включая незавершённые): нельзя перегенерировать
+        long doneToday = cardRepository.countByChildIdAndCardDate(childId, today);
+        if (doneToday >= DAILY_LIMIT) {
+            throw new BadRequestException("Лимит карточек на день исчерпан (3). Новые появятся завтра в 9:00");
         }
 
         LogicCard card = buildCard(child, parentId, today, finalLevel);
@@ -231,11 +240,15 @@ public class LogicCardService {
         return LogicCardDto.of(card, taskRepository.findByCardIdOrderByIdAsc(cardId), false);
     }
 
-    /** «Начать задачу» — старт единого серверного таймера. */
+    /** «Начать задачу» — старт таймера. «Работа над ошибками» — без таймера, можно повторно. */
     @Transactional
     public LogicCardDto start(Long childId, Long cardId) {
         LogicCard card = ownedCard(childId, cardId);
-        if (!"APPROVED".equals(card.getStatus())) {
+        boolean review = "REVIEW".equals(card.getFinalLevel());
+        boolean startable = review
+                ? List.of("APPROVED", "SUCCESS", "FAILED").contains(card.getStatus())
+                : "APPROVED".equals(card.getStatus());
+        if (!startable) {
             throw new BadRequestException("Карточка ещё не одобрена родителем");
         }
         if (!cardRepository.findByChildIdAndCardDateAndStatus(childId, card.getCardDate(), "IN_PROGRESS").isEmpty()) {
@@ -244,7 +257,8 @@ public class LogicCardService {
         Instant now = Instant.now();
         card.setStatus("IN_PROGRESS");
         card.setStartedAt(now);
-        card.setDeadline(now.plusSeconds(card.getMinutes() * 60L));
+        // «Работа над ошибками» (minutes = 0) — без таймера
+        card.setDeadline(card.getMinutes() > 0 ? now.plusSeconds(card.getMinutes() * 60L) : null);
         cardRepository.save(card);
         return LogicCardDto.of(card, taskRepository.findByCardIdOrderByIdAsc(cardId), true);
     }
@@ -291,6 +305,8 @@ public class LogicCardService {
         creditIqCoins(childId, card.getChild().getParent().getId(), xpEarned);
         // Синхронизация дейлика «Логика»: счётчик = число завершённых карточек дня
         syncDailyLogic(childId, card.getCardDate());
+        // После 3/3 дня создаём карточку «Работа над ошибками» из неверных ответов
+        maybeCreateReviewCard(childId, card.getChild().getParent().getId(), card.getCardDate());
         // Авто-начисление достижений
         achievementService.checkProgress(childId);
         return new LogicCardSubmitResult(percent, success, correct, tasks.size(), perTaskXp, successReward, xpEarned);
@@ -325,6 +341,189 @@ public class LogicCardService {
         cardRepository.save(card);
     }
 
+    // ---------- Родитель: карточки дня и перегенерация ----------
+
+    /**
+     * Карточки дня ребёнка для родителя: задачи с ответами + прогресс (решено/лимит).
+     * Дневной план — карточка каждой сложности: недостающие генерируются автоматически.
+     */
+    @Transactional
+    public LogicCardAdminDayDto parentDay(Long parentId, Long childId) {
+        Child child = childRepository.findById(childId)
+                .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
+        if (!child.getParent().getId().equals(parentId)) {
+            throw new NotFoundException("Ребенок не найден");
+        }
+        ensureTopics(parentId);
+        expireOverdue(childId);
+        LocalDate today = todayDate();
+        ensureDayPlan(child, parentId, today);
+        long doneToday = cardRepository.countByChildIdAndCardDateAndFinalLevelNotAndStatusIn(
+                childId, today, "REVIEW", List.of("SUCCESS", "FAILED"));
+        List<LogicCard> dayCards = cardRepository.findByChildIdAndCardDateOrderByCreatedAtDesc(childId, today);
+        // Последние попытки ребёнка по каждой задаче дня (для показа верных/неверных ответов)
+        Map<Long, List<LogicCardTask>> tasksByCard = new HashMap<>();
+        List<Long> dayTaskIds = new ArrayList<>();
+        for (LogicCard card : dayCards) {
+            List<LogicCardTask> tasks = taskRepository.findByCardIdOrderByIdAsc(card.getId());
+            tasksByCard.put(card.getId(), tasks);
+            tasks.forEach(t -> dayTaskIds.add(t.getId()));
+        }
+        Map<Long, LogicCardAttempt> lastAttempts = new HashMap<>();
+        attemptRepository.findByTaskIdInOrderByAttemptedAtAsc(dayTaskIds)
+                .forEach(a -> lastAttempts.put(a.getTask().getId(), a));
+        List<LogicCardAdminDto> cards = dayCards.stream()
+                .sorted(Comparator.comparingInt(c -> LogicDifficulty.valueOf(c.getFinalLevel()).ordinal()))
+                .map(c -> LogicCardAdminDto.of(c, tasksByCard.get(c.getId()), lastAttempts))
+                .toList();
+        return new LogicCardAdminDayDto(cards, (int) doneToday, DAILY_LIMIT);
+    }
+
+    /** Перегенерировать все задачи карточки (пока она не начата). */
+    @Transactional
+    public LogicCardAdminDto regenerateCard(Long parentId, Long cardId) {
+        LogicCard card = editableCard(parentId, cardId);
+        LogicDifficulty level = LogicDifficulty.valueOf(card.getFinalLevel());
+        taskRepository.deleteAll(taskRepository.findByCardIdOrderByIdAsc(cardId));
+        List<LogicCardTask> tasks = buildTasks(card.getChild().getId(), card, parentId, level);
+        card.setTaskCount(tasks.size());
+        card.setTaskTypes(String.join(",", taskTypeSet(tasks)));
+        card.setXpReward(level.getSuccessReward());
+        cardRepository.save(card);
+        taskRepository.saveAll(tasks);
+        return LogicCardAdminDto.of(card, taskRepository.findByCardIdOrderByIdAsc(cardId));
+    }
+
+    /** Перегенерировать одну задачу карточки (пока она не начата). */
+    @Transactional
+    public LogicCardAdminDto regenerateTask(Long parentId, Long taskId) {
+        LogicCardTask task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new NotFoundException("Задача не найдена"));
+        LogicCard card = task.getCard();
+        editableCard(parentId, card.getId());
+        if (LogicDifficulty.valueOf(card.getFinalLevel()) == LogicDifficulty.OLYMPIAD) {
+            throw new BadRequestException("Задачи олимпиадной карточки берутся из шаблона");
+        }
+        LogicDifficulty level = LogicDifficulty.valueOf(card.getFinalLevel());
+        Set<String> texts = new LinkedHashSet<>(taskRepository.findByCardIdOrderByIdAsc(card.getId())
+                .stream().map(LogicCardTask::getText).toList());
+        texts.remove(task.getText());
+        LogicCardGenerator.GeneratedTask fresh = null;
+        for (int guard = 0; guard < 40; guard++) {
+            LogicCardGenerator.GeneratedTask candidate = generator.generate(task.getTopicCode(), level);
+            if (!texts.contains(candidate.text())) {
+                fresh = candidate;
+                break;
+            }
+        }
+        if (fresh == null) {
+            throw new BadRequestException("Не удалось придумать уникальную задачу — попробуйте ещё раз");
+        }
+        // Обновляем задачу на месте — порядок и идентификаторы остальных задач не меняются
+        task.setTaskType(fresh.taskType());
+        task.setText(fresh.text());
+        task.setAnswer(fresh.answer());
+        taskRepository.save(task);
+        List<LogicCardTask> all = taskRepository.findByCardIdOrderByIdAsc(card.getId());
+        card.setTaskTypes(String.join(",", taskTypeSet(all)));
+        cardRepository.save(card);
+        return LogicCardAdminDto.of(card, all);
+    }
+
+    /** Дневной план: карточка каждой сложности (кроме «Работы над ошибками»). Недостающие — генерируются. */
+    private void ensureDayPlan(Child child, Long parentId, LocalDate today) {
+        Long childId = child.getId();
+        for (LogicDifficulty level : LogicDifficulty.values()) {
+            if (level == LogicDifficulty.REVIEW) {
+                continue;
+            }
+            boolean exists = cardRepository
+                    .findFirstByChildIdAndCardDateAndFinalLevelOrderByIdDesc(childId, today, level.name())
+                    .isPresent();
+            if (exists) {
+                continue;
+            }
+            LogicCard card = buildCard(child, parentId, today, level);
+            List<LogicCardTask> tasks = buildTasks(childId, card, parentId, level);
+            card.setTaskCount(tasks.size());
+            card.setTaskTypes(String.join(",", taskTypeSet(tasks)));
+            card.setXpReward(level.getSuccessReward());
+            card.setStatus("CREATED");
+            cardRepository.save(card);
+            taskRepository.saveAll(tasks);
+        }
+    }
+
+    /**
+     * После 3/3 завершённых карточек дня создаёт «Работу над ошибками»:
+     * копии задач, на которые были неверные ответы (по последней попытке).
+     * Без таймера и наград; ребёнок берёт её без запроса родителю.
+     */
+    private void maybeCreateReviewCard(Long childId, Long parentId, LocalDate today) {
+        long finished = cardRepository.countByChildIdAndCardDateAndFinalLevelNotAndStatusIn(
+                childId, today, "REVIEW", List.of("SUCCESS", "FAILED"));
+        if (finished < DAILY_LIMIT) {
+            return;
+        }
+        if (cardRepository.findFirstByChildIdAndCardDateAndFinalLevelOrderByIdDesc(childId, today, "REVIEW").isPresent()) {
+            return;
+        }
+        // Неверные задачи дня: последняя попытка по каждой задаче обычных карточек
+        List<LogicCard> dayCards = cardRepository.findByChildIdAndCardDateOrderByCreatedAtDesc(childId, today).stream()
+                .filter(c -> !"REVIEW".equals(c.getFinalLevel()))
+                .toList();
+        List<Long> taskIds = new ArrayList<>();
+        Map<Long, LogicCardTask> tasksById = new HashMap<>();
+        for (LogicCard card : dayCards) {
+            for (LogicCardTask task : taskRepository.findByCardIdOrderByIdAsc(card.getId())) {
+                taskIds.add(task.getId());
+                tasksById.put(task.getId(), task);
+            }
+        }
+        Map<Long, LogicCardAttempt> lastAttempts = new HashMap<>();
+        attemptRepository.findByTaskIdInOrderByAttemptedAtAsc(taskIds)
+                .forEach(a -> lastAttempts.put(a.getTask().getId(), a));
+        List<LogicCardTask> wrong = taskIds.stream()
+                .map(tasksById::get)
+                .filter(t -> {
+                    LogicCardAttempt a = lastAttempts.get(t.getId());
+                    return a != null && !a.isCorrect();
+                })
+                .toList();
+        if (wrong.isEmpty()) {
+            return;
+        }
+        Child child = childRepository.findById(childId)
+                .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
+        LogicCard review = buildCard(child, parentId, today, LogicDifficulty.REVIEW);
+        review.setDescription("Повтори задачи, где были ошибки");
+        List<LogicCardTask> tasks = wrong.stream().map(t -> {
+            LogicCardTask copy = new LogicCardTask();
+            copy.setCard(review);
+            copy.setTopicCode(t.getTopicCode());
+            copy.setTaskType(t.getTaskType());
+            copy.setText(t.getText());
+            copy.setAnswer(t.getAnswer());
+            return copy;
+        }).toList();
+        review.setTaskCount(tasks.size());
+        review.setTaskTypes(String.join(",", taskTypeSet(tasks)));
+        review.setXpReward(0);
+        // Берётся сразу, без запроса родителю; без таймера (minutes = 0)
+        review.setStatus("APPROVED");
+        cardRepository.save(review);
+        taskRepository.saveAll(tasks);
+    }
+
+    /** Карточка, доступная для перегенерации: родительская и ещё не начатая ребёнком. */
+    private LogicCard editableCard(Long parentId, Long cardId) {
+        LogicCard card = ownedByParent(parentId, cardId);
+        if (!"CREATED".equals(card.getStatus()) && !"REQUESTED".equals(card.getStatus())) {
+            throw new BadRequestException("Перегенерировать можно только не начатую карточку");
+        }
+        return card;
+    }
+
     // ---------- Внутренняя логика ----------
 
     private boolean includeTasks(LogicCard card) {
@@ -338,8 +537,8 @@ public class LogicCardService {
      * full clear (3 карточки) даёт бонус +2 XP как у прочих дейликов (стрик удваивает до 4).
      */
     private void syncDailyLogic(Long childId, LocalDate day) {
-        long finished = cardRepository.countByChildIdAndCardDateAndStatusIn(
-                childId, day, List.of("SUCCESS", "FAILED"));
+        long finished = cardRepository.countByChildIdAndCardDateAndFinalLevelNotAndStatusIn(
+                childId, day, "REVIEW", List.of("SUCCESS", "FAILED"));
         DailyLog log = dailyLogRepository.findByChildIdAndSkillAndDay(childId, "LOGIC", day)
                 .orElseGet(() -> {
                     DailyLog created = new DailyLog();
@@ -431,6 +630,9 @@ public class LogicCardService {
 
     private LogicDifficulty resolveFinal(Long childId, Long parentId, String choice) {
         String c = choice == null ? "MEDIUM" : choice.trim().toUpperCase();
+        if ("REVIEW".equals(c)) {
+            throw new BadRequestException("Карточка «Работа над ошибками» появляется автоматически");
+        }
         try {
             LogicDifficulty.valueOf(c);
         } catch (IllegalArgumentException e) {

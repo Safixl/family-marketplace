@@ -8,7 +8,6 @@ import {
   Home,
   LayoutDashboard,
   LogOut,
-  Package,
   Puzzle,
   ScrollText,
   ShoppingCart,
@@ -28,6 +27,10 @@ import PurchasesTab from './tabs/PurchasesTab';
 import QuestsTab from './tabs/QuestsTab';
 import SeasonalTab from './tabs/SeasonalTab';
 import StoresTab from './tabs/StoresTab';
+import ReadingTab from './tabs/ReadingTab';
+import MathTab from './tabs/MathTab';
+import LogicTab from './tabs/LogicTab';
+import HouseTab from './tabs/HouseTab';
 
 type TabId =
   | 'overview'
@@ -38,7 +41,6 @@ type TabId =
   | 'lang'
   | 'sport'
   | 'house'
-  | 'other'
   | 'achievements'
   | 'purchases'
   | 'quests'
@@ -53,7 +55,6 @@ const TABS: Array<{ id: TabId; label: string; icon: typeof LayoutDashboard }> = 
   { id: 'lang', label: 'Иностранный язык', icon: Globe2 },
   { id: 'sport', label: 'Спорт и хобби', icon: Dumbbell },
   { id: 'house', label: 'Хозяйственность', icon: Home },
-  { id: 'other', label: 'Прочее', icon: Package },
   { id: 'quests', label: 'Квесты', icon: ScrollText },
   { id: 'seasonal', label: 'Сезоны', icon: Sparkles },
   { id: 'achievements', label: 'Достижения', icon: Trophy },
@@ -297,13 +298,12 @@ export default function ParentDashboard() {
               onCreateConsumed={() => setChildCreate(null)}
             />
           )}
-          {tab === 'reading' && <StoresTab templateFilter="READING" title="📚 Чтение" selectedChildId={selectedChildId} />}
-          {tab === 'math' && <StoresTab templateFilter="MATH" title="🧮 Математика" selectedChildId={selectedChildId} />}
-          {tab === 'logic' && <StoresTab templateFilter="LOGIC" title="🧩 Логика" selectedChildId={selectedChildId} />}
+          {tab === 'reading' && <ReadingTab selectedChildId={selectedChildId} />}
+          {tab === 'math' && <MathTab selectedChildId={selectedChildId} />}
+          {tab === 'logic' && <LogicTab selectedChildId={selectedChildId} />}
           {tab === 'lang' && <StoresTab templateFilter="LANG" title="🌍 Иностранный язык" selectedChildId={selectedChildId} />}
           {tab === 'sport' && <StoresTab templateFilter="SPORT" title="⚽ Спорт и хобби" selectedChildId={selectedChildId} />}
-          {tab === 'house' && <StoresTab templateFilter="HOME" title="🏠 Хозяйственность" selectedChildId={selectedChildId} />}
-          {tab === 'other' && <StoresTab templateFilter="NONE" title="📦 Прочее" selectedChildId={selectedChildId} />}
+          {tab === 'house' && <HouseTab selectedChildId={selectedChildId} />}
           {tab === 'achievements' && <AchievementsTab selectedChildId={selectedChildId} />}
           {tab === 'purchases' && <PurchasesTab selectedChildId={selectedChildId} />}
           {tab === 'quests' && (

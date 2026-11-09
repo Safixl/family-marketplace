@@ -818,6 +818,47 @@ export interface MathCardDayDto {
   dailyLimit: number;
 }
 
+/** Задача карточки для родителя: текст, правильный ответ и последний ответ ребёнка. */
+export interface MathCardTaskAdminDto {
+  id: number;
+  topicCode: string;
+  taskType: string;
+  text: string;
+  answer: string;
+  /** Последний ответ ребёнка (null — задача ещё не решалась). */
+  childAnswer: string | null;
+  /** Верен ли последний ответ ребёнка. */
+  correct: boolean | null;
+}
+
+/** Карточка для родителя: метаданные + задачи с ответами (независимо от статуса). */
+export interface MathCardAdminDto {
+  id: number;
+  date: string;
+  level: string;
+  levelLabel: string;
+  levelEmoji: string;
+  minutes: number;
+  description: string;
+  taskCount: number;
+  taskTypes: string[];
+  xpReward: number;
+  maxMatrixReward: number;
+  status: MathCardStatus;
+  startedAt: string | null;
+  deadline: string | null;
+  resultPercent: number | null;
+  xpEarned: number;
+  tasks: MathCardTaskAdminDto[];
+}
+
+/** Карточки дня ребёнка для родителя + прогресс (решено/лимит). */
+export interface MathCardAdminDayDto {
+  cards: MathCardAdminDto[];
+  doneToday: number;
+  dailyLimit: number;
+}
+
 // ===== Логические карточки (структурное зеркало математики) =====
 
 export type LogicChoice =
@@ -899,6 +940,47 @@ export interface LogicCardSubmitResult {
 
 export interface LogicCardDayDto {
   cards: LogicCardDto[];
+  doneToday: number;
+  dailyLimit: number;
+}
+
+/** Задача карточки для родителя: текст, правильный ответ и последний ответ ребёнка. */
+export interface LogicCardTaskAdminDto {
+  id: number;
+  topicCode: string;
+  taskType: string;
+  text: string;
+  answer: string;
+  /** Последний ответ ребёнка (null — задача ещё не решалась). */
+  childAnswer: string | null;
+  /** Верен ли последний ответ ребёнка. */
+  correct: boolean | null;
+}
+
+/** Карточка для родителя: метаданные + задачи с ответами (независимо от статуса). */
+export interface LogicCardAdminDto {
+  id: number;
+  date: string;
+  level: string;
+  levelLabel: string;
+  levelEmoji: string;
+  minutes: number;
+  description: string;
+  taskCount: number;
+  taskTypes: string[];
+  xpReward: number;
+  maxIqReward: number;
+  status: LogicCardStatus;
+  startedAt: string | null;
+  deadline: string | null;
+  resultPercent: number | null;
+  xpEarned: number;
+  tasks: LogicCardTaskAdminDto[];
+}
+
+/** Карточки дня ребёнка для родителя + прогресс (решено/лимит). */
+export interface LogicCardAdminDayDto {
+  cards: LogicCardAdminDto[];
   doneToday: number;
   dailyLimit: number;
 }

@@ -1,6 +1,8 @@
 package com.familymarket.mathcard;
 
 import com.familymarket.common.CurrentUser;
+import com.familymarket.dto.MathCardAdminDayDto;
+import com.familymarket.dto.MathCardAdminDto;
 import com.familymarket.dto.MathCardApprovalDto;
 import com.familymarket.dto.MathCardDayDto;
 import com.familymarket.dto.MathCardDto;
@@ -44,6 +46,24 @@ public class MathCardController {
     @PutMapping("/api/parent/math-card-settings")
     public List<MathTopicDto> saveSettings(@RequestBody MathTopicSettingsRequest request) {
         return mathCardService.updateSettings(CurrentUser.parentId(), request.items());
+    }
+
+    /** Карточки дня выбранного ребёнка: задачи с ответами + прогресс дня. */
+    @GetMapping("/api/parent/children/{childId}/math-cards")
+    public MathCardAdminDayDto parentDay(@PathVariable Long childId) {
+        return mathCardService.parentDay(CurrentUser.parentId(), childId);
+    }
+
+    /** Перегенерировать все задачи карточки (пока она не начата). */
+    @PostMapping("/api/parent/math-cards/{cardId}/regenerate")
+    public MathCardAdminDto regenerateCard(@PathVariable Long cardId) {
+        return mathCardService.regenerateCard(CurrentUser.parentId(), cardId);
+    }
+
+    /** Перегенерировать одну задачу карточки (пока она не начата). */
+    @PostMapping("/api/parent/math-card-tasks/{taskId}/regenerate")
+    public MathCardAdminDto regenerateTask(@PathVariable Long taskId) {
+        return mathCardService.regenerateTask(CurrentUser.parentId(), taskId);
     }
 
     @GetMapping("/api/parent/math-card-approvals")

@@ -1,18 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { BookOpen, CalendarDays, CheckCircle2, ChevronDown, ChevronUp, Package, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronUp, Package, Pencil, Plus, Trash2 } from 'lucide-react';
 import { api } from '../../api/client';
 import { ProductDto, SkillActivationDto, StoreDto } from '../../api/types';
 import { errMsg, fmtAmount } from '../../lib/format';
 import Modal from '../Modal';
-import BooksManager from '../managers/BooksManager';
-import HouseCalendar from '../managers/HouseCalendar';
-import TaskCardsManager from '../managers/TaskCardsManager';
-import TasksManager from '../managers/TasksManager';
-import MathCardSettings from '../managers/MathCardSettings';
-import LogicCardSettings from '../managers/LogicCardSettings';
 import LangCardSettings from '../managers/LangCardSettings';
 import SportCardSettings from '../managers/SportCardSettings';
-import ReadingArchive from '../managers/ReadingArchive';
 import { EmptyState, Spinner } from '../ui';
 
 interface StoreForm {
@@ -67,7 +60,7 @@ export default function StoresTab({ templateFilter, title, selectedChildId }: St
   /** Ребёнок для менеджеров, привязанных к профилю (карточки языка/спорта). */
   const childId = selectedChildId ?? undefined;
   const [managerFor, setManagerFor] = useState<
-    | { store: StoreDto; type: 'books' | 'tasks' | 'house' | 'cards' | 'mathCard' | 'logicCard' | 'langCard' | 'sportCard'; skill?: 'MATH' | 'HOUSE' }
+    | { store: StoreDto; type: 'langCard' | 'sportCard' }
     | null
   >(null);
 
@@ -123,12 +116,6 @@ export default function StoresTab({ templateFilter, title, selectedChildId }: St
     });
   };
 
-  const openStoreCreate = () => {
-    setEditingStore(null);
-    setStoreForm(EMPTY_STORE);
-    setStoreModal(true);
-  };
-
   const openStoreEdit = (store: StoreDto) => {
     setEditingStore(store);
     setStoreForm({
@@ -155,11 +142,7 @@ export default function StoresTab({ templateFilter, title, selectedChildId }: St
         currencyIcon: storeForm.currencyIcon.trim() || '🪙',
         active: storeForm.active,
       };
-      if (editingStore) {
-        await api.put(`/parent/stores/${editingStore.id}`, body);
-      } else {
-        await api.post('/parent/stores', body);
-      }
+      await api.put(`/parent/stores/${editingStore!.id}`, body);
       setStoreModal(false);
       await load();
     } catch (e) {
@@ -266,17 +249,15 @@ export default function StoresTab({ templateFilter, title, selectedChildId }: St
 
   if (error) return <div className="card text-sm text-rose-600">{error}</div>;
 
-  // Фильтр по типу шаблона (вкладка навыка): 'NONE' — магазины без шаблона
-  const visibleStores = templateFilter
-    ? stores.filter((s) => (templateFilter === 'NONE' ? !s.templateType : s.templateType === templateFilter))
-    : stores;
+  // Фильтр по типу шаблона (вкладка навыка)
+  const visibleStores = templateFilter ? stores.filter((s) => s.templateType === templateFilter) : stores;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-xl font-extrabold">{title ?? 'Магазины'}</h1>
-          {templateFilter && templateFilter !== 'NONE' && (
+          {templateFilter && (
             <div className="mt-1 flex flex-wrap items-center gap-1.5">
               {(() => {
                 const act = activations.filter((a) => a.skill === templateFilter);
@@ -297,11 +278,6 @@ export default function StoresTab({ templateFilter, title, selectedChildId }: St
             </div>
           )}
         </div>
-        {!templateFilter && (
-          <button className="btn-secondary" onClick={openStoreCreate}>
-            <Plus size={18} /> Создать магазин
-          </button>
-        )}
       </div>
 
       {visibleStores.length === 0 ? (
@@ -365,46 +341,6 @@ export default function StoresTab({ templateFilter, title, selectedChildId }: St
 
                 {store.templateType && (
                   <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-3">
-                    {store.templateType === 'READING' && (
-                      <button
-                        className="btn-secondary !px-3 !py-1.5 text-xs"
-                        onClick={() => setManagerFor({ store, type: 'books' })}
-                      >
-                        <BookOpen size={14} /> Книги и чтение
-                      </button>
-                    )}
-                    {store.templateType === 'MATH' && (
-                      <button
-                        className="btn-secondary !px-3 !py-1.5 text-xs"
-                        onClick={() => setManagerFor({ store, type: 'tasks' })}
-                      >
-                        <Sparkles size={14} /> Задачи и статистика
-                      </button>
-                    )}
-                    {store.templateType === 'MATH' && (
-                      <button
-                        className="btn-secondary !px-3 !py-1.5 text-xs"
-                        onClick={() => setManagerFor({ store, type: 'cards', skill: 'MATH' })}
-                      >
-                        🎴 Карточки с заданиями
-                      </button>
-                    )}
-                    {store.templateType === 'MATH' && (
-                      <button
-                        className="btn-secondary !px-3 !py-1.5 text-xs"
-                        onClick={() => setManagerFor({ store, type: 'mathCard' })}
-                      >
-                        🧩 Генератор карточек
-                      </button>
-                    )}
-                    {store.templateType === 'LOGIC' && (
-                      <button
-                        className="btn-secondary !px-3 !py-1.5 text-xs"
-                        onClick={() => setManagerFor({ store, type: 'logicCard' })}
-                      >
-                        🧠 Генератор карточек
-                      </button>
-                    )}
                     {store.templateType === 'LANG' && (
                       <button
                         className="btn-secondary !px-3 !py-1.5 text-xs"
@@ -419,22 +355,6 @@ export default function StoresTab({ templateFilter, title, selectedChildId }: St
                         onClick={() => setManagerFor({ store, type: 'sportCard' })}
                       >
                         ⚽ Спорт и хобби
-                      </button>
-                    )}
-                    {store.templateType === 'HOME' && (
-                      <button
-                        className="btn-secondary !px-3 !py-1.5 text-xs"
-                        onClick={() => setManagerFor({ store, type: 'house' })}
-                      >
-                        <CalendarDays size={14} /> Календарь домашних дел
-                      </button>
-                    )}
-                    {store.templateType === 'HOME' && (
-                      <button
-                        className="btn-secondary !px-3 !py-1.5 text-xs"
-                        onClick={() => setManagerFor({ store, type: 'cards', skill: 'HOUSE' })}
-                      >
-                        🏠 Помощь по дому
                       </button>
                     )}
                   </div>
@@ -517,7 +437,7 @@ export default function StoresTab({ templateFilter, title, selectedChildId }: St
       {/* Модалка магазина */}
       {storeModal && (
         <Modal
-          title={editingStore ? 'Редактировать магазин' : 'Новый магазин'}
+          title="Редактировать магазин"
           onClose={() => setStoreModal(false)}
         >
           <div className="space-y-4">
@@ -704,28 +624,7 @@ export default function StoresTab({ templateFilter, title, selectedChildId }: St
         </Modal>
       )}
 
-      {/* Архив чтения ребёнка — внизу вкладки «Чтение» */}
-      {templateFilter === 'READING' && <ReadingArchive />}
-
       {/* Менеджеры шаблонных магазинов */}
-      {managerFor?.type === 'books' && (
-        <BooksManager store={managerFor.store} onClose={() => setManagerFor(null)} />
-      )}
-      {managerFor?.type === 'tasks' && (
-        <TasksManager store={managerFor.store} onClose={() => setManagerFor(null)} />
-      )}
-      {managerFor?.type === 'house' && (
-        <HouseCalendar store={managerFor.store} onClose={() => setManagerFor(null)} />
-      )}
-      {managerFor?.type === 'cards' && managerFor.skill && (
-        <TaskCardsManager store={managerFor.store} skill={managerFor.skill} onClose={() => setManagerFor(null)} />
-      )}
-      {managerFor?.type === 'mathCard' && (
-        <MathCardSettings onClose={() => setManagerFor(null)} />
-      )}
-      {managerFor?.type === 'logicCard' && (
-        <LogicCardSettings onClose={() => setManagerFor(null)} />
-      )}
       {managerFor?.type === 'langCard' && (
         <LangCardSettings childId={childId} onClose={() => setManagerFor(null)} />
       )}

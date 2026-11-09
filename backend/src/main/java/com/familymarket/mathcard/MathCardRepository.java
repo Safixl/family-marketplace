@@ -52,7 +52,11 @@ public interface MathCardRepository extends JpaRepository<MathCard, Long> {
     @Query("SELECT c.cardDate FROM MathCard c WHERE c.child.id = :childId AND c.status IN ('SUCCESS','FAILED')")
     List<LocalDate> findFinishedDates(@Param("childId") Long childId);
 
-    /** Даты дней с успешно решённой карточкой — для стрика и удвоения XP дейлика. */
-    @Query("SELECT c.cardDate FROM MathCard c WHERE c.child.id = :childId AND c.status = 'SUCCESS'")
+    /** Даты дней с успешно решённой карточкой (без «Работы над ошибками») — для стрика и дейлика. */
+    @Query("SELECT c.cardDate FROM MathCard c WHERE c.child.id = :childId AND c.status = 'SUCCESS' AND c.finalLevel <> 'REVIEW'")
     List<LocalDate> findSuccessDates(@Param("childId") Long childId);
+
+    /** Завершённые карточки дня (SUCCESS/FAILED) без карточек «Работа над ошибками». */
+    long countByChildIdAndCardDateAndFinalLevelNotAndStatusIn(
+            Long childId, LocalDate cardDate, String finalLevel, List<String> statuses);
 }
