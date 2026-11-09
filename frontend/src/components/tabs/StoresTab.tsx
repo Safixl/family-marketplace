@@ -4,8 +4,6 @@ import { api } from '../../api/client';
 import { ProductDto, SkillActivationDto, StoreDto } from '../../api/types';
 import { errMsg, fmtAmount } from '../../lib/format';
 import Modal from '../Modal';
-import LangCardSettings from '../managers/LangCardSettings';
-import SportCardSettings from '../managers/SportCardSettings';
 import { EmptyState, Spinner } from '../ui';
 
 interface StoreForm {
@@ -48,7 +46,7 @@ interface StoresTabProps {
   selectedChildId?: number | null;
 }
 
-export default function StoresTab({ templateFilter, title, selectedChildId }: StoresTabProps) {
+export default function StoresTab({ templateFilter, title }: StoresTabProps) {
   const [stores, setStores] = useState<StoreDto[]>([]);
   const [productsByStore, setProductsByStore] = useState<Record<number, ProductDto[]>>({});
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
@@ -57,12 +55,6 @@ export default function StoresTab({ templateFilter, title, selectedChildId }: St
   const [busy, setBusy] = useState(false);
 
   const [activations, setActivations] = useState<SkillActivationDto[]>([]);
-  /** Ребёнок для менеджеров, привязанных к профилю (карточки языка/спорта). */
-  const childId = selectedChildId ?? undefined;
-  const [managerFor, setManagerFor] = useState<
-    | { store: StoreDto; type: 'langCard' | 'sportCard' }
-    | null
-  >(null);
 
   const [storeModal, setStoreModal] = useState(false);
   const [editingStore, setEditingStore] = useState<StoreDto | null>(null);
@@ -341,22 +333,6 @@ export default function StoresTab({ templateFilter, title, selectedChildId }: St
 
                 {store.templateType && (
                   <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-3">
-                    {store.templateType === 'LANG' && (
-                      <button
-                        className="btn-secondary !px-3 !py-1.5 text-xs"
-                        onClick={() => setManagerFor({ store, type: 'langCard' })}
-                      >
-                        🌍 Карточки языка
-                      </button>
-                    )}
-                    {store.templateType === 'SPORT' && (
-                      <button
-                        className="btn-secondary !px-3 !py-1.5 text-xs"
-                        onClick={() => setManagerFor({ store, type: 'sportCard' })}
-                      >
-                        ⚽ Спорт и хобби
-                      </button>
-                    )}
                   </div>
                 )}
 
@@ -624,13 +600,6 @@ export default function StoresTab({ templateFilter, title, selectedChildId }: St
         </Modal>
       )}
 
-      {/* Менеджеры шаблонных магазинов */}
-      {managerFor?.type === 'langCard' && (
-        <LangCardSettings childId={childId} onClose={() => setManagerFor(null)} />
-      )}
-      {managerFor?.type === 'sportCard' && (
-        <SportCardSettings childId={childId} onClose={() => setManagerFor(null)} />
-      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, ChevronLeft, ChevronRight, Pencil, Plus, ShoppingBag, Trash2, XCircle } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, ChevronRight, Pencil, Plus, ShoppingBag, Trophy, Trash2, XCircle } from 'lucide-react';
 import { api } from '../../api/client';
 import {
   HouseCheckRequestDto,
@@ -12,6 +12,8 @@ import {
 } from '../../api/types';
 import { errMsg, fmtAmount } from '../../lib/format';
 import { DEFAULT_ROOM_COMMENTS, ROOM_RATINGS } from '../../lib/houseScale';
+import AchievementsTab from './AchievementsTab';
+import PendingPurchasesCard from '../PendingPurchasesCard';
 import Modal from '../Modal';
 import { EmptyState, Spinner } from '../ui';
 
@@ -128,7 +130,7 @@ export default function HouseTab({ selectedChildId }: Props) {
   const [cardForm, setCardForm] = useState<CardForm>(EMPTY_CARD);
 
   // Магазин навыка
-  const [view, setView] = useState<'main' | 'shop'>('main');
+  const [view, setView] = useState<'main' | 'shop' | 'achievements'>('main');
   const [products, setProducts] = useState<ProductDto[]>([]);
   const [storeModal, setStoreModal] = useState(false);
   const [storeForm, setStoreForm] = useState<StoreForm>({ name: '', description: '', currencyName: '', currencyIcon: '', active: true });
@@ -543,10 +545,26 @@ export default function HouseTab({ selectedChildId }: Props) {
     return (
       <div className="space-y-4">
         <HouseHeader />
+
         <EmptyState
           title="Магазин хозяйственности не найден"
           hint="Включите шаблон «Хозяйственность» в профиле ребёнка"
         />
+      </div>
+    );
+  }
+
+  // ===== Вид достижений навыка =====
+  if (view === 'achievements') {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <button className="btn-secondary !px-3 !py-1.5 text-xs" onClick={() => setView('main')}>
+            К хозяйственности
+          </button>
+          <h1 className="text-xl font-extrabold">🏆 Достижения</h1>
+        </div>
+        <AchievementsTab skill="HOME" selectedChildId={selectedChildId} />
       </div>
     );
   }
@@ -581,6 +599,10 @@ export default function HouseTab({ selectedChildId }: Props) {
               <Pencil size={14} /> Настройки магазина
             </button>
           </div>
+
+
+          {/* Ожидают подтверждения: покупки и активации этого магазина */}
+          <PendingPurchasesCard storeId={store.id} onChanged={() => void openShop()} />
 
           <div className="border-t border-slate-100 pt-3">
             <div className="mb-3 flex items-center justify-between">
@@ -819,7 +841,7 @@ export default function HouseTab({ selectedChildId }: Props) {
 
   return (
     <div className="space-y-4 pb-16">
-      <HouseHeader onOpenShop={openShop} />
+      <HouseHeader onOpenShop={openShop} onOpenAchievements={() => setView('achievements')} />
 
       {/* Статистика: серия порядка и баллы */}
       {data && (
@@ -1246,14 +1268,23 @@ export default function HouseTab({ selectedChildId }: Props) {
 // ---------- Вспомогательные элементы ----------
 
 /** Шапка вкладки: заголовок и кнопка магазина навыка. */
-function HouseHeader({ onOpenShop }: { onOpenShop?: () => void }) {
+function HouseHeader({ onOpenShop, onOpenAchievements }: { onOpenShop?: () => void; onOpenAchievements?: () => void }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <h1 className="text-xl font-extrabold">🏠 Хозяйственность</h1>
       {onOpenShop && (
-        <button className="btn-secondary" onClick={onOpenShop}>
+        <div className="flex items-center gap-2">
+          <button
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-700 hover:bg-amber-200"
+            onClick={onOpenAchievements}
+            title="Достижения"
+          >
+            <Trophy size={18} />
+          </button>
+                  <button className="btn-secondary" onClick={onOpenShop}>
           <ShoppingBag size={17} /> Магазин навыка
         </button>
+        </div>
       )}
     </div>
   );

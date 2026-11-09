@@ -9,6 +9,7 @@ import {
   Pencil,
   Plus,
   ShoppingBag,
+  Trophy,
   Trash2,
   X,
 } from 'lucide-react';
@@ -24,6 +25,8 @@ import {
   StoreDto,
 } from '../../api/types';
 import { errMsg, fmtAmount } from '../../lib/format';
+import AchievementsTab from './AchievementsTab';
+import PendingPurchasesCard from '../PendingPurchasesCard';
 import Modal from '../Modal';
 import { EmptyState, Spinner } from '../ui';
 
@@ -129,7 +132,7 @@ export default function ReadingTab({ selectedChildId }: Props) {
   const childId = selectedChildId != null ? String(selectedChildId) : '';
 
   // Магазин навыка
-  const [view, setView] = useState<'main' | 'shop'>('main');
+  const [view, setView] = useState<'main' | 'shop' | 'achievements'>('main');
   const [products, setProducts] = useState<ProductDto[]>([]);
   const [storeModal, setStoreModal] = useState(false);
   const [storeForm, setStoreForm] = useState<StoreForm>({ name: '', description: '', currencyName: '', currencyIcon: '', active: true });
@@ -647,10 +650,26 @@ export default function ReadingTab({ selectedChildId }: Props) {
     return (
       <div className="space-y-4">
         <ReadingHeader />
+
         <EmptyState
           title="Магазин чтения не найден"
           hint="Включите шаблон «Чтение» в профиле ребёнка, чтобы добавить книги и товары"
         />
+      </div>
+    );
+  }
+
+  // ===== Вид достижений навыка =====
+  if (view === 'achievements') {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <button className="btn-secondary !px-3 !py-1.5 text-xs" onClick={() => setView('main')}>
+            К чтению
+          </button>
+          <h1 className="text-xl font-extrabold">🏆 Достижения</h1>
+        </div>
+        <AchievementsTab skill="READING" selectedChildId={selectedChildId} />
       </div>
     );
   }
@@ -685,6 +704,10 @@ export default function ReadingTab({ selectedChildId }: Props) {
               <Pencil size={14} /> Настройки магазина
             </button>
           </div>
+
+
+          {/* Ожидают подтверждения: покупки и активации этого магазина */}
+          <PendingPurchasesCard storeId={store.id} onChanged={() => void openShop()} />
 
           <div className="border-t border-slate-100 pt-3">
             <div className="mb-3 flex items-center justify-between">
@@ -924,7 +947,7 @@ export default function ReadingTab({ selectedChildId }: Props) {
   // ===== Основной вид вкладки =====
   return (
     <div className="space-y-4 pb-16">
-      <ReadingHeader store={store} onOpenShop={openShop} />
+      <ReadingHeader store={store} onOpenShop={openShop} onOpenAchievements={() => setView('achievements')} />
 
       {/* Статистика навыка */}
       {stats && (
@@ -1281,14 +1304,23 @@ export default function ReadingTab({ selectedChildId }: Props) {
 // ---------- Вспомогательные элементы ----------
 
 /** Шапка вкладки: заголовок и кнопка магазина навыка. Ребёнок выбирается в шапке дашборда. */
-function ReadingHeader({ store, onOpenShop }: { store?: StoreDto; onOpenShop?: () => void }) {
+function ReadingHeader({ store, onOpenShop, onOpenAchievements }: { store?: StoreDto; onOpenShop?: () => void; onOpenAchievements?: () => void }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <h1 className="text-xl font-extrabold">📚 Чтение</h1>
       {store && onOpenShop && (
-        <button className="btn-secondary" onClick={onOpenShop}>
+        <div className="flex items-center gap-2">
+          <button
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-700 hover:bg-amber-200"
+            onClick={onOpenAchievements}
+            title="Достижения"
+          >
+            <Trophy size={18} />
+          </button>
+                  <button className="btn-secondary" onClick={onOpenShop}>
           <ShoppingBag size={17} /> Магазин навыка
         </button>
+        </div>
       )}
     </div>
   );

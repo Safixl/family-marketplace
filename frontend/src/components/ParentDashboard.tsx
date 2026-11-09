@@ -10,26 +10,21 @@ import {
   LogOut,
   Puzzle,
   ScrollText,
-  ShoppingCart,
-  Sparkles,
-  Trophy,
   Users,
   Zap,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
 import { ChildDto, SkillActivationDto } from '../api/types';
-import AchievementsTab from './tabs/AchievementsTab';
 import { NotificationBell, NotificationPanel } from './NotificationCenter';
 import ChildrenTab from './tabs/ChildrenTab';
 import OverviewTab from './tabs/OverviewTab';
-import PurchasesTab from './tabs/PurchasesTab';
 import QuestsTab from './tabs/QuestsTab';
-import SeasonalTab from './tabs/SeasonalTab';
-import StoresTab from './tabs/StoresTab';
 import ReadingTab from './tabs/ReadingTab';
 import MathTab from './tabs/MathTab';
 import LogicTab from './tabs/LogicTab';
+import LangTab from './tabs/LangTab';
+import SportTab from './tabs/SportTab';
 import HouseTab from './tabs/HouseTab';
 
 type TabId =
@@ -41,10 +36,7 @@ type TabId =
   | 'lang'
   | 'sport'
   | 'house'
-  | 'achievements'
-  | 'purchases'
-  | 'quests'
-  | 'seasonal';
+  | 'quests';
 
 const TABS: Array<{ id: TabId; label: string; icon: typeof LayoutDashboard }> = [
   { id: 'children', label: 'Дети', icon: Users },
@@ -56,9 +48,6 @@ const TABS: Array<{ id: TabId; label: string; icon: typeof LayoutDashboard }> = 
   { id: 'sport', label: 'Спорт и хобби', icon: Dumbbell },
   { id: 'house', label: 'Хозяйственность', icon: Home },
   { id: 'quests', label: 'Квесты', icon: ScrollText },
-  { id: 'seasonal', label: 'Сезоны', icon: Sparkles },
-  { id: 'achievements', label: 'Достижения', icon: Trophy },
-  { id: 'purchases', label: 'Покупки', icon: ShoppingCart },
 ];
 
 /** Вкладка навыка → код навыка (вкладка видна только когда навык активирован ребёнку). */
@@ -301,11 +290,9 @@ export default function ParentDashboard() {
           {tab === 'reading' && <ReadingTab selectedChildId={selectedChildId} />}
           {tab === 'math' && <MathTab selectedChildId={selectedChildId} />}
           {tab === 'logic' && <LogicTab selectedChildId={selectedChildId} />}
-          {tab === 'lang' && <StoresTab templateFilter="LANG" title="🌍 Иностранный язык" selectedChildId={selectedChildId} />}
-          {tab === 'sport' && <StoresTab templateFilter="SPORT" title="⚽ Спорт и хобби" selectedChildId={selectedChildId} />}
+          {tab === 'lang' && <LangTab selectedChildId={selectedChildId} />}
+          {tab === 'sport' && <SportTab selectedChildId={selectedChildId} />}
           {tab === 'house' && <HouseTab selectedChildId={selectedChildId} />}
-          {tab === 'achievements' && <AchievementsTab selectedChildId={selectedChildId} />}
-          {tab === 'purchases' && <PurchasesTab selectedChildId={selectedChildId} />}
           {tab === 'quests' && (
             <QuestsTab
               selectedChildId={selectedChildId}
@@ -313,7 +300,6 @@ export default function ParentDashboard() {
               onCreateConsumed={() => setQuestCreate(null)}
             />
           )}
-          {tab === 'seasonal' && <SeasonalTab />}
         </div>
       </main>
 

@@ -60,7 +60,25 @@ const TARGET_OPTIONS: Array<{ value: string; label: string; unit: string }> = [
   { value: 'HOME_PURCHASES', label: 'Выкупить товаров в магазине Дом', unit: 'товаров' },
 ];
 
-export default function AchievementsTab({ selectedChildId }: { selectedChildId?: number | null } = {}) {
+/** Ключи навыков и подписи секций достижений. */
+const SKILL_SECTIONS: Array<{ skill: string; label: string }> = [
+  { skill: 'READING', label: '📚 Чтение' },
+  { skill: 'MATH', label: '🧮 Математика' },
+  { skill: 'LOGIC', label: '🧩 Логика' },
+  { skill: 'LANG', label: '🌍 Иностранный язык' },
+  { skill: 'SPORT', label: '⚽ Спорт и хобби' },
+  { skill: 'HOUSE', label: '🏠 Хозяйственность' },
+  { skill: 'NONE', label: '🏅 Без навыка' },
+];
+
+export default function AchievementsTab({
+  selectedChildId,
+  skill,
+}: {
+  selectedChildId?: number | null;
+  /** Навык, достижения которого показываем (если задан — остальные скрыты). */
+  skill?: string;
+} = {}) {
   const [achievements, setAchievements] = useState<AchievementDto[]>([]);
   const [children, setChildren] = useState<ChildDto[]>([]);
   const [stores, setStores] = useState<StoreDto[]>([]);
@@ -79,8 +97,8 @@ export default function AchievementsTab({ selectedChildId }: { selectedChildId?:
   const [viewChildId, setViewChildId] = useState('');
   /** Статусы достижений выбранного ребёнка (по groupKey). */
   const [childMeta, setChildMeta] = useState<ChildAchievementGroupDto[]>([]);
-  const [skillFilter, setSkillFilter] = useState<'ALL' | 'READING' | 'MATH' | 'HOUSE' | 'NONE'>('ALL');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'DONE' | 'OPEN'>('ALL');
+  const [skillFilter, setSkillFilter] = useState<'ALL' | string>(skill ?? 'ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'DONE'>('ALL');
   /** Каталог прочитанных книг по ребёнку: childId → книги с read-статусом. */
   const [catalogByChild, setCatalogByChild] = useState<Record<string, ReadingCatalogBookDto[]>>({});
 
@@ -108,6 +126,11 @@ export default function AchievementsTab({ selectedChildId }: { selectedChildId?:
     void loadCatalog(viewChildId);
   }, [viewChildId, loadChildMeta, loadCatalog]);
 
+  /** Ребёнок берётся из выбора в шапке дашборда. */
+  useEffect(() => {
+    setViewChildId(selectedChildId != null ? String(selectedChildId) : '');
+  }, [selectedChildId]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -120,10 +143,6 @@ export default function AchievementsTab({ selectedChildId }: { selectedChildId?:
       setAchievements(a);
       setChildren(c);
       setStores(s);
-      const firstChild = c.find((ch) => ch.active);
-      if (firstChild && !viewChildId) {
-        setViewChildId(String(firstChild.id));
-      }
     } catch (e) {
       setError(errMsg(e));
     } finally {
@@ -137,7 +156,7 @@ export default function AchievementsTab({ selectedChildId }: { selectedChildId?:
 
   const openCreate = () => {
     setEditing(null);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, skill: skill ?? '' });
     setModalOpen(true);
   };
 
@@ -258,6 +277,18 @@ export default function AchievementsTab({ selectedChildId }: { selectedChildId?:
     (grouped[key] = grouped[key] ?? []).push(a);
   });
 
+  /** Шкала: сколько достижений выполнено выбранным ребёнком из возможных. */
+  const visibleGroupKeys = Object.keys(grouped).filter((key) => {
+    const gSkill = grouped[key][0].skill ?? 'NONE';
+    if (skill && gSkill !== skill) return false;
+    if (skillFilter !== 'ALL' && gSkill !== skillFilter) return false;
+    return true;
+  });
+  const totalGroups = visibleGroupKeys.length;
+  const doneGroups = visibleGroupKeys.filter(
+    (key) => childMeta.find((m) => m.groupKey === key)?.completed,
+  ).length;
+
   /** Дефолтное (системное) достижение: нельзя удалять и менять параметры — только награду. */
   const isDefaultAchievement = (a: AchievementDto) =>
     (a.skill === 'READING' || a.skill === 'MATH') && a.groupKey != null;
@@ -267,7 +298,11 @@ export default function AchievementsTab({ selectedChildId }: { selectedChildId?:
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-extrabold">Достижения</h1>
+        <h1 className="text-xl font-extrabold">
+          {skill
+            ? `Достижения · ${SKILL_SECTIONS.find((s) => s.skill === skill)?.label ?? skill}`
+            : 'Достижения'}
+        </h1>
         <div className="flex items-center gap-2 text-xs text-slate-500">
           <Layers size={14} /> Цель достигнута — награда начисляется автоматически
         </div>
@@ -283,58 +318,64 @@ export default function AchievementsTab({ selectedChildId }: { selectedChildId?:
         />
       ) : (
         <div className="space-y-5">
-          {/* Фильтры: ребёнок / навык / статус */}
+          {/* Шкала выполненных достижений */}
+          {viewChildId && totalGroups > 0 && (
+            <div className="card p-4">
+              <div className="mb-2 flex items-center justify-between text-sm">
+                <span className="font-bold text-slate-700">Выполнено достижений</span>
+                <span className="font-extrabold text-slate-800">
+                  {doneGroups} / {totalGroups}
+                </span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-emerald-500"
+                  style={{ width: `${Math.round((doneGroups / totalGroups) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Фильтры: навык / статус */}
           <div className="flex flex-wrap items-center gap-2">
-            <select
-              className="input !w-auto"
-              value={viewChildId}
-              onChange={(e) => setViewChildId(e.target.value)}
-            >
-              {children
-                .filter((c) => c.active)
-                .map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.avatarEmoji} {c.name}
+            {!skill && (
+              <select
+                className="input !w-auto"
+                value={skillFilter}
+                onChange={(e) => setSkillFilter(e.target.value)}
+              >
+                <option value="ALL">Все навыки</option>
+                {SKILL_SECTIONS.map((s) => (
+                  <option key={s.skill} value={s.skill}>
+                    {s.label}
                   </option>
                 ))}
-            </select>
-            <select
-              className="input !w-auto"
-              value={skillFilter}
-              onChange={(e) => setSkillFilter(e.target.value as 'ALL' | 'READING' | 'MATH' | 'HOUSE' | 'NONE')}
-            >
-              <option value="ALL">Все навыки</option>
-              <option value="READING">📚 Чтение</option>
-              <option value="MATH">🧮 Математика</option>
-              <option value="HOUSE">🏠 Хозяйственность</option>
-              <option value="NONE">Без навыка</option>
-            </select>
-            <select
-              className="input !w-auto"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as 'ALL' | 'DONE' | 'OPEN')}
-            >
-              <option value="ALL">Любой статус</option>
-              <option value="DONE">✅ Выполнено</option>
-              <option value="OPEN">⏳ Не выполнено</option>
-            </select>
+              </select>
+            )}
+            <div className="flex items-center gap-1 rounded-xl bg-slate-100 p-1">
+              <button
+                className={statusFilter === 'ALL' ? 'btn-primary !px-3 !py-1 text-xs' : 'btn-secondary !px-3 !py-1 text-xs'}
+                onClick={() => setStatusFilter('ALL')}
+              >
+                Показать все
+              </button>
+              <button
+                className={statusFilter === 'DONE' ? 'btn-primary !px-3 !py-1 text-xs' : 'btn-secondary !px-3 !py-1 text-xs'}
+                onClick={() => setStatusFilter('DONE')}
+              >
+                Только выполненные
+              </button>
+            </div>
           </div>
 
           {/* Секции по навыкам */}
-          {(['READING', 'MATH', 'HOUSE', 'NONE'] as const).map((skill) => {
-            if (skillFilter !== 'ALL' && skillFilter !== skill) return null;
-            const skillGroups = Object.entries(grouped).filter(([, group]) => (group[0].skill ?? 'NONE') === skill);
+          {SKILL_SECTIONS.map(({ skill: sectionSkill, label: skillLabel }) => {
+            if (skill && sectionSkill !== skill) return null;
+            if (skillFilter !== 'ALL' && skillFilter !== sectionSkill) return null;
+            const skillGroups = Object.entries(grouped).filter(([, group]) => (group[0].skill ?? 'NONE') === sectionSkill);
             if (skillGroups.length === 0) return null;
-            const skillLabel =
-              skill === 'READING'
-                ? '📚 Чтение'
-                : skill === 'MATH'
-                  ? '🧮 Математика'
-                  : skill === 'HOUSE'
-                    ? '🏠 Хозяйственность'
-                    : '🏅 Без навыка';
             return (
-              <section key={skill}>
+              <section key={sectionSkill}>
                 <h2 className="mb-2 text-lg font-extrabold text-slate-700">{skillLabel}</h2>
                 <div className="space-y-4">
                   {skillGroups.map(([key, group]) => {
@@ -352,7 +393,6 @@ export default function AchievementsTab({ selectedChildId }: { selectedChildId?:
                     const pct = steps > 0 ? Math.round((doneSteps / steps) * 100) : 0;
                     const completed = meta?.completed ?? false;
                     if (statusFilter === 'DONE' && !completed) return null;
-                    if (statusFilter === 'OPEN' && completed) return null;
                     return (
                       <div key={key} className="card space-y-3">
                         <div className="flex items-start gap-3">

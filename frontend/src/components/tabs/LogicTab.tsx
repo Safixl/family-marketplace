@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Settings,
   ShoppingBag,
+  Trophy,
   Trash2,
   X,
 } from 'lucide-react';
@@ -24,6 +25,8 @@ import {
   StoreDto,
 } from '../../api/types';
 import { errMsg, fmtAmount } from '../../lib/format';
+import AchievementsTab from './AchievementsTab';
+import PendingPurchasesCard from '../PendingPurchasesCard';
 import Modal from '../Modal';
 import { EmptyState, Spinner } from '../ui';
 
@@ -112,7 +115,7 @@ export default function LogicTab({ selectedChildId }: Props) {
   const [settingsSaved, setSettingsSaved] = useState(false);
 
   // Магазин навыка
-  const [view, setView] = useState<'main' | 'shop' | 'settings'>('main');
+  const [view, setView] = useState<'main' | 'shop' | 'settings' | 'achievements'>('main');
   const [products, setProducts] = useState<ProductDto[]>([]);
   const [storeModal, setStoreModal] = useState(false);
   const [storeForm, setStoreForm] = useState<StoreForm>({ name: '', description: '', currencyName: '', currencyIcon: '', active: true });
@@ -402,10 +405,26 @@ export default function LogicTab({ selectedChildId }: Props) {
     return (
       <div className="space-y-4">
         <LogicHeader />
+
         <EmptyState
           title="Магазин логики не найден"
           hint="Включите шаблон «Логика» в профиле ребёнка, чтобы генерировать карточки"
         />
+      </div>
+    );
+  }
+
+  // ===== Вид достижений навыка =====
+  if (view === 'achievements') {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <button className="btn-secondary !px-3 !py-1.5 text-xs" onClick={() => setView('main')}>
+            К логике
+          </button>
+          <h1 className="text-xl font-extrabold">🏆 Достижения</h1>
+        </div>
+        <AchievementsTab skill="LOGIC" selectedChildId={selectedChildId} />
       </div>
     );
   }
@@ -440,6 +459,10 @@ export default function LogicTab({ selectedChildId }: Props) {
               <Pencil size={14} /> Настройки магазина
             </button>
           </div>
+
+
+          {/* Ожидают подтверждения: покупки и активации этого магазина */}
+          <PendingPurchasesCard storeId={store.id} onChanged={() => void openShop()} />
 
           <div className="border-t border-slate-100 pt-3">
             <div className="mb-3 flex items-center justify-between">
@@ -757,6 +780,7 @@ export default function LogicTab({ selectedChildId }: Props) {
           void loadTopics();
         }}
         onOpenShop={openShop}
+        onOpenAchievements={() => setView('achievements')}
       />
 
       {/* Прогресс дня */}
@@ -908,7 +932,7 @@ export default function LogicTab({ selectedChildId }: Props) {
 // ---------- Вспомогательные элементы ----------
 
 /** Шапка вкладки: заголовок, кнопки настроек и магазина. Ребёнок выбирается в шапке дашборда. */
-function LogicHeader({ onOpenSettings, onOpenShop }: { onOpenSettings?: () => void; onOpenShop?: () => void }) {
+function LogicHeader({ onOpenSettings, onOpenShop, onOpenAchievements }: { onOpenSettings?: () => void; onOpenShop?: () => void; onOpenAchievements?: () => void }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <h1 className="text-xl font-extrabold">🧩 Логика</h1>
@@ -916,6 +940,15 @@ function LogicHeader({ onOpenSettings, onOpenShop }: { onOpenSettings?: () => vo
         {onOpenSettings && (
           <button className="btn-secondary" onClick={onOpenSettings}>
             <Settings size={17} /> Настройки
+          </button>
+        )}
+        {onOpenAchievements && (
+          <button
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-700 hover:bg-amber-200"
+            onClick={onOpenAchievements}
+            title="Достижения"
+          >
+            <Trophy size={18} />
           </button>
         )}
         {onOpenShop && (

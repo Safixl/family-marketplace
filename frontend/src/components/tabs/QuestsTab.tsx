@@ -5,7 +5,9 @@ import {
   Pencil,
   Plus,
   ScrollText,
+  Sparkles,
   Trash2,
+  Trophy,
   XCircle,
 } from 'lucide-react';
 import { api } from '../../api/client';
@@ -17,7 +19,9 @@ import {
   StoreDto,
 } from '../../api/types';
 import { errMsg, fmtAmount, fmtDate } from '../../lib/format';
+import AchievementsTab from './AchievementsTab';
 import Modal from '../Modal';
+import SeasonalTab from './SeasonalTab';
 import { EmptyState, Spinner } from '../ui';
 
 interface QuestForm {
@@ -92,6 +96,8 @@ export default function QuestsTab({
   const [children, setChildren] = useState<ChildDto[]>([]);
   const [stores, setStores] = useState<StoreDto[]>([]);
   const [events, setEvents] = useState<SeasonalEventDto[]>([]);
+  const [seasonalOpen, setSeasonalOpen] = useState(false);
+  const [achievementsOpen, setAchievementsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -289,12 +295,28 @@ export default function QuestsTab({
               Дейлики (повторяемые) и сюжетные квесты. Награда: валюта магазина + общий опыт.
             </p>
           </div>
-          <button
-            onClick={openCreate}
-            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
-          >
-            <Plus size={16} /> Новый квест
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setAchievementsOpen(true)}
+              title="Достижения без навыка"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700 hover:bg-amber-200"
+            >
+              <Trophy size={16} />
+            </button>
+            <button
+              onClick={() => setSeasonalOpen(true)}
+              title="Сезонные ивенты"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-fuchsia-600 text-white hover:bg-fuchsia-700"
+            >
+              <Sparkles size={16} />
+            </button>
+            <button
+              onClick={openCreate}
+              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+            >
+              <Plus size={16} /> Новый квест
+            </button>
+          </div>
         </div>
 
         {/* Вкладки-группы */}
@@ -693,6 +715,20 @@ export default function QuestsTab({
           </div>
         </div>
       </Modal>
+      )}
+
+      {/* Сезонные ивенты */}
+      {seasonalOpen && (
+        <Modal title="Сезонные ивенты" onClose={() => setSeasonalOpen(false)} wide>
+          <SeasonalTab />
+        </Modal>
+      )}
+
+      {/* Достижения без навыка */}
+      {achievementsOpen && (
+        <Modal title="Достижения" onClose={() => setAchievementsOpen(false)} wide>
+          <AchievementsTab skill="NONE" selectedChildId={selectedChildId} />
+        </Modal>
       )}
     </div>
   );
