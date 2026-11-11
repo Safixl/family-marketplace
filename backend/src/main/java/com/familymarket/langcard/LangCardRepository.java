@@ -13,6 +13,9 @@ public interface LangCardRepository extends JpaRepository<LangCard, Long> {
 
     long countByChildIdAndCardDate(Long childId, LocalDate cardDate);
 
+    /** Успешно пройденные карточки (для достижений). */
+    long countByChildIdAndStatus(Long childId, String status);
+
     List<LangCard> findByChildIdAndCardDateAndStatus(Long childId, LocalDate cardDate, String status);
 
     /** Сколько карточек дня уже завершено (SUCCESS/FAILED) — лимит 3. */

@@ -64,6 +64,10 @@ public class LogicCard {
     @Column(name = "deadline")
     private Instant deadline;
 
+    /** Остаток времени при паузе (сек). null — таймер идёт. */
+    @Column(name = "remaining_seconds")
+    private Integer remainingSeconds;
+
     @Column(name = "submitted_at")
     private Instant submittedAt;
 

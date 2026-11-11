@@ -1,5 +1,6 @@
 package com.familymarket.purchase;
 
+import com.familymarket.audit.AuditService;
 import com.familymarket.achievement.AchievementService;
 import com.familymarket.balance.Balance;
 import com.familymarket.balance.BalanceRepository;
@@ -28,19 +29,22 @@ public class PurchaseService {
     private final AchievementService achievementService;
     private final InventoryService inventoryService;
     private final LimitService limitService;
+    private final AuditService auditService;
 
     public PurchaseService(PurchaseRepository purchaseRepository,
                            ProductRepository productRepository,
                            BalanceRepository balanceRepository,
                            AchievementService achievementService,
                            InventoryService inventoryService,
-                           LimitService limitService) {
+                           LimitService limitService,
+                           AuditService auditService) {
         this.purchaseRepository = purchaseRepository;
         this.productRepository = productRepository;
         this.balanceRepository = balanceRepository;
         this.achievementService = achievementService;
         this.inventoryService = inventoryService;
         this.limitService = limitService;
+        this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
@@ -154,6 +158,8 @@ public class PurchaseService {
 
         // Автоначисление достижений (например, «выкупить N товаров в магазине Дом»)
         achievementService.checkProgress(purchase.getChild().getId());
+        auditService.record(parentId, "PURCHASE_APPROVE", "PURCHASE",
+                "Покупка подтверждена: " + purchase.getProduct().getName() + " · " + purchase.getChild().getName());
         return PurchaseDto.from(purchase);
     }
 
@@ -168,6 +174,8 @@ public class PurchaseService {
         }
         purchase.setStatus(PurchaseStatus.REJECTED);
         purchase.setConfirmedAt(Instant.now());
+        auditService.record(parentId, "PURCHASE_REJECT", "PURCHASE",
+                "Покупка отклонена: " + purchase.getProduct().getName() + " · " + purchase.getChild().getName());
         return PurchaseDto.from(purchase);
     }
 

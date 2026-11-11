@@ -278,8 +278,20 @@ public class SportCardService {
     public SportCardDto generate(Long childId, Long directionId) {
         ensureDirections(childId);
         LocalDate today = todayDate();
-        if (cardRepository.findByChildIdAndCardDate(childId, today).isPresent()) {
-            throw new BadRequestException("Дейлик по спорту на сегодня уже выбран");
+        // Несвёрнутая карточка дня (CREATED, ещё не отправлена родителю) заменяется новой:
+        // ребёнок может «свернуть» дейлик и выбрать другое направление. Лимит дня —
+        // только на решённые (SUCCESS/FAILED) карточки.
+        java.util.Optional<SportCard> existingToday = cardRepository.findByChildIdAndCardDate(childId, today);
+        SportCard reused = null;
+        if (existingToday.isPresent()) {
+            SportCard existing = existingToday.get();
+            if (!"CREATED".equals(existing.getStatus())) {
+                throw new BadRequestException("Дейлик по спорту на сегодня уже выполняется");
+            }
+            // Несвёрнутую карточку переиспользуем: смена направления, задачи пересоздаются.
+            // (В БД уникальный индекс на (child_id, card_date) — удалять и создавать нельзя.)
+            reused = existing;
+            cardTaskRepository.deleteAll(cardTaskRepository.findByCardIdOrderByIdAsc(existing.getId()));
         }
         SportDirection direction = directionRepository.findById(directionId)
                 .orElseThrow(() -> new NotFoundException("Направление не найдено"));
@@ -306,14 +318,20 @@ public class SportCardService {
         int count = Math.min("Физкультура".equals(direction.getName()) ? PE_EXERCISES_PER_CARD : HOBBY_TASKS_PER_CARD,
                 eligible.size());
 
-        SportCard card = new SportCard();
-        card.setChild(child);
-        card.setCardDate(today);
-        card.setDirection(direction);
-        card.setStatus("CREATED");
-        card.setBaseReward(BASE_REWARD);
-        card.setCreatedAt(Instant.now());
-        card = cardRepository.save(card);
+        SportCard card;
+        if (reused != null) {
+            card = reused;
+            card.setDirection(direction);
+        } else {
+            card = new SportCard();
+            card.setChild(child);
+            card.setCardDate(today);
+            card.setDirection(direction);
+            card.setStatus("CREATED");
+            card.setBaseReward(BASE_REWARD);
+            card.setCreatedAt(Instant.now());
+            card = cardRepository.save(card);
+        }
 
         List<SportCardTask> cardTasks = new ArrayList<>();
         for (int i = 0; i < count; i++) {

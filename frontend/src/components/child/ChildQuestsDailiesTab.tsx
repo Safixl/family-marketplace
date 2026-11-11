@@ -12,16 +12,16 @@ export default function ChildQuestsDailiesTab() {
     <div className="space-y-8">
       <section>
         <h2 className="rpg-title mb-3 flex items-center gap-2 text-xl">
-          <Sparkles size={20} className="text-amber-400" /> Дейлики на сегодня
+          <ScrollText size={20} className="text-amber-400" /> Квесты ГМа
         </h2>
-        <ChildDailiesTab />
+        <ChildQuestsTab />
       </section>
 
       <section>
         <h2 className="rpg-title mb-3 flex items-center gap-2 text-xl">
-          <ScrollText size={20} className="text-amber-400" /> Квесты ГМа
+          <Sparkles size={20} className="text-amber-400" /> Дейлики на сегодня
         </h2>
-        <ChildQuestsTab />
+        <ChildDailiesTab />
       </section>
     </div>
   );

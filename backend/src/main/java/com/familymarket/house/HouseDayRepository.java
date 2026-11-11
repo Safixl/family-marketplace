@@ -52,4 +52,27 @@ public interface HouseDayRepository extends JpaRepository<HouseDay, Long> {
     /** Накопленные баллы за помощь по дому (сумма living_score). */
     @Query("select coalesce(sum(h.livingScore), 0) from HouseDay h where h.child.id = :childId")
     long sumLivingScoreByChildId(@Param("childId") Long childId);
+
+    /**
+     * Текущая серия дней с положительной оценкой (стрик) одним SQL-запросом с оконными функциями.
+     * Режим: 'ROOM' — порядок в комнате, 'HELP' — помощь по дому.
+     * Серия учитывается, если последний день — сегодня или вчера.
+     */
+    @Query(value = """
+            WITH days AS (
+                SELECT DISTINCT day FROM house_days
+                WHERE child_id = :childId
+                  AND (:mode = 'ROOM' AND room_score > 0 OR :mode = 'HELP' AND living_score > 0)
+            ),
+            grp AS (
+                SELECT day, (day - (ROW_NUMBER() OVER (ORDER BY day))::int) AS g FROM days
+            ),
+            series AS (
+                SELECT g, COUNT(*) AS cnt, MAX(day) AS mx FROM grp GROUP BY g
+            )
+            SELECT COALESCE((SELECT cnt FROM series
+                             WHERE mx IN (CURRENT_DATE, CURRENT_DATE - 1)
+                             ORDER BY mx DESC LIMIT 1), 0)
+            """, nativeQuery = true)
+    long currentPositiveStreak(@Param("childId") Long childId, @Param("mode") String mode);
 }

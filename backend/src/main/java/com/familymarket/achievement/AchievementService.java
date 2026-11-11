@@ -13,7 +13,10 @@ import com.familymarket.dto.ChildAchievementGroupDto;
 import com.familymarket.dto.GrantAchievementRequest;
 import com.familymarket.dto.GrantResult;
 import com.familymarket.dto.SkillTotalDto;
+import com.familymarket.audit.AuditService;
 import com.familymarket.house.HouseDayRepository;
+import com.familymarket.langcard.LangCardRepository;
+import com.familymarket.logiccard.LogicCardRepository;
 import com.familymarket.math.MathAttemptRepository;
 import com.familymarket.mathcard.MathCardAttemptRepository;
 import com.familymarket.mathcard.MathCardRepository;
@@ -40,6 +43,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class AchievementService {
@@ -74,7 +78,12 @@ public class AchievementService {
     private final PurchaseRepository purchaseRepository;
     private final DailyLogRepository dailyLogRepository;
     private final ChildTaskCardRepository childTaskCardRepository;
+    private final LogicCardRepository logicCardRepository;
+    private final LangCardRepository langCardRepository;
+    private final AuditService auditService;
     private final BalanceService balanceService;
+    /** Родители, чьи дефолтные достижения уже созданы (защита от повторных блокировок). */
+    private final Set<Long> ensuredParents = ConcurrentHashMap.newKeySet();
 
     public AchievementService(AchievementRepository achievementRepository,
                               ChildRepository childRepository,
@@ -91,6 +100,9 @@ public class AchievementService {
                               PurchaseRepository purchaseRepository,
                               DailyLogRepository dailyLogRepository,
                               ChildTaskCardRepository childTaskCardRepository,
+                              LogicCardRepository logicCardRepository,
+                              LangCardRepository langCardRepository,
+                              AuditService auditService,
                               BalanceService balanceService) {
         this.achievementRepository = achievementRepository;
         this.childRepository = childRepository;
@@ -107,6 +119,9 @@ public class AchievementService {
         this.purchaseRepository = purchaseRepository;
         this.dailyLogRepository = dailyLogRepository;
         this.childTaskCardRepository = childTaskCardRepository;
+        this.logicCardRepository = logicCardRepository;
+        this.langCardRepository = langCardRepository;
+        this.auditService = auditService;
         this.balanceService = balanceService;
     }
 
@@ -127,10 +142,17 @@ public class AchievementService {
      */
     @Transactional
     public synchronized void ensureDefaultAchievements(Long parentId) {
+        // Быстрый выход: дефолты уже созданы — не занимаем соединение пула на блокировке
+        if (ensuredParents.contains(parentId)) {
+            return;
+        }
         User parent = userRepository.findById(parentId)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
         if (achievementRepository.countByParentIdAndSkill(parentId, "READING") == 0) {
             achievementRepository.saveAll(AchievementDefaults.reading(parent));
+        } else {
+            // Новые дефолтные группы чтения (квесты серий) досоздаются и у существующих родителей
+            ensureMissingReadingDefaults(parent);
         }
         if (achievementRepository.countByParentIdAndSkill(parentId, "MATH") == 0) {
             achievementRepository.saveAll(AchievementDefaults.math(parent));
@@ -141,7 +163,33 @@ public class AchievementService {
         if (achievementRepository.countByParentIdAndSkill(parentId, "HOUSE") == 0) {
             achievementRepository.saveAll(AchievementDefaults.house(parent));
         }
+        if (achievementRepository.countByParentIdAndSkill(parentId, "SPORT") == 0) {
+            achievementRepository.saveAll(AchievementDefaults.sport(parent));
+        }
+        if (achievementRepository.countByParentIdAndSkill(parentId, "LOGIC") == 0) {
+            achievementRepository.saveAll(AchievementDefaults.logic(parent));
+        }
+        if (achievementRepository.countByParentIdAndSkill(parentId, "LANG") == 0) {
+            achievementRepository.saveAll(AchievementDefaults.lang(parent));
+        }
+        ensuredParents.add(parentId);
         syncDefaultXp(parentId);
+    }
+
+    /** Досоздаёт новые дефолтные группы достижений чтения (идемпотентно, по groupKey). */
+    private void ensureMissingReadingDefaults(User parent) {
+        Set<String> present = new HashSet<>();
+        for (Achievement e : achievementRepository.findByParentIdAndSkill(parent.getId(), "READING")) {
+            if (e.getGroupKey() != null) {
+                present.add(e.getGroupKey());
+            }
+        }
+        List<Achievement> toAdd = AchievementDefaults.reading(parent).stream()
+                .filter(a -> a.getGroupKey() != null && !present.contains(a.getGroupKey()))
+                .toList();
+        if (!toAdd.isEmpty()) {
+            achievementRepository.saveAll(toAdd);
+        }
     }
 
     /** Досоздаёт новые дефолтные группы достижений математики (идемпотентно, по groupKey). */
@@ -339,6 +387,8 @@ public class AchievementService {
         childAchievement.setAchievement(achievement);
         childAchievement.setUnlockedAt(Instant.now());
         childAchievementRepository.save(childAchievement);
+        auditService.record(parentId, "ACHIEVEMENT_GRANT", "ACHIEVEMENT",
+                "Достижение «" + achievement.getName() + "» выдано ребёнку " + child.getName());
 
         BigDecimal credited = BigDecimal.ZERO;
         Long storeId = null;
@@ -590,16 +640,16 @@ public class AchievementService {
             case "POINTS_EARNED" -> balanceRepository.sumByChildId(childId).longValue();
             case "MATH_STREAK" -> streak(union(mathAttemptRepository.findDistinctCorrectDates(childId),
                     mathCardRepository.findFinishedDates(childId)));
-            case "HOUSE_CLEAN_STREAK" -> streak(houseDayRepository.findCleanRoomDays(childId));
-            case "HOUSE_HELP_STREAK" -> streak(houseDayRepository.findHelpDays(childId));
+            case "HOUSE_CLEAN_STREAK" -> houseDayRepository.currentPositiveStreak(childId, "ROOM");
+            case "HOUSE_HELP_STREAK" -> houseDayRepository.currentPositiveStreak(childId, "HELP");
             case "HOME_PURCHASES" -> purchaseRepository.countPaidInHomeStores(childId);
             case "LOGIC_TASKS" -> dailyLogRepository.sumPointsByChildIdAndSkill(childId, "LOGIC");
             case "LANG_WORDS" -> dailyLogRepository.sumPointsByChildIdAndSkill(childId, "LANG");
             case "SPORT_DAYS" -> dailyLogRepository.findActiveDays(childId, "SPORT").size();
             case "READING_STREAK" -> streak(readingLogRepository.findDistinctApprovedDates(childId));
-            case "LOGIC_STREAK" -> streak(dailyLogRepository.findActiveDays(childId, "LOGIC"));
-            case "LANG_STREAK" -> streak(dailyLogRepository.findActiveDays(childId, "LANG"));
-            case "SPORT_STREAK" -> streak(dailyLogRepository.findActiveDays(childId, "SPORT"));
+            case "LOGIC_STREAK" -> dailyLogRepository.currentActiveStreak(childId, "LOGIC");
+            case "LANG_STREAK" -> dailyLogRepository.currentActiveStreak(childId, "LANG");
+            case "SPORT_STREAK" -> dailyLogRepository.currentActiveStreak(childId, "SPORT");
             case "MATH_CARD_SUCCESS" -> mathCardRepository.countByChildIdAndStatus(childId, "SUCCESS");
             case "MATH_CARD_STREAK" -> streak(mathCardRepository.findFinishedDates(childId));
             case "MATH_CARD_LVL_EASY" -> mathCardRepository.countByChildIdAndStatusAndFinalLevel(childId, "SUCCESS", "EASY");
@@ -611,6 +661,8 @@ public class AchievementService {
             case "MATH_CARD_DONE_HARD" -> mathCardRepository.countByChildIdAndStatusAndFinalLevel(childId, "SUCCESS", "HARD");
             case "MATH_CARD_DONE_EXTREME" -> mathCardRepository.countByChildIdAndStatusAndFinalLevel(childId, "SUCCESS", "EXTREME");
             case "MATH_CARD_DONE_OLYMPIAD" -> mathCardRepository.countByChildIdAndStatusAndFinalLevel(childId, "SUCCESS", "OLYMPIAD");
+            case "LOGIC_CARDS" -> logicCardRepository.countByChildIdAndStatus(childId, "SUCCESS");
+            case "LANG_CARDS" -> langCardRepository.countByChildIdAndStatus(childId, "SUCCESS");
             default -> 0;
         };
     }

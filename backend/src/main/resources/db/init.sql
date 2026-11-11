@@ -1186,3 +1186,18 @@ ON CONFLICT (code) DO NOTHING;
 
 -- Ребрендинг навыка «Порядок в комнате» → «Хозяйственность»: обновляем описания существующих магазинов
 UPDATE stores SET description = REPLACE(description, 'порядок в комнате', 'хозяйственность') WHERE description LIKE '%порядок в комнате%';
+
+-- Журнал аудита ключевых действий родителя (кто/что/когда)
+CREATE TABLE IF NOT EXISTS audit_log (
+    id          BIGSERIAL PRIMARY KEY,
+    parent_id   BIGINT       NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    action      VARCHAR(64)  NOT NULL,
+    entity      VARCHAR(64),
+    details     TEXT,
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_audit_log_parent ON audit_log (parent_id, created_at DESC);
+
+-- Пауза таймера карточек: остаток секунд при паузе (null — таймер идёт)
+ALTER TABLE math_cards  ADD COLUMN IF NOT EXISTS remaining_seconds INT;
+ALTER TABLE logic_cards ADD COLUMN IF NOT EXISTS remaining_seconds INT;

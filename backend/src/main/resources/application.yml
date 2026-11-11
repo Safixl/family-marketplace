@@ -13,6 +13,7 @@ spring:
     password: ${DB_PASSWORD:familymarket}
     hikari:
       minimum-idle: 2
+      maximum-pool-size: 15
       # Защита от «зависших» соединений после сна ОС / перезапуска PostgreSQL:
       # мёртвые TCP-соединения выбиваются keepalive-пингами и лимитом жизни.
       connection-timeout: 15000

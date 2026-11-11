@@ -766,6 +766,7 @@ export type MathCardStatus =
   | 'REQUESTED'
   | 'APPROVED'
   | 'IN_PROGRESS'
+  | 'PAUSED'
   | 'SUCCESS'
   | 'FAILED';
 
@@ -892,6 +893,7 @@ export type LogicCardStatus =
   | 'REQUESTED'
   | 'APPROVED'
   | 'IN_PROGRESS'
+  | 'PAUSED'
   | 'SUCCESS'
   | 'FAILED';
 

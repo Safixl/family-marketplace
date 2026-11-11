@@ -68,7 +68,7 @@ export default function MathCardView({ onDone }: { onDone?: () => void }) {
     }
   };
 
-  const act = async (card: MathCardDto, action: 'request' | 'revoke' | 'start') => {
+  const act = async (card: MathCardDto, action: 'request' | 'revoke' | 'start' | 'pause' | 'resume') => {
     setBusy(true);
     try {
       await api.post(`/child/math-cards/${card.id}/${action}`);
@@ -211,6 +211,16 @@ export default function MathCardView({ onDone }: { onDone?: () => void }) {
                     className={`mt-2 flex items-center gap-2 text-lg font-extrabold ${overdue ? 'text-rose-400' : 'text-amber-200'}`}
                   >
                     <Clock3 size={18} /> {overdue ? 'Время вышло' : fmt(remaining(card))}
+                    {!overdue && (
+                      <button
+                        className="rpg-badge border border-stone-600/60 bg-stone-700/30 text-stone-300 hover:border-amber-600/60"
+                        disabled={busy}
+                        onClick={() => void act(card, 'pause')}
+                        title="Свернуть задачу (таймер остановится) и взять другую"
+                      >
+                        ⏸ Свернуть
+                      </button>
+                    )}
                   </div>
                 )}
                 {card.status === 'SUCCESS' && card.xpEarned > 0 && (
@@ -238,6 +248,11 @@ export default function MathCardView({ onDone }: { onDone?: () => void }) {
               {card.status === 'APPROVED' && (
                 <button className="rpg-btn" disabled={busy} onClick={() => void act(card, 'start')}>
                   ▶ Начать задачу
+                </button>
+              )}
+              {card.status === 'PAUSED' && (
+                <button className="rpg-btn" disabled={busy} onClick={() => void act(card, 'resume')}>
+                  ▶ Продолжить
                 </button>
               )}
               {card.level === 'REVIEW' && card.status === 'SUCCESS' && (

@@ -71,6 +71,23 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return (await response.json()) as T;
 }
 
+/** Скачивание файла с авторизацией (возвращает Blob). */
+export async function downloadFile(path: string): Promise<Blob> {
+  const session = loadSession();
+  const headers: Record<string, string> = {};
+  if (session?.type === 'parent') {
+    headers['Authorization'] = `Bearer ${session.token}`;
+  }
+  if (session?.type === 'child') {
+    headers['X-Access-Key'] = session.accessKey;
+  }
+  const response = await fetch(`/api${path}`, { headers });
+  if (!response.ok) {
+    throw new ApiError(`Ошибка скачивания (${response.status})`, response.status);
+  }
+  return response.blob();
+}
+
 export const api = {
   get: <T>(path: string): Promise<T> => request<T>(path),
   post: <T>(path: string, body?: unknown): Promise<T> =>

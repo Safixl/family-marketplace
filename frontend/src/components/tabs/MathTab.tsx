@@ -67,6 +67,7 @@ const CARD_STATUS: Record<string, { label: string; cls: string }> = {
   REQUESTED: { label: '⏳ Ждёт одобрения', cls: 'bg-amber-100 text-amber-700' },
   APPROVED: { label: '✅ Одобрена', cls: 'bg-sky-100 text-sky-700' },
   IN_PROGRESS: { label: '✍️ В работе', cls: 'bg-indigo-100 text-indigo-700' },
+  PAUSED: { label: '⏸ На паузе', cls: 'bg-stone-100 text-stone-700' },
   SUCCESS: { label: '🏆 Решена', cls: 'bg-emerald-100 text-emerald-700' },
   FAILED: { label: '❌ Не решена', cls: 'bg-rose-100 text-rose-700' },
 };

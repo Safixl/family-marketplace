@@ -18,6 +18,8 @@ export default function SportCardView({ onDone }: { onDone?: () => void }) {
   const [showRequest, setShowRequest] = useState(false);
   const [reqName, setReqName] = useState('');
   const [reqComment, setReqComment] = useState('');
+  /** Несвёрнутая карточка дня (CREATED) можно свернуть и выбрать другое направление. */
+  const [cardCollapsed, setCardCollapsed] = useState(false);
 
   const load = useCallback(async () => {
     // Направления и запросы грузим независимо: ошибка истории запросов
@@ -43,6 +45,7 @@ export default function SportCardView({ onDone }: { onDone?: () => void }) {
     setBusy(true);
     try {
       await api.post<SportCardDto>('/child/sport-cards/generate', { directionId });
+      setCardCollapsed(false);
       await load();
       onDone?.();
     } catch (e) {
@@ -88,8 +91,8 @@ export default function SportCardView({ onDone }: { onDone?: () => void }) {
 
   return (
     <div className="space-y-3">
-      {/* Карточка дня (если выбрано направление) */}
-      {card && (
+      {/* Карточка дня (если выбрано направление); несвёрнутую CREATED можно свернуть */}
+      {card && !(card.status === 'CREATED' && cardCollapsed) && (
         <div className="rpg-panel p-4">
           <div className="flex flex-wrap items-center gap-2 font-bold text-amber-100">
             <span className="text-lg">{card.directionIcon}</span> {card.directionName} · дейлик дня
@@ -115,6 +118,17 @@ export default function SportCardView({ onDone }: { onDone?: () => void }) {
             <span className="rpg-badge border border-violet-500/40 bg-violet-500/15 text-violet-300">
               🔍 Проверка родителем ×0/×1/×2
             </span>
+            {card.status === 'CREATED' && (
+              <button
+                className="rpg-badge border border-stone-600/60 bg-stone-700/30 text-stone-300 hover:border-amber-600/60"
+                onClick={() => {
+                  setCardCollapsed(true);
+                }}
+                title="Свернуть задачу и выбрать другое направление"
+              >
+                ▲ Свернуть
+              </button>
+            )}
           </div>
 
           <div className="mt-3 space-y-2">
@@ -151,8 +165,8 @@ export default function SportCardView({ onDone }: { onDone?: () => void }) {
         </div>
       )}
 
-      {/* Выбор направления — если дейлик ещё не сделан */}
-      {!card && (
+      {/* Выбор направления — если дейлик не сделан или несвёрнутая карточка свёрнута */}
+      {(!card || (card.status === 'CREATED' && cardCollapsed)) && (
         <>
           <div className="text-sm font-bold text-amber-100">Выбери направление для сегодняшнего дейлика:</div>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">

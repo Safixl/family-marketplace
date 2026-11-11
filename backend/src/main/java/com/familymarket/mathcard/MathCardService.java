@@ -269,7 +269,7 @@ public class MathCardService {
     public MathCardSubmitResult submit(Long childId, Long cardId, List<String> answers) {
         MathCard card = ownedCard(childId, cardId);
         expireOverdue(childId);
-        if (!"IN_PROGRESS".equals(card.getStatus())) {
+        if (!"IN_PROGRESS".equals(card.getStatus()) && !"PAUSED".equals(card.getStatus())) {
             throw new BadRequestException("Карточка не в работе");
         }
         List<MathCardTask> tasks = taskRepository.findByCardIdOrderByIdAsc(cardId);
@@ -311,6 +311,43 @@ public class MathCardService {
         // Авто-начисление достижений по математике (примеры, карточки, стрики)
         achievementService.checkProgress(childId);
         return new MathCardSubmitResult(percent, success, correct, tasks.size(), perExampleXp, successReward, xpEarned);
+    }
+
+    /** «Свернуть» — пауза таймера; карточку можно оставить на паузе и начать другую. */
+    @Transactional
+    public MathCardDto pause(Long childId, Long cardId) {
+        MathCard card = ownedCard(childId, cardId);
+        if (!"IN_PROGRESS".equals(card.getStatus())) {
+            throw new BadRequestException("На паузу можно поставить только начатую карточку");
+        }
+        Instant now = Instant.now();
+        long remaining = card.getDeadline() != null
+                ? Math.max(60, java.time.Duration.between(now, card.getDeadline()).getSeconds())
+                : 600;
+        card.setRemainingSeconds((int) remaining);
+        card.setDeadline(null);
+        card.setStatus("PAUSED");
+        cardRepository.save(card);
+        return MathCardDto.of(card, taskRepository.findByCardIdOrderByIdAsc(cardId), true);
+    }
+
+    /** «Продолжить» — возобновить свёрнутую карточку (таймер продолжается с остатка). */
+    @Transactional
+    public MathCardDto resume(Long childId, Long cardId) {
+        MathCard card = ownedCard(childId, cardId);
+        if (!"PAUSED".equals(card.getStatus())) {
+            throw new BadRequestException("Возобновить можно только карточку на паузе");
+        }
+        if (!cardRepository.findByChildIdAndCardDateAndStatus(childId, card.getCardDate(), "IN_PROGRESS").isEmpty()) {
+            throw new BadRequestException("Сначала завершите текущую карточку");
+        }
+        card.setStatus("IN_PROGRESS");
+        if (card.getRemainingSeconds() != null) {
+            card.setDeadline(Instant.now().plusSeconds(card.getRemainingSeconds()));
+            card.setRemainingSeconds(null);
+        }
+        cardRepository.save(card);
+        return MathCardDto.of(card, taskRepository.findByCardIdOrderByIdAsc(cardId), true);
     }
 
     // ---------- Одобрение родителем ----------

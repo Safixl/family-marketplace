@@ -14,7 +14,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { api } from '../api/client';
+import { api, downloadFile } from '../api/client';
 import { ChildDto, SkillActivationDto } from '../api/types';
 import { NotificationBell, NotificationPanel } from './NotificationCenter';
 import ChildrenTab from './tabs/ChildrenTab';
@@ -93,6 +93,21 @@ export default function ParentDashboard() {
   const { session, logout } = useAuth();
   const [tab, setTab] = useState<TabId>('overview');
   const [notifOpen, setNotifOpen] = useState(false);
+
+  /** Скачивание CSV-отчёта (дети, достижения, покупки). */
+  const exportReport = async () => {
+    try {
+      const blob = await downloadFile('/parent/export/report.csv');
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `family-report-${new Date().toISOString().slice(0, 10)}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert('Не удалось скачать отчёт');
+    }
+  };
   const [notifCount, setNotifCount] = useState(0);
   /** Список детей и выбранный ребёнок — все вкладки показывают его профиль. */
   const [children, setChildren] = useState<ChildDto[]>([]);
@@ -137,11 +152,25 @@ export default function ParentDashboard() {
   const refreshNotifCount = useCallback(async () => {
     try {
       const count = await api.get<number>('/parent/notifications/count');
-      setNotifCount(count);
+      setNotifCount((prev) => {
+        // Новые уведомления появились — показать системное браузерное уведомление
+        if (count > prev && count > 0 && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
+          new Notification('Дейлики', { body: 'У ребёнка новые события — загляните в уведомления' });
+        }
+        return count;
+      });
     } catch {
       // тихо — бейдж просто не обновится
     }
   }, []);
+
+  /** Разрешение на браузерные уведомления (запрашивается мягко, при клике на колокольчик). */
+  const requestNotificationPermission = () => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      void Notification.requestPermission();
+    }
+    setNotifOpen(true);
+  };
 
   useEffect(() => {
     void refreshNotifCount();
@@ -240,8 +269,14 @@ export default function ParentDashboard() {
         <div className="border-t border-slate-800 pt-4">
           <div className="mb-2 flex items-center justify-between px-2">
             <span className="truncate text-sm font-semibold text-white">{profile?.name}</span>
-            <NotificationBell count={notifCount} onClick={() => setNotifOpen(true)} />
+            <NotificationBell count={notifCount} onClick={requestNotificationPermission} />
           </div>
+          <button
+            onClick={() => void exportReport()}
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white"
+          >
+            ⬇️ Экспорт отчёта
+          </button>
           <button
             onClick={logout}
             className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white"
@@ -267,7 +302,7 @@ export default function ParentDashboard() {
           onCreate={startChildCreate}
         />
         <div className="flex items-center gap-1">
-          <NotificationBell count={notifCount} onClick={() => setNotifOpen(true)} />
+          <NotificationBell count={notifCount} onClick={requestNotificationPermission} />
           <button onClick={logout} className="rounded-xl p-2 text-slate-300 hover:bg-slate-800" title="Выйти">
             <LogOut size={20} />
           </button>

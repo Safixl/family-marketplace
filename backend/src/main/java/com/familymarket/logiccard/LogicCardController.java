@@ -108,6 +108,18 @@ public class LogicCardController {
         return logicCardService.start(CurrentUser.childId(), cardId);
     }
 
+    /** «Свернуть» — пауза таймера; карточку можно оставить и начать другую. */
+    @PostMapping("/api/child/logic-cards/{cardId}/pause")
+    public LogicCardDto pause(@PathVariable Long cardId) {
+        return logicCardService.pause(CurrentUser.childId(), cardId);
+    }
+
+    /** «Продолжить» — возобновление свёрнутой карточки (таймер с остатка). */
+    @PostMapping("/api/child/logic-cards/{cardId}/resume")
+    public LogicCardDto resume(@PathVariable Long cardId) {
+        return logicCardService.resume(CurrentUser.childId(), cardId);
+    }
+
     @PostMapping("/api/child/logic-cards/{cardId}/submit")
     public LogicCardSubmitResult submit(@PathVariable Long cardId, @RequestBody LogicCardSubmitRequest request) {
         return logicCardService.submit(CurrentUser.childId(), cardId, request.answers());

@@ -41,6 +41,12 @@ public class GlobalExceptionHandler {
         return ApiError.of(e.getMessage());
     }
 
+    @ExceptionHandler(TooManyRequestsException.class)
+    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
+    public ApiError handleTooManyRequests(TooManyRequestsException e) {
+        return ApiError.of(e.getMessage());
+    }
+
     @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public ApiError handleAccessDenied(org.springframework.security.access.AccessDeniedException e) {

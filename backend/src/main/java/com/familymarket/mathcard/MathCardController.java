@@ -108,6 +108,18 @@ public class MathCardController {
         return mathCardService.start(CurrentUser.childId(), cardId);
     }
 
+    /** «Свернуть» — пауза таймера; карточку можно оставить и начать другую. */
+    @PostMapping("/api/child/math-cards/{cardId}/pause")
+    public MathCardDto pause(@PathVariable Long cardId) {
+        return mathCardService.pause(CurrentUser.childId(), cardId);
+    }
+
+    /** «Продолжить» — возобновление свёрнутой карточки (таймер с остатка). */
+    @PostMapping("/api/child/math-cards/{cardId}/resume")
+    public MathCardDto resume(@PathVariable Long cardId) {
+        return mathCardService.resume(CurrentUser.childId(), cardId);
+    }
+
     @PostMapping("/api/child/math-cards/{cardId}/submit")
     public MathCardSubmitResult submit(@PathVariable Long cardId, @RequestBody MathCardSubmitRequest request) {
         return mathCardService.submit(CurrentUser.childId(), cardId, request.answers());
