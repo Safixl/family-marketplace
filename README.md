@@ -120,3 +120,81 @@ docker compose up --build
 ```bash
 cd backend && ./gradlew bootJar          # jar в build/libs/
 cd frontend && npm run build             # статика в dist/
+```
+
+## PWA и установка на iPhone
+
+Приложение собирается как PWA: манифест, иконки, splash-экраны и Service Worker.
+
+| Файл | Назначение |
+|---|---|
+| `frontend/public/manifest.webmanifest` | имя, `standalone`, `orientation: any`, иконки |
+| `frontend/public/icons/` | иконки 180/192/512/1024 и maskable |
+| `frontend/public/splash/` | splash-экраны iPhone 12+ в портрете и ландшафте |
+| `frontend/public/sw.js` | кэш оболочки; запросы `/api` не кэшируются |
+| `frontend/scripts/generate-icons.mjs` | генерация PNG и splash из SVG |
+
+Перегенерировать иконки и splash после изменения `public/icon.svg` / `public/icon-mark.svg`:
+
+```bash
+cd frontend
+npm run icons
+```
+
+### Как установить на iPhone
+
+1. Открыть HTTPS-адрес приложения в Safari.
+2. Нажать «Поделиться» → «На экран Домой».
+3. Запустить с иконки: приложение откроется без адресной строки (standalone), в портрете и ландшафте.
+
+> Service Worker и полноценная установка требуют HTTPS (или `localhost`). По локальному IP через HTTP Safari может добавить ярлык, но Service Worker не зарегистрируется.
+
+## Локальный запуск без Docker (macOS)
+
+1. PostgreSQL (отдельный кластер в `/tmp`, порт `5433`):
+   ```bash
+   initdb -D /tmp/fm-pgdata -U "$USER" --auth=trust
+   pg_ctl -D /tmp/fm-pgdata -l /tmp/fm-postgres.log -o "-p 5433" start
+   psql -p 5433 -d postgres -c "CREATE ROLE familymarket LOGIN PASSWORD 'familymarket';" || true
+   createdb -p 5433 -O familymarket familymarket || true
+   ```
+   По умолчанию backend использует `jdbc:postgresql://localhost:5433/familymarket` с пользователем/паролем `familymarket`. Свои креды можно положить в `backend/.env`.
+
+2. Backend:
+   ```bash
+   cd backend
+   ./gradlew bootRun
+   ```
+
+3. Frontend:
+   ```bash
+   cd frontend
+   npm install
+   npm run dev -- --host
+   # http://localhost:5173 и http://<IP-машины>:5173
+   ```
+
+### Проверка PWA и Service Worker
+
+```bash
+cd frontend
+npm run build
+npm run preview -- --host
+# http://localhost:4173
+```
+
+Service Worker регистрируется только в production/preview. Для отладки на dev-сервере:
+
+```bash
+VITE_ENABLE_SW=1 npm run dev -- --host
+```
+
+### Проверка на iPhone
+
+- Поднимите HTTPS-туннель на порт `5173` (dev) или `4173` (preview), например через cloudpub/ngrok.
+- Откройте ссылку в Safari и проверьте:
+  - нет горизонтального скролла и обрезанных кнопок;
+  - нижняя навигация не перекрывает контент;
+  - при повороте в ландшафт все разделы доступны (у ребёнка — верхнее меню, у родителя — нижнее меню и «Ещё»);
+  - «На экран Домой» → иконка, splash, standalone, корректный статус-бар.
+- Ограничения iOS: установка только через Safari → «Поделиться» → «На экран Домой»; Service Worker требует HTTPS; Web Push без отдельной настройки недоступен.
