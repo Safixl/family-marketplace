@@ -58,6 +58,13 @@ public class Child {
     @Column(name = "birth_date")
     private LocalDate birthDate;
 
+    /**
+     * Лимит доверия: если включён, ребёнок может брать карточки по математике,
+     * логике и иностранному языку без подтверждения родителя.
+     */
+    @Column(name = "trust_limit", nullable = false)
+    private boolean trustLimit;
+
     /** Возраст (полных лет) — вычисляется из даты рождения, влияет на сложность дейликов. */
     public Integer getAge() {
         if (birthDate == null) {

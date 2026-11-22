@@ -15,6 +15,8 @@ export interface ChildDto {
   avatarEmoji: string;
   accessKey: string;
   active: boolean;
+  /** Лимит доверия: ребёнок берёт карточки без подтверждения родителя. */
+  trustLimit: boolean;
   /** Возраст вычисляется автоматически из даты рождения. */
   age: number | null;
   /** Дата рождения в формате YYYY-MM-DD. */
@@ -193,7 +195,7 @@ export interface GrantResult {
 }
 
 export interface ChildProfileResponse {
-  child: { id: number; name: string; avatarEmoji: string };
+  child: { id: number; name: string; avatarEmoji: string; trustLimit: boolean };
   balances: Array<{
     storeId: number;
     storeName: string;
@@ -788,6 +790,8 @@ export interface MathCardDto {
   resultPercent: number | null;
   xpEarned: number;
   tasks: MathCardTaskDto[];
+  /** Черновик ответов, сохранённый сервером во время теста. */
+  draftAnswers: string[];
 }
 
 export interface MathCardApprovalDto {
@@ -817,6 +821,7 @@ export interface MathCardDayDto {
   cards: MathCardDto[];
   doneToday: number;
   dailyLimit: number;
+  trustLimit: boolean;
 }
 
 /** Задача карточки для родителя: текст, правильный ответ и последний ответ ребёнка. */
@@ -915,6 +920,8 @@ export interface LogicCardDto {
   resultPercent: number | null;
   xpEarned: number;
   tasks: LogicCardTaskDto[];
+  /** Черновик ответов, сохранённый сервером во время теста. */
+  draftAnswers: string[];
 }
 
 export interface LogicCardApprovalDto {
@@ -944,6 +951,7 @@ export interface LogicCardDayDto {
   cards: LogicCardDto[];
   doneToday: number;
   dailyLimit: number;
+  trustLimit: boolean;
 }
 
 /** Задача карточки для родителя: текст, правильный ответ и последний ответ ребёнка. */
@@ -1016,6 +1024,8 @@ export interface LangCardTaskDto {
 
 export type LangCardStatus =
   | 'CREATED'
+  | 'REQUESTED'
+  | 'APPROVED'
   | 'IN_PROGRESS'
   | 'REVIEW'
   | 'SUCCESS'
@@ -1042,12 +1052,29 @@ export interface LangCardDto {
   xpEarned: number;
   parentComment: string | null;
   tasks: LangCardTaskDto[];
+  /** Черновик ответов, сохранённый сервером во время теста. */
+  draftAnswers: string[];
 }
 
 export interface LangCardDayDto {
   cards: LangCardDto[];
   doneToday: number;
   dailyLimit: number;
+  trustLimit: boolean;
+}
+
+export interface LangCardApprovalDto {
+  cardId: number;
+  childId: number;
+  childName: string;
+  childAvatar: string;
+  taskType: LangTaskType;
+  taskTypeLabel: string;
+  taskTypeEmoji: string;
+  difficultyLabel: string;
+  minutes: number;
+  baseReward: number;
+  manual: boolean;
 }
 
 export interface LangCardSubmitResult {

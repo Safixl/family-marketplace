@@ -31,7 +31,7 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+function authHeaders(options: RequestInit = {}): Record<string, string> {
   const session = loadSession();
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string> | undefined),
@@ -45,7 +45,29 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (session?.type === 'child') {
     headers['X-Access-Key'] = session.accessKey;
   }
+  return headers;
+}
 
+/**
+ * Fire-and-forget запрос, который переживает сворачивание/закрытие страницы.
+ * Нужен для анти-читинга: завершение теста и сохранение черновика при pagehide/visibilitychange.
+ */
+function keepaliveRequest(path: string, method: 'POST' | 'PUT', body?: unknown): void {
+  const payload = body === undefined ? undefined : JSON.stringify(body);
+  try {
+    void fetch(`/api${path}`, {
+      method,
+      headers: authHeaders({ body: payload }),
+      body: payload,
+      keepalive: true,
+    });
+  } catch {
+    // страница уже закрывается — ответ не нужен
+  }
+}
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const headers = authHeaders(options);
   const response = await fetch(`/api${path}`, { ...options, headers });
 
   if (!response.ok) {
@@ -95,4 +117,7 @@ export const api = {
   put: <T>(path: string, body?: unknown): Promise<T> =>
     request<T>(path, { method: 'PUT', body: body === undefined ? undefined : JSON.stringify(body) }),
   del: (path: string): Promise<void> => request<void>(path, { method: 'DELETE' }),
+  /** Запрос, который должен успеть уйти при сворачивании/закрытии страницы. */
+  keepalivePost: (path: string, body?: unknown): void => keepaliveRequest(path, 'POST', body),
+  keepalivePut: (path: string, body?: unknown): void => keepaliveRequest(path, 'PUT', body),
 };

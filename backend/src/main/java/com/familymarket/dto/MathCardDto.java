@@ -1,5 +1,6 @@
 package com.familymarket.dto;
 
+import com.familymarket.common.CardAnswers;
 import com.familymarket.mathcard.MathCard;
 import com.familymarket.mathcard.MathCardTask;
 import com.familymarket.mathcard.MathDifficulty;
@@ -31,7 +32,8 @@ public record MathCardDto(
         Instant deadline,
         Integer resultPercent,
         int xpEarned,
-        List<MathCardTaskDto> tasks) {
+        List<MathCardTaskDto> tasks,
+        List<String> draftAnswers) {
 
     public static MathCardDto of(MathCard card, List<MathCardTask> taskList, boolean includeTasks) {
         MathDifficulty diff = MathDifficulty.valueOf(card.getFinalLevel());
@@ -44,6 +46,7 @@ public record MathCardDto(
                 : List.of();
         // Максимум «Матриксов» за карточку: все примеры верно (по уровню) + награда за 100%
         int maxMatrix = card.getTaskCount() * diff.getPerExampleXp() + diff.getSuccessReward() * 2;
+        List<String> draftAnswers = includeTasks ? CardAnswers.read(card.getAnswersJson()) : List.of();
         return new MathCardDto(
                 card.getId(),
                 card.getCardDate(),
@@ -61,6 +64,7 @@ public record MathCardDto(
                 card.getDeadline(),
                 card.getResultPercent(),
                 card.getXpEarned(),
-                tasks);
+                tasks,
+                draftAnswers);
     }
 }

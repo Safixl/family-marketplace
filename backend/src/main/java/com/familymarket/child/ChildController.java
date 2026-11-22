@@ -9,6 +9,7 @@ import com.familymarket.dto.ChildSessionRequest;
 import com.familymarket.dto.ChildSettingsDto;
 import com.familymarket.dto.ChildSettingsUpdateRequest;
 import com.familymarket.dto.ChildUpsertRequest;
+import com.familymarket.dto.TrustLimitRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -49,6 +50,12 @@ public class ChildController {
     @PutMapping("/api/parent/children/{id}")
     public ChildDto updateChild(@PathVariable Long id, @Valid @RequestBody ChildUpsertRequest request) {
         return ChildDto.from(childService.update(CurrentUser.parentId(), id, request));
+    }
+
+    /** Переключатель «Лимит доверия» для карточек математики, логики и языка. */
+    @PutMapping("/api/parent/children/{id}/trust-limit")
+    public ChildDto updateTrustLimit(@PathVariable Long id, @Valid @RequestBody TrustLimitRequest request) {
+        return ChildDto.from(childService.updateTrustLimit(CurrentUser.parentId(), id, request.enabled()));
     }
 
     @DeleteMapping("/api/parent/children/{id}")

@@ -77,6 +77,33 @@ docker compose up --build
    # http://localhost:5173
    ```
 
+## Лимит доверия и анти-читинг
+
+### Лимит доверия
+
+Переключатель находится в разделе «Дети» в карточке ребёнка.
+
+- **Включён** — ребёнок может брать карточки по математике, логике и иностранному языку
+  без подтверждения родителя: карточка сразу получает статус `APPROVED`.
+- **Выключен** — ребёнок нажимает «Взять карточку», карточка уходит родителю в `REQUESTED`;
+  после одобрения её можно начать.
+
+API: `PUT /api/parent/children/{id}/trust-limit` с телом `{ "enabled": true }`.
+
+### Анти-читинг в карточках с таймером
+
+- Ответы сохраняются на сервере как черновик (`answers_json`) с задержкой 400 мс.
+- При сворачивании приложения/браузера (`visibilitychange`, `pagehide`, `freeze`) тест
+  **моментально завершается** с уже введёнными ответами через `fetch(..., { keepalive: true })`.
+- При возврате (`visibilitychange` или `pageshow`) выполняется страховочный сабмит и
+  перезагрузка карточки — на случай, если keepalive-запрос не дошёл.
+- `blur` сохраняет только черновик, чтобы показ клавиатуры на iOS не завершал тест.
+- Если время истекло, сервер проверяет последний черновик и начисляет XP по фактическому
+  результату; без ответов карточка получает 0%.
+- Кнопка «Свернуть» во время активного теста убрана: таймер нельзя остановить вручную.
+- Ограничение iOS: скриншот веб-приложение обнаружить не может, но уход со страницы
+  (сворачивание, переключение приложения, блокировка) обнаруживается.
+
 ## Как это работает
 
 1. Родитель регистрируется по email/паролю → получает JWT (Bearer).
@@ -98,6 +125,7 @@ docker compose up --build
 
 **Родитель** (`Authorization: Bearer <JWT>`)
 - `/api/parent/children` (+`/{id}`, `PUT`, `DELETE`, `POST /{id}/regenerate-key`)
+- `PUT /api/parent/children/{id}/trust-limit` — лимит доверия
 - `/api/parent/stores` (+`/{id}`), `/api/parent/stores/{storeId}/products`, `/api/parent/products/{id}`
 - `/api/parent/balances`, `POST /api/parent/balances/adjust`
 - `/api/parent/achievements` (+`/{id}`, `POST /grant`)
@@ -106,6 +134,9 @@ docker compose up --build
 **Ребенок** (`X-Access-Key: <ключ>`)
 - `/api/child/stores`, `/api/child/stores/{id}/products`
 - `POST /api/child/purchases`, `GET /api/child/purchases`, `GET /api/child/profile`
+- `/api/child/{math,logic,lang}-cards` — карточки дня; `.../{id}/request|revoke|start|submit`
+- `PUT /api/child/{math,logic,lang}-cards/{id}/answers` — черновик ответов для анти-читинга
+- `/api/parent/lang-card-approvals` (+`/{id}/approve|reject`) — подтверждение карточек языка
 
 ## Безопасность
 

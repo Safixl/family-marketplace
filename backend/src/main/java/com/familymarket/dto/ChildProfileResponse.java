@@ -11,7 +11,7 @@ import java.util.List;
 public record ChildProfileResponse(ChildBrief child, List<BalanceInfo> balances, Stats stats,
                                    List<AchievementInfo> achievements, List<PurchasedItemDto> purchasedItems) {
 
-    public record ChildBrief(Long id, String name, String avatarEmoji) {
+    public record ChildBrief(Long id, String name, String avatarEmoji, boolean trustLimit) {
     }
 
     public record BalanceInfo(Long storeId, String storeName, String currencyName,

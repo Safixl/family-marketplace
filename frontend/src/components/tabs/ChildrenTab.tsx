@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, Copy, Gift, KeyRound, Pencil, Plus, RefreshCw, Timer, Trash2 } from 'lucide-react';
+import { CheckCircle2, Copy, Gift, KeyRound, Pencil, Plus, RefreshCw, ShieldCheck, Timer, Trash2 } from 'lucide-react';
 import { api } from '../../api/client';
 import { ChildDto, WishlistItemDto } from '../../api/types';
 import { errMsg, fmtDate } from '../../lib/format';
@@ -143,6 +143,17 @@ export default function ChildrenTab({
     }
   };
 
+  const toggleTrust = async (child: ChildDto) => {
+    try {
+      const updated = await api.put<ChildDto>(`/parent/children/${child.id}/trust-limit`, {
+        enabled: !child.trustLimit,
+      });
+      setChildren((prev) => prev.map((c) => (c.id === child.id ? updated : c)));
+    } catch (e) {
+      alert(errMsg(e));
+    }
+  };
+
   const remove = async (child: ChildDto) => {
     if (!window.confirm(`Удалить ребенка «${child.name}»? Все его данные будут удалены.`)) return;
     try {
@@ -276,6 +287,24 @@ export default function ChildrenTab({
               >
                 <Timer size={16} /> Лимиты экрана и карманные деньги
               </button>
+
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={child.trustLimit}
+                  onChange={() => void toggleTrust(child)}
+                  className="mt-0.5 h-5 w-5 rounded border-slate-300 text-emerald-600"
+                />
+                <span className="min-w-0">
+                  <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+                    <ShieldCheck size={16} className="text-emerald-600" /> Лимит доверия
+                  </span>
+                  <span className="mt-0.5 block text-xs text-slate-500">
+                    Ребёнок может брать карточки по математике, логике и иностранному языку без подтверждения
+                    родителя
+                  </span>
+                </span>
+              </label>
 
               <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
                 <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">

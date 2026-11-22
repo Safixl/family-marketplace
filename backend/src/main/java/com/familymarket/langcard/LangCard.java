@@ -20,8 +20,9 @@ import java.time.LocalDate;
 
 /**
  * Логическая карточка языка.
- * Авто-задания: CREATED → IN_PROGRESS → SUCCESS/FAILED (порог 80%).
- * Ручные задания: CREATED → IN_PROGRESS → REVIEW (проверка родителя) → SUCCESS/FAILED.
+ * Авто-задания: CREATED → REQUESTED → APPROVED → IN_PROGRESS → SUCCESS/FAILED (порог 80%).
+ * Ручные задания: CREATED → REQUESTED → APPROVED → IN_PROGRESS → REVIEW (проверка родителя) → SUCCESS/FAILED.
+ * При включённом «Лимите доверия» карточка минует REQUESTED и сразу получает APPROVED.
  */
 @Entity
 @Table(name = "lang_cards")
@@ -65,6 +66,10 @@ public class LangCard {
 
     @Column(name = "result_percent")
     private Integer resultPercent;
+
+    /** Черновик ответов (JSON-массив) для анти-читинга: завершение теста при сворачивании. */
+    @Column(name = "answers_json", columnDefinition = "TEXT")
+    private String answersJson;
 
     /** Базовая награда до множителя родителя. */
     @Column(name = "base_reward", nullable = false)

@@ -74,6 +74,10 @@ public class MathCard {
     @Column(name = "result_percent")
     private Integer resultPercent;
 
+    /** Черновик ответов (JSON-массив) для анти-читинга: завершение теста при сворачивании. */
+    @Column(name = "answers_json", columnDefinition = "TEXT")
+    private String answersJson;
+
     /** Награда за успех (по уровню карточки), при 100% удваивается. */
     @Column(name = "xp_reward", nullable = false)
     private int xpReward;

@@ -6,5 +6,6 @@ import java.util.List;
 public record MathCardDayDto(
         List<MathCardDto> cards,
         int doneToday,
-        int dailyLimit) {
+        int dailyLimit,
+        boolean trustLimit) {
 }

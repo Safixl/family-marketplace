@@ -18,8 +18,19 @@ public interface LangCardRepository extends JpaRepository<LangCard, Long> {
 
     List<LangCard> findByChildIdAndCardDateAndStatus(Long childId, LocalDate cardDate, String status);
 
+    /** Все карточки ребёнка в статусе (например, IN_PROGRESS) — для завершения просроченных. */
+    List<LangCard> findByChildIdAndStatus(Long childId, String status);
+
     /** Сколько карточек дня уже завершено (SUCCESS/FAILED) — лимит 3. */
     long countByChildIdAndCardDateAndStatusIn(Long childId, LocalDate cardDate, List<String> statuses);
+
+    /** Запросы на одобрение (карточки статуса REQUESTED) для родителя. */
+    @Query("""
+            SELECT c FROM LangCard c
+            WHERE c.status = 'REQUESTED' AND c.child.parent.id = :parentId
+            ORDER BY c.createdAt ASC
+            """)
+    List<LangCard> findByParentRequested(@Param("parentId") Long parentId);
 
     /** Карточки на ручной проверке родителя (статус REVIEW). */
     @Query("""
