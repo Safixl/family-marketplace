@@ -149,9 +149,9 @@ export function NotificationPanel({
   const newCount = items.filter((n) => n.status === 'NEW').length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/50 p-4 pt-16 sm:justify-end sm:pr-4">
-      <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-900 px-4 py-3">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 px-safe-4 py-safe-4 sm:items-start sm:justify-end sm:p-4">
+      <div className="modal-safe flex w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-slate-900 px-4 py-3">
           <div className="flex items-center gap-2 font-bold text-white">
             <Bell size={18} />
             Уведомления
@@ -161,13 +161,14 @@ export function NotificationPanel({
           </div>
           <button
             onClick={onClose}
-            className="rounded-xl p-2 text-slate-300 transition-colors hover:bg-slate-800 hover:text-white"
+            className="touch-target flex items-center justify-center rounded-xl p-2 text-slate-300 transition-colors hover:bg-slate-800 hover:text-white"
+            aria-label="Закрыть"
           >
             <X size={18} />
           </button>
         </div>
 
-        <div className="max-h-[70vh] overflow-y-auto">
+        <div className="scroll-touch min-h-0 flex-1 overflow-y-auto">
           {error && <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>}
           {items.length === 0 ? (
             <div className="px-4 py-12 text-center text-sm text-slate-400">

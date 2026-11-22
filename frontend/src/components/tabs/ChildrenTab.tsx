@@ -227,21 +227,21 @@ export default function ChildrenTab({
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => void toggleActive(child)}
-                    className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
+                    className="touch-target flex items-center justify-center rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
                     title={child.active ? 'Деактивировать' : 'Активировать'}
                   >
                     {child.active ? <CheckCircle2 size={18} className="text-emerald-600" /> : <CheckCircle2 size={18} className="text-slate-300" />}
                   </button>
                   <button
                     onClick={() => openEdit(child)}
-                    className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
+                    className="touch-target flex items-center justify-center rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
                     title="Редактировать"
                   >
                     <Pencil size={18} />
                   </button>
                   <button
                     onClick={() => void remove(child)}
-                    className="rounded-lg p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600"
+                    className="touch-target flex items-center justify-center rounded-lg p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600"
                     title="Удалить"
                   >
                     <Trash2 size={18} />
@@ -256,7 +256,7 @@ export default function ChildrenTab({
                 </code>
                 <button
                   onClick={() => void copyKey(child)}
-                  className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-200"
+                  className="touch-target flex items-center justify-center rounded-lg p-1.5 text-slate-500 hover:bg-slate-200"
                   title="Скопировать ключ"
                 >
                   {copiedId === child.id ? <CheckCircle2 size={16} className="text-emerald-600" /> : <Copy size={16} />}
