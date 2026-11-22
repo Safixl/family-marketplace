@@ -48,13 +48,13 @@ export default function StoreView({ store, products, balance, cartCount, onAddTo
 
                 {product.limitPerChild != null && (
                   <div>
-                    <div className="mb-1 flex justify-between text-xs text-slate-500">
+                    <div className="theme-muted mb-1 flex justify-between text-xs">
                       <span>
                         Куплено: {product.boughtCount} из {product.limitPerChild}
                       </span>
                       {limitReached && <span className="font-semibold text-rose-600">лимит</span>}
                     </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                    <div className="h-1.5 overflow-hidden rounded-full bg-slate-400/30">
                       <div
                         className={`h-full rounded-full ${limitReached ? 'bg-rose-500' : 'bg-emerald-500'}`}
                         style={{ width: `${percent}%` }}
@@ -64,7 +64,7 @@ export default function StoreView({ store, products, balance, cartCount, onAddTo
                 )}
 
                 {limitReached ? (
-                  <span className="badge justify-center bg-slate-100 py-2 text-slate-500">лимит исчерпан</span>
+                  <span className="badge justify-center bg-slate-500/20 py-2 text-slate-400">лимит исчерпан</span>
                 ) : (
                   <button
                     className="theme-btn w-full rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
@@ -76,7 +76,7 @@ export default function StoreView({ store, products, balance, cartCount, onAddTo
                   </button>
                 )}
                 {!limitReached && notEnough && (
-                  <p className="-mt-2 text-center text-xs text-rose-600">Недостаточно средств</p>
+                  <p className="-mt-2 text-center text-xs text-rose-400">Недостаточно средств</p>
                 )}
               </div>
             );

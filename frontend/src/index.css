@@ -32,8 +32,9 @@
     touch-action: manipulation;
   }
 
-  /* iOS Safari зумит страницу, если шрифт инпута меньше 16px. */
-  @media (max-width: 640px) {
+  /* iOS Safari зумит страницу, если шрифт инпута меньше 16px.
+     Учитываем и портрет, и ландшафт: на iPhone ширина в ландшафте > 640px. */
+  @media (max-width: 640px), (hover: none) and (pointer: coarse) {
     input,
     select,
     textarea {
@@ -589,6 +590,28 @@
   .touch-target {
     min-width: 44px;
     min-height: 44px;
+  }
+
+  /* Компактная верхняя панель под статус-баром. */
+  .safe-top-bar {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 0.5rem);
+  }
+}
+
+/* Горизонтальные отступы страницы: не меньше 1rem и не уже safe-area. */
+.px-page {
+  padding-left: max(1rem, env(safe-area-inset-left, 0px));
+  padding-right: max(1rem, env(safe-area-inset-right, 0px));
+}
+
+@media (min-width: 640px) {
+  .px-page {
+    padding-left: max(1.5rem, env(safe-area-inset-left, 0px));
+    padding-right: max(1.5rem, env(safe-area-inset-right, 0px));
+  }
+
+  .safe-header {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 1.5rem);
   }
 }
 
