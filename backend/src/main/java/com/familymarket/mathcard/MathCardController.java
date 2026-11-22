@@ -1,6 +1,7 @@
 package com.familymarket.mathcard;
 
 import com.familymarket.common.CurrentUser;
+import com.familymarket.dto.CardAnswersRequest;
 import com.familymarket.dto.MathCardAdminDayDto;
 import com.familymarket.dto.MathCardAdminDto;
 import com.familymarket.dto.MathCardApprovalDto;
@@ -123,5 +124,11 @@ public class MathCardController {
     @PostMapping("/api/child/math-cards/{cardId}/submit")
     public MathCardSubmitResult submit(@PathVariable Long cardId, @RequestBody MathCardSubmitRequest request) {
         return mathCardService.submit(CurrentUser.childId(), cardId, request.answers());
+    }
+
+    /** Черновик ответов: сохраняется при вводе и перед сворачиванием страницы. */
+    @PutMapping("/api/child/math-cards/{cardId}/answers")
+    public MathCardDto saveAnswers(@PathVariable Long cardId, @RequestBody CardAnswersRequest request) {
+        return mathCardService.saveAnswers(CurrentUser.childId(), cardId, request.answers());
     }
 }

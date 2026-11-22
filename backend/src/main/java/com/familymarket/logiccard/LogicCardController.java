@@ -1,6 +1,7 @@
 package com.familymarket.logiccard;
 
 import com.familymarket.common.CurrentUser;
+import com.familymarket.dto.CardAnswersRequest;
 import com.familymarket.dto.LogicCardAdminDayDto;
 import com.familymarket.dto.LogicCardAdminDto;
 import com.familymarket.dto.LogicCardApprovalDto;
@@ -123,5 +124,11 @@ public class LogicCardController {
     @PostMapping("/api/child/logic-cards/{cardId}/submit")
     public LogicCardSubmitResult submit(@PathVariable Long cardId, @RequestBody LogicCardSubmitRequest request) {
         return logicCardService.submit(CurrentUser.childId(), cardId, request.answers());
+    }
+
+    /** Черновик ответов: сохраняется при вводе и перед сворачиванием страницы. */
+    @PutMapping("/api/child/logic-cards/{cardId}/answers")
+    public LogicCardDto saveAnswers(@PathVariable Long cardId, @RequestBody CardAnswersRequest request) {
+        return logicCardService.saveAnswers(CurrentUser.childId(), cardId, request.answers());
     }
 }

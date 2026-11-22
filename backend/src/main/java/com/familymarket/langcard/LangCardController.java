@@ -1,6 +1,8 @@
 package com.familymarket.langcard;
 
 import com.familymarket.common.CurrentUser;
+import com.familymarket.dto.CardAnswersRequest;
+import com.familymarket.dto.LangCardApprovalDto;
 import com.familymarket.dto.LangCardDayDto;
 import com.familymarket.dto.LangCardDto;
 import com.familymarket.dto.LangCardGenerateRequest;
@@ -68,6 +70,21 @@ public class LangCardController {
         service.markLearnedByParent(CurrentUser.parentId(), childId, wordId);
     }
 
+    @GetMapping("/api/parent/lang-card-approvals")
+    public List<LangCardApprovalDto> approvals() {
+        return service.parentApprovals(CurrentUser.parentId());
+    }
+
+    @PostMapping("/api/parent/lang-card-approvals/{cardId}/approve")
+    public void approve(@PathVariable Long cardId) {
+        service.approve(CurrentUser.parentId(), cardId);
+    }
+
+    @PostMapping("/api/parent/lang-card-approvals/{cardId}/reject")
+    public void reject(@PathVariable Long cardId) {
+        service.reject(CurrentUser.parentId(), cardId);
+    }
+
     @GetMapping("/api/parent/lang-card-reviews")
     public List<LangCardReviewDto> reviews() {
         return service.parentReviews(CurrentUser.parentId());
@@ -90,6 +107,16 @@ public class LangCardController {
         return service.generate(CurrentUser.childId(), request.taskType());
     }
 
+    @PostMapping("/api/child/lang-cards/{cardId}/request")
+    public LangCardDto request(@PathVariable Long cardId) {
+        return service.request(CurrentUser.childId(), cardId);
+    }
+
+    @PostMapping("/api/child/lang-cards/{cardId}/revoke")
+    public LangCardDto revoke(@PathVariable Long cardId) {
+        return service.revoke(CurrentUser.childId(), cardId);
+    }
+
     @PostMapping("/api/child/lang-cards/{cardId}/start")
     public LangCardDto start(@PathVariable Long cardId) {
         return service.start(CurrentUser.childId(), cardId);
@@ -98,6 +125,12 @@ public class LangCardController {
     @PostMapping("/api/child/lang-cards/{cardId}/submit")
     public LangCardSubmitResult submit(@PathVariable Long cardId, @RequestBody LangCardSubmitRequest request) {
         return service.submit(CurrentUser.childId(), cardId, request.answers());
+    }
+
+    /** Черновик ответов: сохраняется при вводе и перед сворачиванием страницы. */
+    @PutMapping("/api/child/lang-cards/{cardId}/answers")
+    public LangCardDto saveAnswers(@PathVariable Long cardId, @RequestBody CardAnswersRequest request) {
+        return service.saveAnswers(CurrentUser.childId(), cardId, request.answers());
     }
 
     @GetMapping("/api/child/lang-vocab")

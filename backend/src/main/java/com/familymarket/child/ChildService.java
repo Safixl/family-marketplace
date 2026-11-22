@@ -134,7 +134,8 @@ public class ChildService {
                 .toList();
 
         return new ChildProfileResponse(
-                new ChildProfileResponse.ChildBrief(child.getId(), child.getName(), child.getAvatarEmoji()),
+                new ChildProfileResponse.ChildBrief(
+                        child.getId(), child.getName(), child.getAvatarEmoji(), child.isTrustLimit()),
                 balances.stream()
                         .map(b -> new ChildProfileResponse.BalanceInfo(
                                 b.getStore().getId(), b.getStore().getName(),
@@ -153,6 +154,14 @@ public class ChildService {
     public Child getOwned(Long parentId, Long childId) {
         return childRepository.findByIdAndParentId(childId, parentId)
                 .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
+    }
+
+    /** Переключатель «Лимит доверия»: разрешить брать карточки без подтверждения. */
+    @Transactional
+    public Child updateTrustLimit(Long parentId, Long childId, boolean enabled) {
+        Child child = getOwned(parentId, childId);
+        child.setTrustLimit(enabled);
+        return childRepository.save(child);
     }
 
     // ---------- Настройки интерфейса ребёнка ----------

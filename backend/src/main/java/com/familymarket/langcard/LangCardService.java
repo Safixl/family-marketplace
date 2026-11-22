@@ -5,9 +5,11 @@ import com.familymarket.balance.BalanceService;
 import com.familymarket.child.Child;
 import com.familymarket.child.ChildRepository;
 import com.familymarket.common.BadRequestException;
+import com.familymarket.common.CardAnswers;
 import com.familymarket.common.NotFoundException;
 import com.familymarket.daily.DailyLog;
 import com.familymarket.daily.DailyLogRepository;
+import com.familymarket.dto.LangCardApprovalDto;
 import com.familymarket.dto.LangCardDayDto;
 import com.familymarket.dto.LangCardDto;
 import com.familymarket.dto.LangCardReviewDto;
@@ -262,7 +264,8 @@ public class LangCardService {
         List<LangCardDto> cards = dayCards.stream()
                 .map(c -> LangCardDto.of(c, taskRepository.findByCardIdOrderByIdAsc(c.getId()), includeTasks(c)))
                 .toList();
-        return new LangCardDayDto(cards, (int) doneToday, DAILY_LIMIT);
+        boolean trustLimit = childRepository.findById(childId).map(Child::isTrustLimit).orElse(false);
+        return new LangCardDayDto(cards, (int) doneToday, DAILY_LIMIT, trustLimit);
     }
 
     @Transactional
@@ -319,12 +322,36 @@ public class LangCardService {
 
     // ---------- Жизненный цикл (ребёнок) ----------
 
-    /** «Начать» — для авто- и ручных заданий одобрение родителя не требуется. */
+    /** «Взять карточку» — запрос родителю; при включённом лимите доверия сразу APPROVED. */
+    @Transactional
+    public LangCardDto request(Long childId, Long cardId) {
+        LangCard card = ownedCard(childId, cardId);
+        if (!"CREATED".equals(card.getStatus())) {
+            throw new BadRequestException("Карточка уже взята");
+        }
+        card.setStatus(card.getChild().isTrustLimit() ? "APPROVED" : "REQUESTED");
+        cardRepository.save(card);
+        return LangCardDto.of(card, taskRepository.findByCardIdOrderByIdAsc(cardId), false);
+    }
+
+    /** Отзыв запроса (повторное нажатие «Ожидает одобрения»). */
+    @Transactional
+    public LangCardDto revoke(Long childId, Long cardId) {
+        LangCard card = ownedCard(childId, cardId);
+        if (!"REQUESTED".equals(card.getStatus())) {
+            throw new BadRequestException("Отозвать можно только ожидающий одобрения запрос");
+        }
+        card.setStatus("CREATED");
+        cardRepository.save(card);
+        return LangCardDto.of(card, taskRepository.findByCardIdOrderByIdAsc(cardId), false);
+    }
+
+    /** «Начать» — только после одобрения родителем (или сразу при лимите доверия). */
     @Transactional
     public LangCardDto start(Long childId, Long cardId) {
         LangCard card = ownedCard(childId, cardId);
-        if (!"CREATED".equals(card.getStatus())) {
-            throw new BadRequestException("Карточка уже начата или завершена");
+        if (!"APPROVED".equals(card.getStatus())) {
+            throw new BadRequestException("Карточка ещё не одобрена родителем");
         }
         if (!cardRepository.findByChildIdAndCardDateAndStatus(childId, card.getCardDate(), "IN_PROGRESS").isEmpty()) {
             throw new BadRequestException("Сначала завершите текущую карточку");
@@ -337,11 +364,27 @@ public class LangCardService {
         return LangCardDto.of(card, taskRepository.findByCardIdOrderByIdAsc(cardId), true);
     }
 
+    /** Черновик ответов во время теста: нужен для завершения при сворачивании. */
+    @Transactional(noRollbackFor = BadRequestException.class)
+    public LangCardDto saveAnswers(Long childId, Long cardId, List<String> answers) {
+        LangCard card = ownedCard(childId, cardId);
+        if (!"IN_PROGRESS".equals(card.getStatus())) {
+            throw new BadRequestException("Карточка не в работе");
+        }
+        if (card.getDeadline() != null && card.getDeadline().isBefore(Instant.now())) {
+            expireOverdue(childId);
+            throw new BadRequestException("Время вышло — карточка завершена");
+        }
+        card.setAnswersJson(CardAnswers.write(answers));
+        cardRepository.save(card);
+        return LangCardDto.of(card, taskRepository.findByCardIdOrderByIdAsc(cardId), true);
+    }
+
     /**
      * Сдача карточки. Авто-задания проверяются сразу (порог 80%).
      * Ручные задания уходят родителю на проверку (статус REVIEW, множитель 0/1/2).
      */
-    @Transactional
+    @Transactional(noRollbackFor = BadRequestException.class)
     public LangCardSubmitResult submit(Long childId, Long cardId, List<String> answers) {
         LangCard card = ownedCard(childId, cardId);
         expireOverdue(childId);
@@ -354,17 +397,24 @@ public class LangCardService {
             // Ручное задание: ответ уходит родителю на проверку с множителем
             card.setStatus("REVIEW");
             card.setSubmittedAt(Instant.now());
+            card.setAnswersJson(null);
             cardRepository.save(card);
             saveAttemptText(tasks, answers);
             return new LangCardSubmitResult(0, false, 0, tasks.size(), 0, 0, 0, true);
         }
 
+        return gradeAutoAndFinish(card, answers);
+    }
+
+    /** Проверка авто-задания и завершение — используется при сабмите и истечении времени. */
+    private LangCardSubmitResult gradeAutoAndFinish(LangCard card, List<String> answers) {
+        List<LangCardTask> tasks = taskRepository.findByCardIdOrderByIdAsc(card.getId());
         LangDifficulty difficulty = card.getDifficulty();
         List<String> list = answers == null ? List.of() : answers;
         int correct = 0;
         for (int i = 0; i < tasks.size(); i++) {
             String given = i < list.size() ? list.get(i) : "";
-            boolean ok = checkAnswer(tasks.get(i), given, childId);
+            boolean ok = checkAnswer(tasks.get(i), given, card.getChild().getId());
             if (ok) {
                 correct++;
             }
@@ -387,10 +437,11 @@ public class LangCardService {
         card.setSubmittedAt(Instant.now());
         card.setXpEarned(xpEarned);
         card.setMultiplier(1);
+        card.setAnswersJson(null);
         cardRepository.save(card);
-        creditLingvoMiles(childId, card.getChild().getParent().getId(), xpEarned);
-        syncDailyLang(childId, card.getCardDate());
-        achievementService.checkProgress(childId);
+        creditLingvoMiles(card.getChild().getId(), card.getChild().getParent().getId(), xpEarned);
+        syncDailyLang(card.getChild().getId(), card.getCardDate());
+        achievementService.checkProgress(card.getChild().getId());
         return new LangCardSubmitResult(percent, success, correct, tasks.size(), perTaskXp, successReward, xpEarned, false);
     }
 
@@ -443,6 +494,35 @@ public class LangCardService {
             attempt.setAttemptedAt(Instant.now());
             attemptRepository.save(attempt);
         }
+    }
+
+    // ---------- Одобрение взятия карточки родителем ----------
+
+    @Transactional(readOnly = true)
+    public List<LangCardApprovalDto> parentApprovals(Long parentId) {
+        return cardRepository.findByParentRequested(parentId).stream()
+                .map(LangCardApprovalDto::of)
+                .toList();
+    }
+
+    @Transactional
+    public void approve(Long parentId, Long cardId) {
+        LangCard card = ownedByParent(parentId, cardId);
+        if (!"REQUESTED".equals(card.getStatus())) {
+            throw new BadRequestException("Запроса на одобрение нет");
+        }
+        card.setStatus("APPROVED");
+        cardRepository.save(card);
+    }
+
+    @Transactional
+    public void reject(Long parentId, Long cardId) {
+        LangCard card = ownedByParent(parentId, cardId);
+        if (!"REQUESTED".equals(card.getStatus())) {
+            throw new BadRequestException("Запроса на одобрение нет");
+        }
+        card.setStatus("CREATED");
+        cardRepository.save(card);
     }
 
     // ---------- Проверка ручных заданий родителем ----------
@@ -596,17 +676,41 @@ public class LangCardService {
         }
     }
 
-    /** Просроченные IN_PROGRESS-карточки завершаются как «не сдано» (0%, без XP). */
+    /**
+     * Просроченные IN_PROGRESS-карточки завершаются автоматически.
+     * Авто-задания проверяются по сохранённому черновику; ручные с ответами уходят в REVIEW,
+     * без ответов — «не сдано» (0%, без XP).
+     */
     private void expireOverdue(Long childId) {
         Instant now = Instant.now();
-        LocalDate today = todayDate();
-        for (LangCard card : cardRepository.findByChildIdAndCardDateAndStatus(childId, today, "IN_PROGRESS")) {
+        for (LangCard card : cardRepository.findByChildIdAndStatus(childId, "IN_PROGRESS")) {
             if (card.getDeadline() != null && card.getDeadline().isBefore(now)) {
-                card.setStatus("FAILED");
-                card.setResultPercent(0);
-                card.setXpEarned(0);
-                card.setSubmittedAt(null);
-                cardRepository.save(card);
+                List<String> answers = CardAnswers.read(card.getAnswersJson());
+                if (card.getTaskType().isManual()) {
+                    if (CardAnswers.hasAnyAnswer(answers)) {
+                        card.setStatus("REVIEW");
+                        card.setSubmittedAt(Instant.now());
+                        card.setAnswersJson(null);
+                        cardRepository.save(card);
+                        saveAttemptText(taskRepository.findByCardIdOrderByIdAsc(card.getId()), answers);
+                    } else {
+                        card.setStatus("FAILED");
+                        card.setResultPercent(0);
+                        card.setXpEarned(0);
+                        card.setSubmittedAt(null);
+                        card.setAnswersJson(null);
+                        cardRepository.save(card);
+                    }
+                } else if (CardAnswers.hasAnyAnswer(answers)) {
+                    gradeAutoAndFinish(card, answers);
+                } else {
+                    card.setStatus("FAILED");
+                    card.setResultPercent(0);
+                    card.setXpEarned(0);
+                    card.setSubmittedAt(null);
+                    card.setAnswersJson(null);
+                    cardRepository.save(card);
+                }
             }
         }
     }
@@ -615,6 +719,15 @@ public class LangCardService {
         LangCard card = cardRepository.findById(cardId)
                 .orElseThrow(() -> new NotFoundException("Карточка не найдена"));
         if (!card.getChild().getId().equals(childId)) {
+            throw new NotFoundException("Карточка не найдена");
+        }
+        return card;
+    }
+
+    private LangCard ownedByParent(Long parentId, Long cardId) {
+        LangCard card = cardRepository.findById(cardId)
+                .orElseThrow(() -> new NotFoundException("Карточка не найдена"));
+        if (!card.getChild().getParent().getId().equals(parentId)) {
             throw new NotFoundException("Карточка не найдена");
         }
         return card;

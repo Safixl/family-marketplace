@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS children (
     active       BOOLEAN      NOT NULL DEFAULT TRUE,
     created_at   TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
+-- Лимит доверия: ребёнок может брать карточки (математика, логика, язык) без подтверждения родителя
+ALTER TABLE children ADD COLUMN IF NOT EXISTS trust_limit BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE TABLE IF NOT EXISTS stores (
     id            BIGSERIAL PRIMARY KEY,
@@ -701,6 +703,8 @@ ALTER TABLE math_cards ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ;
 ALTER TABLE math_cards ADD COLUMN IF NOT EXISTS result_percent INT;
 ALTER TABLE math_cards ADD COLUMN IF NOT EXISTS xp_reward INT NOT NULL DEFAULT 0; -- награда за успех
 ALTER TABLE math_cards ADD COLUMN IF NOT EXISTS xp_earned INT NOT NULL DEFAULT 0; -- фактически начислено в навык
+-- Черновик ответов (JSON-массив строк) для анти-читинга: при сворачивании тест завершается по этим ответам
+ALTER TABLE math_cards ADD COLUMN IF NOT EXISTS answers_json TEXT;
 
 -- Задачи карточки
 CREATE TABLE IF NOT EXISTS math_card_tasks (
@@ -793,6 +797,8 @@ CREATE TABLE IF NOT EXISTS logic_cards (
     created_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_logic_cards_child_date ON logic_cards (child_id, card_date);
+-- Черновик ответов (JSON-массив строк) для анти-читинга
+ALTER TABLE logic_cards ADD COLUMN IF NOT EXISTS answers_json TEXT;
 
 -- Задачи логической карточки
 CREATE TABLE IF NOT EXISTS logic_card_tasks (
@@ -888,7 +894,7 @@ CREATE TABLE IF NOT EXISTS lang_cards (
     task_type   VARCHAR(32)  NOT NULL,
     minutes     INT          NOT NULL,
     difficulty  VARCHAR(8)   NOT NULL DEFAULT 'EASY',
-    status      VARCHAR(20)  NOT NULL DEFAULT 'CREATED', -- CREATED/IN_PROGRESS/REVIEW/SUCCESS/FAILED
+    status      VARCHAR(20)  NOT NULL DEFAULT 'CREATED', -- CREATED/REQUESTED/APPROVED/IN_PROGRESS/REVIEW/SUCCESS/FAILED
     started_at  TIMESTAMPTZ,
     deadline    TIMESTAMPTZ,
     submitted_at TIMESTAMPTZ,
@@ -900,6 +906,8 @@ CREATE TABLE IF NOT EXISTS lang_cards (
     created_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_lang_cards_child_date ON lang_cards (child_id, card_date);
+-- Черновик ответов (JSON-массив строк) для анти-читинга
+ALTER TABLE lang_cards ADD COLUMN IF NOT EXISTS answers_json TEXT;
 
 -- Задачи карточки языка (для SECRET_STORIES answer = "en|ru")
 CREATE TABLE IF NOT EXISTS lang_card_tasks (

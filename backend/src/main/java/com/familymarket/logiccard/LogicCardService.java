@@ -5,6 +5,7 @@ import com.familymarket.balance.BalanceService;
 import com.familymarket.child.Child;
 import com.familymarket.child.ChildRepository;
 import com.familymarket.common.BadRequestException;
+import com.familymarket.common.CardAnswers;
 import com.familymarket.common.NotFoundException;
 import com.familymarket.daily.DailyLog;
 import com.familymarket.daily.DailyLogRepository;
@@ -169,7 +170,8 @@ public class LogicCardService {
                 .sorted(Comparator.comparingInt(c -> LogicDifficulty.valueOf(c.getFinalLevel()).ordinal()))
                 .map(c -> LogicCardDto.of(c, taskRepository.findByCardIdOrderByIdAsc(c.getId()), includeTasks(c)))
                 .toList();
-        return new LogicCardDayDto(cards, (int) doneToday, DAILY_LIMIT);
+        boolean trustLimit = childRepository.findById(childId).map(Child::isTrustLimit).orElse(false);
+        return new LogicCardDayDto(cards, (int) doneToday, DAILY_LIMIT, trustLimit);
     }
 
     @Transactional
@@ -216,16 +218,32 @@ public class LogicCardService {
 
     // ---------- Жизненный цикл (ребёнок) ----------
 
-    /** «Взять задачу» — запрос родителю на одобрение. */
+    /** «Взять задачу» — запрос родителю; при включённом лимите доверия сразу APPROVED. */
     @Transactional
     public LogicCardDto request(Long childId, Long cardId) {
         LogicCard card = ownedCard(childId, cardId);
         if (!"CREATED".equals(card.getStatus())) {
             throw new BadRequestException("Карточка уже взята");
         }
-        card.setStatus("REQUESTED");
+        card.setStatus(card.getChild().isTrustLimit() ? "APPROVED" : "REQUESTED");
         cardRepository.save(card);
         return LogicCardDto.of(card, taskRepository.findByCardIdOrderByIdAsc(cardId), false);
+    }
+
+    /** Черновик ответов во время теста: нужен для завершения при сворачивании. */
+    @Transactional(noRollbackFor = BadRequestException.class)
+    public LogicCardDto saveAnswers(Long childId, Long cardId, List<String> answers) {
+        LogicCard card = ownedCard(childId, cardId);
+        if (!"IN_PROGRESS".equals(card.getStatus())) {
+            throw new BadRequestException("Карточка не в работе");
+        }
+        if (card.getDeadline() != null && card.getDeadline().isBefore(Instant.now())) {
+            expireOverdue(childId);
+            throw new BadRequestException("Время вышло — карточка завершена");
+        }
+        card.setAnswersJson(CardAnswers.write(answers));
+        cardRepository.save(card);
+        return LogicCardDto.of(card, taskRepository.findByCardIdOrderByIdAsc(cardId), true);
     }
 
     /** Отзыв запроса (повторное нажатие «Ожидает одобрения»). */
@@ -264,14 +282,19 @@ public class LogicCardService {
     }
 
     /** Отправка на проверку (одной кнопкой): проверка всех ответов, начисление XP. */
-    @Transactional
+    @Transactional(noRollbackFor = BadRequestException.class)
     public LogicCardSubmitResult submit(Long childId, Long cardId, List<String> answers) {
         LogicCard card = ownedCard(childId, cardId);
         expireOverdue(childId);
         if (!"IN_PROGRESS".equals(card.getStatus()) && !"PAUSED".equals(card.getStatus())) {
             throw new BadRequestException("Карточка не в работе");
         }
-        List<LogicCardTask> tasks = taskRepository.findByCardIdOrderByIdAsc(cardId);
+        return gradeAndFinish(card, answers);
+    }
+
+    /** Проверка ответов и завершение карточки — используется и при сабмите, и при истечении времени. */
+    private LogicCardSubmitResult gradeAndFinish(LogicCard card, List<String> answers) {
+        List<LogicCardTask> tasks = taskRepository.findByCardIdOrderByIdAsc(card.getId());
         LogicDifficulty level = LogicDifficulty.valueOf(card.getFinalLevel());
 
         List<String> list = answers == null ? List.of() : answers;
@@ -300,15 +323,16 @@ public class LogicCardService {
         card.setResultPercent(percent);
         card.setSubmittedAt(Instant.now());
         card.setXpEarned(xpEarned);
+        card.setAnswersJson(null);
         cardRepository.save(card);
         // «IQ-коины» = XP логики 1:1: начисляем в баланс магазина «Логика»
-        creditIqCoins(childId, card.getChild().getParent().getId(), xpEarned);
+        creditIqCoins(card.getChild().getId(), card.getChild().getParent().getId(), xpEarned);
         // Синхронизация дейлика «Логика»: счётчик = число завершённых карточек дня
-        syncDailyLogic(childId, card.getCardDate());
+        syncDailyLogic(card.getChild().getId(), card.getCardDate());
         // После 3/3 дня создаём карточку «Работа над ошибками» из неверных ответов
-        maybeCreateReviewCard(childId, card.getChild().getParent().getId(), card.getCardDate());
+        maybeCreateReviewCard(card.getChild().getId(), card.getChild().getParent().getId(), card.getCardDate());
         // Авто-начисление достижений
-        achievementService.checkProgress(childId);
+        achievementService.checkProgress(card.getChild().getId());
         return new LogicCardSubmitResult(percent, success, correct, tasks.size(), perTaskXp, successReward, xpEarned);
     }
 
@@ -632,17 +656,26 @@ public class LogicCardService {
         }
     }
 
-    /** Просроченные IN_PROGRESS-карточки завершаются как «не сдано» (0%, без XP). */
+    /**
+     * Просроченные IN_PROGRESS-карточки завершаются автоматически.
+     * Если есть сохранённый черновик ответов — проверяем его и начисляем XP по факту;
+     * если ответов нет — «не сдано» (0%, без XP).
+     */
     private void expireOverdue(Long childId) {
         Instant now = Instant.now();
-        LocalDate today = todayDate();
-        for (LogicCard card : cardRepository.findByChildIdAndCardDateAndStatus(childId, today, "IN_PROGRESS")) {
+        for (LogicCard card : cardRepository.findByChildIdAndStatus(childId, "IN_PROGRESS")) {
             if (card.getDeadline() != null && card.getDeadline().isBefore(now)) {
-                card.setStatus("FAILED");
-                card.setResultPercent(0);
-                card.setXpEarned(0);
-                card.setSubmittedAt(null);
-                cardRepository.save(card);
+                List<String> answers = CardAnswers.read(card.getAnswersJson());
+                if (CardAnswers.hasAnyAnswer(answers)) {
+                    gradeAndFinish(card, answers);
+                } else {
+                    card.setStatus("FAILED");
+                    card.setResultPercent(0);
+                    card.setXpEarned(0);
+                    card.setSubmittedAt(null);
+                    card.setAnswersJson(null);
+                    cardRepository.save(card);
+                }
             }
         }
     }

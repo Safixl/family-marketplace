@@ -1,5 +1,6 @@
 package com.familymarket.dto;
 
+import com.familymarket.common.CardAnswers;
 import com.familymarket.langcard.LangCard;
 import com.familymarket.langcard.LangCardTask;
 import com.familymarket.langcard.LangDifficulty;
@@ -30,7 +31,8 @@ public record LangCardDto(
         Integer resultPercent,
         int xpEarned,
         String parentComment,
-        List<LangCardTaskDto> tasks) {
+        List<LangCardTaskDto> tasks,
+        List<String> draftAnswers) {
 
     public static LangCardDto of(LangCard card, List<LangCardTask> tasks, boolean includeTasks) {
         List<LangCardTaskDto> taskDtos = includeTasks
@@ -39,6 +41,7 @@ public record LangCardDto(
         int maxReward = card.getTaskType().isManual()
                 ? card.getBaseReward() * 2
                 : card.getBaseReward() + card.getTaskType().getTaskCount() * card.getDifficulty().getPerTaskXp();
+        List<String> draftAnswers = includeTasks ? CardAnswers.read(card.getAnswersJson()) : List.of();
         return new LangCardDto(
                 card.getId(),
                 card.getCardDate(),
@@ -59,6 +62,7 @@ public record LangCardDto(
                 card.getResultPercent(),
                 card.getXpEarned(),
                 card.getParentComment(),
-                taskDtos);
+                taskDtos,
+                draftAnswers);
     }
 }

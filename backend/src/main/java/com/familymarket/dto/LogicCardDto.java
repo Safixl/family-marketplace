@@ -1,5 +1,6 @@
 package com.familymarket.dto;
 
+import com.familymarket.common.CardAnswers;
 import com.familymarket.logiccard.LogicCard;
 import com.familymarket.logiccard.LogicCardTask;
 import com.familymarket.logiccard.LogicDifficulty;
@@ -31,7 +32,8 @@ public record LogicCardDto(
         Instant deadline,
         Integer resultPercent,
         int xpEarned,
-        List<LogicCardTaskDto> tasks) {
+        List<LogicCardTaskDto> tasks,
+        List<String> draftAnswers) {
 
     public static LogicCardDto of(LogicCard card, List<LogicCardTask> taskList, boolean includeTasks) {
         LogicDifficulty diff = LogicDifficulty.valueOf(card.getFinalLevel());
@@ -44,6 +46,7 @@ public record LogicCardDto(
                 : List.of();
         // Максимум «IQ-коинов» за карточку: все задачи верно (по уровню) + награда за 100%
         int maxIq = card.getTaskCount() * diff.getPerExampleXp() + diff.getSuccessReward() * 2;
+        List<String> draftAnswers = includeTasks ? CardAnswers.read(card.getAnswersJson()) : List.of();
         return new LogicCardDto(
                 card.getId(),
                 card.getCardDate(),
@@ -61,6 +64,7 @@ public record LogicCardDto(
                 card.getDeadline(),
                 card.getResultPercent(),
                 card.getXpEarned(),
-                tasks);
+                tasks,
+                draftAnswers);
     }
 }

@@ -22,6 +22,9 @@ public interface LogicCardRepository extends JpaRepository<LogicCard, Long> {
 
     List<LogicCard> findByChildIdAndCardDateAndStatus(Long childId, LocalDate cardDate, String status);
 
+    /** Все карточки ребёнка в статусе (например, IN_PROGRESS) — для завершения просроченных. */
+    List<LogicCard> findByChildIdAndStatus(Long childId, String status);
+
     /** Сколько карточек дня уже завершено (SUCCESS/FAILED) — лимит 3. */
     long countByChildIdAndCardDateAndStatusIn(Long childId, LocalDate cardDate, List<String> statuses);
 

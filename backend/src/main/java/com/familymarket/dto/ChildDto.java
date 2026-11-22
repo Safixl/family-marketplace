@@ -6,7 +6,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 
 public record ChildDto(Long id, String name, String avatarEmoji, String accessKey, boolean active,
-                       Integer age, LocalDate birthDate, Instant createdAt) {
+                       boolean trustLimit, Integer age, LocalDate birthDate, Instant createdAt) {
 
     public static ChildDto from(Child child) {
         return new ChildDto(
@@ -15,6 +15,7 @@ public record ChildDto(Long id, String name, String avatarEmoji, String accessKe
                 child.getAvatarEmoji(),
                 child.getAccessKey(),
                 child.isActive(),
+                child.isTrustLimit(),
                 child.getAge(),
                 child.getBirthDate(),
                 child.getCreatedAt());

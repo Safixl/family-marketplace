@@ -5,6 +5,7 @@ import com.familymarket.balance.BalanceService;
 import com.familymarket.child.Child;
 import com.familymarket.child.ChildRepository;
 import com.familymarket.common.BadRequestException;
+import com.familymarket.common.CardAnswers;
 import com.familymarket.common.NotFoundException;
 import com.familymarket.daily.DailyLog;
 import com.familymarket.daily.DailyLogRepository;
@@ -170,7 +171,8 @@ public class MathCardService {
                 .sorted(Comparator.comparingInt(c -> MathDifficulty.valueOf(c.getFinalLevel()).ordinal()))
                 .map(c -> MathCardDto.of(c, taskRepository.findByCardIdOrderByIdAsc(c.getId()), includeTasks(c)))
                 .toList();
-        return new MathCardDayDto(cards, (int) doneToday, DAILY_LIMIT);
+        boolean trustLimit = childRepository.findById(childId).map(Child::isTrustLimit).orElse(false);
+        return new MathCardDayDto(cards, (int) doneToday, DAILY_LIMIT, trustLimit);
     }
 
     @Transactional
@@ -217,16 +219,32 @@ public class MathCardService {
 
     // ---------- Жизненный цикл (ребёнок) ----------
 
-    /** «Взять задачу» — запрос родителю на одобрение. */
+    /** «Взять задачу» — запрос родителю; при включённом лимите доверия сразу APPROVED. */
     @Transactional
     public MathCardDto request(Long childId, Long cardId) {
         MathCard card = ownedCard(childId, cardId);
         if (!"CREATED".equals(card.getStatus())) {
             throw new BadRequestException("Карточка уже взята");
         }
-        card.setStatus("REQUESTED");
+        card.setStatus(card.getChild().isTrustLimit() ? "APPROVED" : "REQUESTED");
         cardRepository.save(card);
         return MathCardDto.of(card, taskRepository.findByCardIdOrderByIdAsc(cardId), false);
+    }
+
+    /** Черновик ответов во время теста: нужен для завершения при сворачивании. */
+    @Transactional(noRollbackFor = BadRequestException.class)
+    public MathCardDto saveAnswers(Long childId, Long cardId, List<String> answers) {
+        MathCard card = ownedCard(childId, cardId);
+        if (!"IN_PROGRESS".equals(card.getStatus())) {
+            throw new BadRequestException("Карточка не в работе");
+        }
+        if (card.getDeadline() != null && card.getDeadline().isBefore(Instant.now())) {
+            expireOverdue(childId);
+            throw new BadRequestException("Время вышло — карточка завершена");
+        }
+        card.setAnswersJson(CardAnswers.write(answers));
+        cardRepository.save(card);
+        return MathCardDto.of(card, taskRepository.findByCardIdOrderByIdAsc(cardId), true);
     }
 
     /** Отзыв запроса (повторное нажатие «Ожидает одобрения»). */
@@ -265,14 +283,19 @@ public class MathCardService {
     }
 
     /** Отправка на проверку (одной кнопкой): проверка всех ответов, начисление XP. */
-    @Transactional
+    @Transactional(noRollbackFor = BadRequestException.class)
     public MathCardSubmitResult submit(Long childId, Long cardId, List<String> answers) {
         MathCard card = ownedCard(childId, cardId);
         expireOverdue(childId);
         if (!"IN_PROGRESS".equals(card.getStatus()) && !"PAUSED".equals(card.getStatus())) {
             throw new BadRequestException("Карточка не в работе");
         }
-        List<MathCardTask> tasks = taskRepository.findByCardIdOrderByIdAsc(cardId);
+        return gradeAndFinish(card, answers);
+    }
+
+    /** Проверка ответов и завершение карточки — используется и при сабмите, и при истечении времени. */
+    private MathCardSubmitResult gradeAndFinish(MathCard card, List<String> answers) {
+        List<MathCardTask> tasks = taskRepository.findByCardIdOrderByIdAsc(card.getId());
         MathDifficulty level = MathDifficulty.valueOf(card.getFinalLevel());
 
         List<String> list = answers == null ? List.of() : answers;
@@ -301,15 +324,16 @@ public class MathCardService {
         card.setResultPercent(percent);
         card.setSubmittedAt(Instant.now());
         card.setXpEarned(xpEarned);
+        card.setAnswersJson(null);
         cardRepository.save(card);
         // «Матриксы» = XP математики 1:1: начисляем в баланс магазина «Математика»
-        creditMatrices(childId, card.getChild().getParent().getId(), xpEarned);
+        creditMatrices(card.getChild().getId(), card.getChild().getParent().getId(), xpEarned);
         // Синхронизация дейлика «Математика»: счётчик = число завершённых карточек дня
-        syncDailyMath(childId, card.getCardDate());
+        syncDailyMath(card.getChild().getId(), card.getCardDate());
         // После 3/3 дня создаём карточку «Работа над ошибками» из неверных ответов
-        maybeCreateReviewCard(childId, card.getChild().getParent().getId(), card.getCardDate());
+        maybeCreateReviewCard(card.getChild().getId(), card.getChild().getParent().getId(), card.getCardDate());
         // Авто-начисление достижений по математике (примеры, карточки, стрики)
-        achievementService.checkProgress(childId);
+        achievementService.checkProgress(card.getChild().getId());
         return new MathCardSubmitResult(percent, success, correct, tasks.size(), perExampleXp, successReward, xpEarned);
     }
 
@@ -633,17 +657,26 @@ public class MathCardService {
         }
     }
 
-    /** Просроченные IN_PROGRESS-карточки завершаются как «не сдано» (0%, без XP). */
+    /**
+     * Просроченные IN_PROGRESS-карточки завершаются автоматически.
+     * Если есть сохранённый черновик ответов — проверяем его и начисляем XP по факту;
+     * если ответов нет — «не сдано» (0%, без XP).
+     */
     private void expireOverdue(Long childId) {
         Instant now = Instant.now();
-        LocalDate today = todayDate();
-        for (MathCard card : cardRepository.findByChildIdAndCardDateAndStatus(childId, today, "IN_PROGRESS")) {
+        for (MathCard card : cardRepository.findByChildIdAndStatus(childId, "IN_PROGRESS")) {
             if (card.getDeadline() != null && card.getDeadline().isBefore(now)) {
-                card.setStatus("FAILED");
-                card.setResultPercent(0);
-                card.setXpEarned(0);
-                card.setSubmittedAt(null);
-                cardRepository.save(card);
+                List<String> answers = CardAnswers.read(card.getAnswersJson());
+                if (CardAnswers.hasAnyAnswer(answers)) {
+                    gradeAndFinish(card, answers);
+                } else {
+                    card.setStatus("FAILED");
+                    card.setResultPercent(0);
+                    card.setXpEarned(0);
+                    card.setSubmittedAt(null);
+                    card.setAnswersJson(null);
+                    cardRepository.save(card);
+                }
             }
         }
     }
