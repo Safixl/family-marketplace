@@ -69,7 +69,7 @@ export default function ArchiveTab({ config, rows }: Props) {
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
-        <div className="flex gap-1.5 overflow-x-auto">
+        <div className="flex flex-wrap gap-1.5">
           {(['ALL', 'DONE', 'IN_PROGRESS', 'PENDING'] as const).map((s) => (
             <button
               key={s}
@@ -85,7 +85,79 @@ export default function ArchiveTab({ config, rows }: Props) {
       {filtered.length === 0 ? (
         <EmptyState title={rows.length === 0 ? config.archiveEmpty : 'Ничего не найдено'} hint="Попробуйте изменить поиск или фильтр" />
       ) : (
-        <div className="rpg-panel overflow-x-auto">
+        <>
+          {/* Мобильные карточки вместо широкой таблицы */}
+          <div className="space-y-2 sm:hidden">
+            {filtered.map((row) => {
+              const meta = STATUS_META[row.status];
+              const isReading = row.status === 'IN_PROGRESS';
+              const shownPage = row.currentPage ?? 0;
+              return (
+                <div key={row.id} className="rpg-panel p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="break-words font-semibold text-amber-100">{row.title}</div>
+                      <div className="mt-0.5 break-words text-xs text-stone-400">
+                        {[row.author, row.genre, row.series].filter(Boolean).join(' · ') || '—'}
+                      </div>
+                    </div>
+                    <span className={`rpg-badge shrink-0 border ${meta.cls}`}>{meta.label}</span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-sm">
+                      {isReading ? (
+                        editId === row.id ? (
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="number"
+                              min={shownPage > 0 ? shownPage : 1}
+                              max={row.pages}
+                              className="rpg-input w-20"
+                              value={editPage}
+                              onChange={(e) => setEditPage(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') void savePage(row);
+                              }}
+                            />
+                            <button
+                              className="rpg-btn !px-2 !py-1 text-xs"
+                              disabled={busy}
+                              onClick={() => void savePage(row)}
+                            >
+                              ОК
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              className="rounded-lg p-1 text-sky-300 hover:bg-sky-500/20"
+                              onClick={() => {
+                                setEditId(row.id);
+                                setEditPage(String(shownPage > 0 ? shownPage : ''));
+                              }}
+                              title="Изменить страницу"
+                            >
+                              <Pencil size={13} />
+                            </button>
+                            <span className="font-bold text-sky-300">
+                              Стр. {shownPage}/{row.pages}
+                            </span>
+                          </div>
+                        )
+                      ) : (
+                        <span className="text-stone-300">
+                          Стр. {row.status === 'DONE' ? `${row.pages}/${row.pages}` : (row.pages ?? '—')}
+                        </span>
+                      )}
+                    </div>
+                    <span className="font-bold text-amber-300">+{row.points}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="rpg-panel hidden overflow-x-auto sm:block">
           <table className="rpg-table w-full min-w-[560px]">
             <thead>
               <tr>
@@ -167,7 +239,8 @@ export default function ArchiveTab({ config, rows }: Props) {
               })}
             </tbody>
           </table>
-        </div>
+          </div>
+        </>
       )}
     </div>
   );

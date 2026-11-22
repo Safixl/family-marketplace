@@ -134,9 +134,9 @@ export default function AchievementPopup({ childId, achievements }: Props) {
   const tier = tierForLevel(current.level);
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-6 z-50 flex justify-center px-4">
+    <div className="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top,0px)+0.75rem)] z-50 flex justify-center px-safe-4">
       <div
-        className={`wow-popup flex items-center gap-3 rounded-2xl border-2 bg-gradient-to-r ${tier.card} px-5 py-4 shadow-2xl transition-all duration-300 ${
+        className={`wow-popup flex w-full max-w-md min-w-0 items-center gap-3 rounded-2xl border-2 bg-gradient-to-r ${tier.card} px-4 py-3 shadow-2xl transition-all duration-300 sm:px-5 sm:py-4 ${
           visible ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0'
         }`}
       >

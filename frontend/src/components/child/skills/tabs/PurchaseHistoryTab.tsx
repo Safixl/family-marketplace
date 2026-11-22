@@ -24,39 +24,67 @@ export default function PurchaseHistoryTab({ purchases }: Props) {
   }
 
   return (
-    <div className="rpg-panel overflow-x-auto">
-      <table className="rpg-table w-full min-w-[520px]">
-        <thead>
-          <tr>
-            <th>Товар</th>
-            <th>Магазин</th>
-            <th>Дата</th>
-            <th className="text-right">Сумма</th>
-            <th>Статус</th>
-          </tr>
-        </thead>
-        <tbody>
-          {purchases.map((p) => {
-            const meta = STATUS_META[p.status];
-            return (
-              <tr key={p.id}>
-                <td className="font-semibold text-amber-100">{p.productName}</td>
-                <td className="text-stone-300">{p.storeName}</td>
-                <td className="text-stone-300">{fmtDate(p.createdAt)}</td>
-                <td className="text-right font-bold text-amber-300">
-                  {p.currencyIcon} {fmtAmount(p.amount, p.currencyName)}
-                </td>
-                <td>
-                  <span className={`rpg-badge border ${meta.cls}`}>
-                    {p.status === 'PENDING' && <Clock3 size={11} />}
-                    {meta.label}
-                  </span>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+    <>
+      {/* Мобильные карточки: без горизонтального скролла */}
+      <div className="space-y-2 sm:hidden">
+        {purchases.map((p) => {
+          const meta = STATUS_META[p.status];
+          return (
+            <div key={p.id} className="rpg-panel p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="break-words font-semibold text-amber-100">{p.productName}</div>
+                  <div className="mt-0.5 truncate text-xs text-stone-400">
+                    {p.storeName} · {fmtDate(p.createdAt)}
+                  </div>
+                </div>
+                <span className={`rpg-badge shrink-0 border ${meta.cls}`}>
+                  {p.status === 'PENDING' && <Clock3 size={11} />}
+                  {meta.label}
+                </span>
+              </div>
+              <div className="mt-2 text-sm font-bold text-amber-300">
+                {p.currencyIcon} {fmtAmount(p.amount, p.currencyName)}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="rpg-panel hidden overflow-x-auto sm:block">
+        <table className="rpg-table w-full min-w-[520px]">
+          <thead>
+            <tr>
+              <th>Товар</th>
+              <th>Магазин</th>
+              <th>Дата</th>
+              <th className="text-right">Сумма</th>
+              <th>Статус</th>
+            </tr>
+          </thead>
+          <tbody>
+            {purchases.map((p) => {
+              const meta = STATUS_META[p.status];
+              return (
+                <tr key={p.id}>
+                  <td className="font-semibold text-amber-100">{p.productName}</td>
+                  <td className="text-stone-300">{p.storeName}</td>
+                  <td className="text-stone-300">{fmtDate(p.createdAt)}</td>
+                  <td className="text-right font-bold text-amber-300">
+                    {p.currencyIcon} {fmtAmount(p.amount, p.currencyName)}
+                  </td>
+                  <td>
+                    <span className={`rpg-badge border ${meta.cls}`}>
+                      {p.status === 'PENDING' && <Clock3 size={11} />}
+                      {meta.label}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }

@@ -40,13 +40,13 @@ import { Spinner } from './ui';
 
 type Tab = 'home' | 'quests' | 'shops' | 'inventory' | 'skills' | 'achievements';
 
-const TABS: Array<{ id: Tab; label: string; icon: typeof Home }> = [
-  { id: 'home', label: 'Главная', icon: Home },
-  { id: 'quests', label: 'Квесты и Дейлики', icon: ScrollText },
-  { id: 'shops', label: 'Магазины', icon: Store },
-  { id: 'inventory', label: 'Инвентарь', icon: Package },
-  { id: 'skills', label: 'Навыки', icon: Swords },
-  { id: 'achievements', label: 'Достижения', icon: Trophy },
+const TABS: Array<{ id: Tab; label: string; shortLabel: string; icon: typeof Home }> = [
+  { id: 'home', label: 'Главная', shortLabel: 'Главная', icon: Home },
+  { id: 'quests', label: 'Квесты и Дейлики', shortLabel: 'Квесты', icon: ScrollText },
+  { id: 'shops', label: 'Магазины', shortLabel: 'Магазины', icon: Store },
+  { id: 'inventory', label: 'Инвентарь', shortLabel: 'Сумка', icon: Package },
+  { id: 'skills', label: 'Навыки', shortLabel: 'Навыки', icon: Swords },
+  { id: 'achievements', label: 'Достижения', shortLabel: 'Ачивки', icon: Trophy },
 ];
 
 const DEFAULT_SETTINGS: ChildSettingsDto = {
@@ -217,7 +217,7 @@ export default function ChildDashboard() {
   const skillProgress = (skill: SkillId) => skills.find((s) => s.skill === skill);
 
   return (
-    <div className="theme-body min-h-screen">
+    <div className="theme-body min-h-dvh">
       <AchievementPopup childId={child?.id ?? 0} achievements={achievements} />
 
       {heroOpen && child && (
@@ -225,7 +225,7 @@ export default function ChildDashboard() {
       )}
 
       {settingsOpen && (
-        <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-sm sm:items-center">
+        <div className="scroll-touch fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/60 px-safe-4 py-safe-4 backdrop-blur-sm sm:items-center">
           <div className="rpg-panel rpg-panel-gold w-full max-w-2xl p-4 sm:p-6">
             <ChildSettingsTab
               profile={profile}
@@ -234,7 +234,7 @@ export default function ChildDashboard() {
               onWidgetsChange={(w) => void changeWidgets(w)}
             />
             <div className="mt-4 flex justify-end">
-              <button className="rpg-btn rpg-btn-ghost" onClick={() => setSettingsOpen(false)}>
+              <button className="rpg-btn rpg-btn-ghost touch-target" onClick={() => setSettingsOpen(false)}>
                 Закрыть
               </button>
             </div>
@@ -243,33 +243,33 @@ export default function ChildDashboard() {
       )}
 
       {/* Шапка героя */}
-      <header className="theme-header pb-20 pt-6 text-white">
-        <div className="mx-auto max-w-5xl px-4 sm:px-6">
-          <div className="flex items-center justify-between">
+      <header className="theme-header safe-header landscape-compact-header pb-6 text-white sm:pb-20">
+        <div className="mx-auto max-w-5xl px-page">
+          <div className="flex items-center justify-between gap-3">
             <button
               onClick={() => setHeroOpen(true)}
-              className="flex items-center gap-3 text-left transition hover:opacity-90"
+              className="flex min-w-0 items-center gap-3 text-left transition hover:opacity-90"
               title="Мой Герой"
             >
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border-2 border-amber-400/50 bg-black/30 text-3xl shadow-lg">
+              <div className="landscape-compact-avatar flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-2 border-amber-400/50 bg-black/30 text-3xl shadow-lg">
                 {child?.avatarEmoji}
               </div>
-              <div>
-                <div className="text-lg font-extrabold drop-shadow">{child?.name}</div>
-                <div className="text-sm text-amber-200/90">Мой Герой</div>
+              <div className="min-w-0">
+                <div className="truncate text-lg font-extrabold drop-shadow">{child?.name}</div>
+                <div className="landscape-hide text-sm text-amber-200/90">Мой Герой</div>
               </div>
             </button>
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               <button
                 onClick={() => setSettingsOpen(true)}
-                className="rounded-xl bg-white/15 p-2.5 backdrop-blur transition hover:bg-white/25"
+                className="touch-target flex items-center justify-center rounded-xl bg-white/15 p-2.5 backdrop-blur transition hover:bg-white/25"
                 title="Настройки"
               >
                 <Settings size={20} />
               </button>
               <button
                 onClick={logout}
-                className="rounded-xl bg-white/15 p-2.5 backdrop-blur transition hover:bg-white/25"
+                className="touch-target flex items-center justify-center rounded-xl bg-white/15 p-2.5 backdrop-blur transition hover:bg-white/25"
                 title="Выйти"
               >
                 <LogOut size={20} />
@@ -278,20 +278,21 @@ export default function ChildDashboard() {
           </div>
 
           {/* Уровень и опыт */}
-          <div className="mt-4">
+          <div className="landscape-compact-gap mt-4">
             <LevelBar level={level} />
           </div>
 
           {/* Балансы */}
           {profile && profile.balances.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 flex max-w-full flex-wrap gap-2">
               {profile.balances.map((b) => (
                 <div
                   key={b.storeId}
-                  className="rounded-xl border border-amber-400/30 bg-black/25 px-4 py-2 text-sm font-semibold backdrop-blur"
+                  className="flex min-w-0 max-w-full items-center gap-1 rounded-xl border border-amber-400/30 bg-black/25 px-3 py-1.5 text-xs font-semibold backdrop-blur sm:px-4 sm:py-2 sm:text-sm"
                 >
-                  {b.currencyIcon} {fmtAmount(b.amount, b.currencyName)}
-                  <span className="ml-1 font-normal text-white/70">· {b.storeName}</span>
+                  <span className="shrink-0">{b.currencyIcon}</span>
+                  <span className="truncate">{fmtAmount(b.amount, b.currencyName)}</span>
+                  <span className="hidden truncate font-normal text-white/70 sm:inline">· {b.storeName}</span>
                 </div>
               ))}
             </div>
@@ -299,16 +300,16 @@ export default function ChildDashboard() {
         </div>
       </header>
 
-      {/* Вкладки */}
-      <nav className="sticky top-0 z-20 -mt-12 mb-6 px-4 sm:px-6">
-        <div className="mx-auto flex max-w-5xl gap-1 overflow-x-auto rounded-2xl border border-amber-900/40 bg-stone-900/95 p-1.5 shadow-xl backdrop-blur">
+      {/* Вкладки (десктоп) */}
+      <nav className="sticky top-0 z-20 -mt-12 mb-6 hidden px-page sm:block">
+        <div className="no-scrollbar mx-auto flex max-w-5xl gap-1 overflow-x-auto rounded-2xl border border-amber-900/40 bg-stone-900/95 p-1.5 shadow-xl backdrop-blur">
           {TABS.map((t) => {
             const Icon = t.icon;
             return (
               <button
                 key={t.id}
                 onClick={() => navigate(t.id)}
-                className={`rpg-tab flex-1 justify-center ${tab === t.id ? 'rpg-tab-active' : ''}`}
+                className={`rpg-tab flex-1 justify-center whitespace-nowrap ${tab === t.id ? 'rpg-tab-active' : ''}`}
               >
                 <Icon size={17} /> {t.label}
               </button>
@@ -317,7 +318,7 @@ export default function ChildDashboard() {
         </div>
       </nav>
 
-      <main className="mx-auto max-w-5xl px-4 pb-12 sm:px-6">
+      <main className="mx-auto max-w-5xl px-page pb-mobile-nav sm:pb-12">
         {tab === 'home' && (
           <ChildHomeTab
             achievements={achievements}
@@ -365,6 +366,27 @@ export default function ChildDashboard() {
 
         {tab === 'home' && !profile && <Spinner label="Загружаем главную…" />}
       </main>
+
+      {/* Вкладки (мобильные): все шесть разделов всегда на виду, без скролла вбок */}
+      <nav className="safe-bottom-nav fixed inset-x-0 bottom-0 z-30 border-t border-amber-900/40 bg-stone-900/95 px-1 pt-1 backdrop-blur sm:hidden">
+        <div className="mx-auto grid max-w-lg grid-cols-6 gap-0.5">
+          {TABS.map((t) => {
+            const Icon = t.icon;
+            return (
+              <button
+                key={t.id}
+                onClick={() => navigate(t.id)}
+                className={`flex min-w-0 flex-col items-center gap-0.5 rounded-lg px-0.5 py-1.5 text-[10px] font-semibold leading-tight transition ${
+                  tab === t.id ? 'bg-amber-900/35 text-amber-300' : 'text-stone-400 active:bg-white/5'
+                }`}
+              >
+                <Icon size={19} />
+                <span className="w-full truncate text-center">{t.shortLabel}</span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }

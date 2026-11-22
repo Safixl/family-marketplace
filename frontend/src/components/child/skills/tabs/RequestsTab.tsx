@@ -81,7 +81,38 @@ export default function RequestsTab({ config, store, requests, onReload }: Props
       {requests.length === 0 ? (
         <EmptyState title="Запросов пока нет" hint="Отправленные запросы появятся здесь" />
       ) : (
-        <div className="rpg-panel overflow-x-auto">
+        <>
+          <div className="space-y-2 sm:hidden">
+            {requests.map((r) => {
+              const meta = STATUS_META[r.status];
+              return (
+                <div key={r.id} className="rpg-panel p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="break-words font-semibold text-amber-100">{r.title}</div>
+                      <div className="mt-0.5 text-xs text-stone-400">{fmtDate(r.createdAt)}</div>
+                    </div>
+                    <span className={`rpg-badge shrink-0 border ${meta.cls}`}>
+                      {r.status === 'PENDING' && <Clock3 size={11} />}
+                      {meta.label}
+                    </span>
+                  </div>
+                  {r.link && (
+                    <a
+                      href={r.link}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 block truncate text-xs text-sky-300 underline"
+                    >
+                      {r.link}
+                    </a>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="rpg-panel hidden overflow-x-auto sm:block">
           <table className="rpg-table w-full min-w-[480px]">
             <thead>
               <tr>
@@ -118,7 +149,8 @@ export default function RequestsTab({ config, store, requests, onReload }: Props
               })}
             </tbody>
           </table>
-        </div>
+          </div>
+        </>
       )}
     </div>
   );

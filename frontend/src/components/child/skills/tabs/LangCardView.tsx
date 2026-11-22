@@ -121,7 +121,7 @@ export default function LangCardView({ onDone }: { onDone?: () => void }) {
   return (
     <div className="space-y-3">
       {/* Вкладки: карточки / словарь / манускрипт */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1">
+      <div className="flex flex-wrap gap-1.5 pb-1">
         {([
           { id: 'cards', label: '🎴 Карточки' },
           { id: 'vocab', label: `📖 Словарь (${learning.length}/${learned.length})` },

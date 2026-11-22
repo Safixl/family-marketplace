@@ -22,7 +22,6 @@ import { rankTier, tierForLevel } from '../../lib/achievementTiers';
 import { RANKS, RpgLevel } from '../../lib/rpg';
 import { EmptyState } from '../ui';
 import ChildHouseView from './ChildHouseView';
-import LevelBar from './rpg/LevelBar';
 import SkillHexagon from './rpg/SkillHexagon';
 import AdventureLog from './rpg/AdventureLog';
 import LimitsPanel from './LimitsPanel';
@@ -124,7 +123,6 @@ export default function ChildHomeTab({
       {/* Верхний блок: слева опыт + лимиты, справа карта навыков */}
       <div className="grid gap-4 lg:grid-cols-5">
         <div className="space-y-4 lg:col-span-2">
-          <LevelBar level={level} compact />
           <section className="rpg-panel rpg-panel-gold p-4">
             <h2 className="mb-3 flex items-center gap-2 text-base font-bold text-amber-200">
               <Sparkles size={18} className="text-amber-400" /> Лимиты дня
@@ -134,7 +132,7 @@ export default function ChildHomeTab({
         </div>
 
         <section className="rpg-panel rpg-panel-gold p-4 sm:p-6 lg:col-span-3">
-          <div className="mb-2 flex items-center justify-between">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 text-lg font-bold text-amber-200">
               <Swords size={20} className="text-amber-400" /> Карта навыков
             </h2>
@@ -190,12 +188,12 @@ export default function ChildHomeTab({
                     Стр. {book.currentPage ?? 0}/{book.pages}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <input
                     type="number"
                     min={book.currentPage ?? 1}
                     max={book.pages || undefined}
-                    className="rpg-input w-24"
+                    className="rpg-input w-20 sm:w-24"
                     placeholder="стр."
                     value={pageInput[book.id] ?? ''}
                     onChange={(e) => setPageInput((prev) => ({ ...prev, [book.id]: e.target.value }))}
