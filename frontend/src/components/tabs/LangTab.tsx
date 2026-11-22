@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Check, Pencil, Plus, Save, ShoppingBag, Trophy, Trash2, X } from 'lucide-react';
 import { api } from '../../api/client';
 import {
+  LangCardApprovalDto,
   LangCardReviewDto,
   LangCardSettingDto,
   LangDifficulty,
@@ -53,7 +54,7 @@ const DIFF_LABELS: Record<LangDifficulty, string> = {
   HARD: 'Сложная 🔴',
 };
 
-type Panel = 'tasks' | 'vocab' | 'reviews';
+type Panel = 'tasks' | 'approvals' | 'vocab' | 'reviews';
 
 interface Props {
   /** Ребёнок, выбранный в шапке дашборда — чьи настройки и словарь управляем. */
@@ -78,6 +79,7 @@ export default function LangTab({ selectedChildId }: Props) {
   const [panel, setPanel] = useState<Panel>('tasks');
   const [settings, setSettings] = useState<LangCardSettingDto[] | null>(null);
   const [vocab, setVocab] = useState<LangParentVocabWord[] | null>(null);
+  const [approvals, setApprovals] = useState<LangCardApprovalDto[]>([]);
   const [reviews, setReviews] = useState<LangCardReviewDto[]>([]);
   const [filter, setFilter] = useState('');
 
@@ -127,6 +129,14 @@ export default function LangTab({ selectedChildId }: Props) {
     }
   }, [childId]);
 
+  const loadApprovals = useCallback(async () => {
+    try {
+      setApprovals(await api.get<LangCardApprovalDto[]>('/parent/lang-card-approvals'));
+    } catch {
+      setApprovals([]);
+    }
+  }, []);
+
   const loadReviews = useCallback(async () => {
     try {
       setReviews(await api.get<LangCardReviewDto[]>('/parent/lang-card-reviews'));
@@ -142,13 +152,15 @@ export default function LangTab({ selectedChildId }: Props) {
     }
     void loadSettings();
     void loadVocab();
+    void loadApprovals();
     void loadReviews();
-    // Живое обновление проверок
+    // Живое обновление запросов и проверок
     const timer = setInterval(() => {
+      void loadApprovals();
       void loadReviews();
     }, 15000);
     return () => clearInterval(timer);
-  }, [childId, loadSettings, loadVocab, loadReviews]);
+  }, [childId, loadSettings, loadVocab, loadApprovals, loadReviews]);
 
   // ---------- Настройки ----------
 
@@ -197,6 +209,20 @@ export default function LangTab({ selectedChildId }: Props) {
     try {
       await api.post(`/parent/lang-vocab/${wordId}/mark-learned?childId=${childId}`);
       await loadVocab();
+    } catch (e) {
+      alert(errMsg(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // ---------- Запросы на взятие карточки ----------
+
+  const decide = async (cardId: number, action: 'approve' | 'reject') => {
+    setBusy(true);
+    try {
+      await api.post(`/parent/lang-card-approvals/${cardId}/${action}`);
+      await loadApprovals();
     } catch (e) {
       alert(errMsg(e));
     } finally {
@@ -663,6 +689,7 @@ export default function LangTab({ selectedChildId }: Props) {
       {/* Переключатель панелей */}
       <div className="flex flex-wrap gap-1.5">
         {panelBtn('tasks', '⏱ Время и сложность')}
+        {panelBtn('approvals', `✅ Запросы на карточки${approvals.length ? ` (${approvals.length})` : ''}`)}
         {panelBtn('vocab', `📖 Словарь (${activeCount}/50)`)}
         {panelBtn('reviews', `🔍 Проверка заданий${reviews.length ? ` (${reviews.length})` : ''}`)}
       </div>
@@ -714,6 +741,52 @@ export default function LangTab({ selectedChildId }: Props) {
                 <Save size={16} /> Сохранить
               </button>
             </div>
+          </div>
+        ))}
+
+      {/* Запросы на взятие карточки */}
+      {panel === 'approvals' &&
+        (approvals.length === 0 ? (
+          <EmptyState
+            title="Запросов на взятие карточек нет"
+            hint="Ребёнок ещё не брал карточку или у него включён «Лимит доверия»"
+          />
+        ) : (
+          <div className="space-y-2">
+            <p className="text-sm text-slate-500">
+              Подтвердите взятие карточки. При включённом «Лимите доверия» запросы не появляются — ребёнок берёт
+              карточки без подтверждения.
+            </p>
+            {approvals.map((a) => (
+              <div key={a.cardId} className="card flex flex-wrap items-center gap-3 p-3">
+                <span className="text-xl">{a.childAvatar}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold text-slate-800">
+                    {a.childName} · {a.taskTypeEmoji} {a.taskTypeLabel}
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    {a.difficultyLabel} · {a.minutes} мин · {a.manual ? 'ручная проверка' : 'авто-проверка'} · до{' '}
+                    {a.baseReward} XP
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    className="btn-secondary !px-3 !py-1.5 text-xs"
+                    disabled={busy}
+                    onClick={() => void decide(a.cardId, 'reject')}
+                  >
+                    <X size={14} /> Отклонить
+                  </button>
+                  <button
+                    className="btn-primary !px-3 !py-1.5 text-xs"
+                    disabled={busy}
+                    onClick={() => void decide(a.cardId, 'approve')}
+                  >
+                    <Check size={14} /> Одобрить
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         ))}
 

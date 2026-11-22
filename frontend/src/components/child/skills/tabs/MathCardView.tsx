@@ -3,6 +3,7 @@ import { Check, Clock3, Send, X } from 'lucide-react';
 import { api } from '../../../../api/client';
 import { MathCardDayDto, MathCardDto, MathCardSubmitResult, MathChoice } from '../../../../api/types';
 import { errMsg } from '../../../../lib/format';
+import { useAntiCheatTest } from '../../../../hooks/useAntiCheatTest';
 import MathManuscript from './MathManuscript';
 import { Spinner } from '../../../ui';
 
@@ -41,9 +42,46 @@ export default function MathCardView({ onDone }: { onDone?: () => void }) {
       setDay(await api.get<MathCardDayDto>('/child/math-cards'));
     } catch (e) {
       alert(errMsg(e));
-      setDay({ cards: [], doneToday: 0, dailyLimit: 3 });
+      setDay({ cards: [], doneToday: 0, dailyLimit: 3, trustLimit: false });
     }
   }, []);
+
+  const active = day?.cards.find((c) => c.status === 'IN_PROGRESS') ?? null;
+  const activeAnswers = active ? active.tasks.map((t) => answers[t.id] ?? '') : [];
+  const overdue = Boolean(
+    active && active.deadline && new Date(active.deadline).getTime() <= Date.now(),
+  );
+
+  useAntiCheatTest({
+    cardId: active?.id ?? null,
+    status: active?.status ?? null,
+    answers: activeAnswers,
+    basePath: '/child/math-cards',
+    onResume: load,
+  });
+
+  // Восстанавливаем черновик после перезагрузки/возврата на страницу.
+  useEffect(() => {
+    if (!active) return;
+    setAnswers((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      active.tasks.forEach((t, i) => {
+        if (next[t.id] === undefined && active.draftAnswers[i] != null) {
+          next[t.id] = active.draftAnswers[i];
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [active]);
+
+  // Время вышло — просим сервер завершить карточку по черновику.
+  useEffect(() => {
+    if (overdue) {
+      void load();
+    }
+  }, [overdue, load]);
 
   useEffect(() => {
     void load();
@@ -68,7 +106,7 @@ export default function MathCardView({ onDone }: { onDone?: () => void }) {
     }
   };
 
-  const act = async (card: MathCardDto, action: 'request' | 'revoke' | 'start' | 'pause' | 'resume') => {
+  const act = async (card: MathCardDto, action: 'request' | 'revoke' | 'start' | 'resume') => {
     setBusy(true);
     try {
       await api.post(`/child/math-cards/${card.id}/${action}`);
@@ -76,6 +114,7 @@ export default function MathCardView({ onDone }: { onDone?: () => void }) {
       await load();
     } catch (e) {
       alert(errMsg(e));
+      await load();
     } finally {
       setBusy(false);
     }
@@ -90,6 +129,7 @@ export default function MathCardView({ onDone }: { onDone?: () => void }) {
       await load();
     } catch (e) {
       alert(errMsg(e));
+      await load();
     } finally {
       setBusy(false);
     }
@@ -111,7 +151,6 @@ export default function MathCardView({ onDone }: { onDone?: () => void }) {
   const cards = day.cards;
   const doneToday = day.doneToday;
   const dailyLimit = day.dailyLimit;
-  const active = cards.find((c) => c.status === 'IN_PROGRESS');
   const limitReached = doneToday >= dailyLimit;
   const visible = active ? [active] : cards;
 
@@ -132,6 +171,11 @@ export default function MathCardView({ onDone }: { onDone?: () => void }) {
       {tab === 'manuscript' && <MathManuscript />}
 
       {tab === 'cards' && (<>
+      {day.trustLimit && (
+        <div className="rpg-panel border border-emerald-600/40 bg-emerald-900/20 p-3 text-sm text-emerald-200">
+          🛡 Лимит доверия включён: карточки можно брать без подтверждения родителя
+        </div>
+      )}
       {limitReached && !active && (
         <div className="rpg-panel p-3 text-sm text-stone-400">
           Лимит на сегодня исчерпан — новые карточки появятся завтра в 9:00
@@ -211,16 +255,6 @@ export default function MathCardView({ onDone }: { onDone?: () => void }) {
                     className={`mt-2 flex items-center gap-2 text-lg font-extrabold ${overdue ? 'text-rose-400' : 'text-amber-200'}`}
                   >
                     <Clock3 size={18} /> {overdue ? 'Время вышло' : fmt(remaining(card))}
-                    {!overdue && (
-                      <button
-                        className="rpg-badge border border-stone-600/60 bg-stone-700/30 text-stone-300 hover:border-amber-600/60"
-                        disabled={busy}
-                        onClick={() => void act(card, 'pause')}
-                        title="Свернуть задачу (таймер остановится) и взять другую"
-                      >
-                        ⏸ Свернуть
-                      </button>
-                    )}
                   </div>
                 )}
                 {card.status === 'SUCCESS' && card.xpEarned > 0 && (
@@ -237,7 +271,7 @@ export default function MathCardView({ onDone }: { onDone?: () => void }) {
 
               {card.status === 'CREATED' && (
                 <button className="rpg-btn" disabled={busy} onClick={() => void act(card, 'request')}>
-                  🎯 Взять задачу
+                  {day.trustLimit ? '🎯 Взять без подтверждения' : '🎯 Взять задачу'}
                 </button>
               )}
               {card.status === 'REQUESTED' && (

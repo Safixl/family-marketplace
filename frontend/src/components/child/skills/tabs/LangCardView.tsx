@@ -9,6 +9,7 @@ import {
   LangVocabWord,
 } from '../../../../api/types';
 import { errMsg } from '../../../../lib/format';
+import { useAntiCheatTest } from '../../../../hooks/useAntiCheatTest';
 import LangManuscript from './LangManuscript';
 import { Spinner } from '../../../ui';
 
@@ -38,10 +39,74 @@ export default function LangCardView({ onDone }: { onDone?: () => void }) {
       setVocab(v);
     } catch (e) {
       alert(errMsg(e));
-      setDay({ cards: [], doneToday: 0, dailyLimit: 3 });
+      setDay({ cards: [], doneToday: 0, dailyLimit: 3, trustLimit: false });
       setVocab([]);
     }
   }, []);
+
+  const active = day?.cards.find((c) => c.status === 'IN_PROGRESS') ?? null;
+  const activeAnswers = active
+    ? active.tasks.map((t) =>
+        t.taskType === 'SECRET_STORIES'
+          ? `${answers[t.id] ?? ''}|${answersRu[t.id] ?? ''}`
+          : answers[t.id] ?? '',
+      )
+    : [];
+  const overdue = Boolean(
+    active && active.deadline && new Date(active.deadline).getTime() <= Date.now(),
+  );
+
+  useAntiCheatTest({
+    cardId: active?.id ?? null,
+    status: active?.status ?? null,
+    answers: activeAnswers,
+    basePath: '/child/lang-cards',
+    onResume: load,
+  });
+
+  // Восстанавливаем черновик после перезагрузки/возврата на страницу.
+  useEffect(() => {
+    if (!active) return;
+    setAnswers((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      active.tasks.forEach((t, i) => {
+        if (next[t.id] !== undefined) return;
+        const draft = active.draftAnswers[i] ?? '';
+        if (t.taskType === 'SECRET_STORIES') {
+          const [en] = draft.split('|', 2);
+          if (en) {
+            next[t.id] = en;
+            changed = true;
+          }
+        } else if (draft) {
+          next[t.id] = draft;
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+    setAnswersRu((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      active.tasks.forEach((t, i) => {
+        if (t.taskType !== 'SECRET_STORIES' || next[t.id] !== undefined) return;
+        const [, ru] = (active.draftAnswers[i] ?? '').split('|', 2);
+        if (ru) {
+          next[t.id] = ru;
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [active]);
+
+  // Время вышло — просим сервер завершить карточку по черновику.
+  useEffect(() => {
+    if (overdue) {
+      void load();
+    }
+  }, [overdue, load]);
 
   useEffect(() => {
     void load();
@@ -68,16 +133,15 @@ export default function LangCardView({ onDone }: { onDone?: () => void }) {
     }
   };
 
-  const start = async (card: LangCardDto) => {
+  const act = async (card: LangCardDto, action: 'request' | 'revoke' | 'start') => {
     setBusy(true);
     try {
-      await api.post(`/child/lang-cards/${card.id}/start`);
+      await api.post(`/child/lang-cards/${card.id}/${action}`);
       setResult(null);
-      setAnswers({});
-      setAnswersRu({});
       await load();
     } catch (e) {
       alert(errMsg(e));
+      await load();
     } finally {
       setBusy(false);
     }
@@ -94,6 +158,7 @@ export default function LangCardView({ onDone }: { onDone?: () => void }) {
       await load();
     } catch (e) {
       alert(errMsg(e));
+      await load();
     } finally {
       setBusy(false);
     }
@@ -112,7 +177,6 @@ export default function LangCardView({ onDone }: { onDone?: () => void }) {
 
   if (day === null) return <Spinner label="Загружаем карточки…" />;
 
-  const active = day.cards.find((c) => c.status === 'IN_PROGRESS');
   const limitReached = day.doneToday >= day.dailyLimit;
   const visible = active ? [active] : day.cards;
   const learning = vocab.filter((w) => w.status === 'ACTIVE');
@@ -177,6 +241,11 @@ export default function LangCardView({ onDone }: { onDone?: () => void }) {
 
       {tab === 'cards' && (
         <>
+          {day.trustLimit && (
+            <div className="rpg-panel border border-emerald-600/40 bg-emerald-900/20 p-3 text-sm text-emerald-200">
+              🛡 Лимит доверия включён: карточки можно брать без подтверждения родителя
+            </div>
+          )}
           {limitReached && !active && (
             <div className="rpg-panel p-3 text-sm text-stone-400">
               Лимит на сегодня исчерпан — новые карточки появятся завтра в 9:00
@@ -266,7 +335,17 @@ export default function LangCardView({ onDone }: { onDone?: () => void }) {
                   </div>
 
                   {card.status === 'CREATED' && (
-                    <button className="rpg-btn" disabled={busy} onClick={() => void start(card)}>
+                    <button className="rpg-btn" disabled={busy} onClick={() => void act(card, 'request')}>
+                      {day.trustLimit ? '🎯 Взять без подтверждения' : '🎯 Взять карточку'}
+                    </button>
+                  )}
+                  {card.status === 'REQUESTED' && (
+                    <button className="rpg-btn rpg-btn-ghost" disabled={busy} onClick={() => void act(card, 'revoke')}>
+                      ⏳ Ожидает одобрения (отозвать)
+                    </button>
+                  )}
+                  {card.status === 'APPROVED' && (
+                    <button className="rpg-btn" disabled={busy} onClick={() => void act(card, 'start')}>
                       ▶ Начать
                     </button>
                   )}
