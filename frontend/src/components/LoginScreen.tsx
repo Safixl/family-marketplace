@@ -120,7 +120,7 @@ export default function LoginScreen() {
 
   return (
     <div
-      className="flex min-h-screen items-center justify-center p-4"
+      className="flex min-h-dvh items-center justify-center px-safe-4 py-safe-4"
       style={{
         background:
           'radial-gradient(ellipse at 50% 0%, rgba(180,83,9,0.25), transparent 60%),' +
