@@ -9,7 +9,7 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-100">
+      <div className="flex min-h-dvh items-center justify-center bg-slate-100">
         <Loader2 className="animate-spin text-indigo-600" size={40} />
       </div>
     );

@@ -5,10 +5,48 @@
 @layer base {
   html {
     @apply antialiased;
+    height: 100%;
+    overflow-x: hidden;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   body {
     @apply bg-slate-100 text-slate-900;
+    min-height: 100%;
+    min-height: 100dvh;
+    overflow-x: clip;
+    overscroll-behavior-x: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  #root {
+    min-height: 100dvh;
+  }
+
+  button,
+  a,
+  [role='button'] {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  /* iOS Safari зумит страницу, если шрифт инпута меньше 16px.
+     Учитываем и портрет, и ландшафт: на iPhone ширина в ландшафте > 640px. */
+  @media (max-width: 640px), (hover: none) and (pointer: coarse) {
+    input,
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
+
+  /* В standalone-режиме убираем резиновый вертикальный отскок страницы. */
+  @media (display-mode: standalone) {
+    body {
+      overscroll-behavior-y: none;
+    }
   }
 }
 
@@ -466,6 +504,142 @@
 
   .rpg-table tr:hover td {
     background: rgba(255, 255, 255, 0.03);
+  }
+}
+
+/* ============ Мобильные safe-area утилиты (iOS) ============ */
+@layer utilities {
+  .min-h-dvh {
+    min-height: 100dvh;
+  }
+
+  .h-dvh {
+    height: 100dvh;
+  }
+
+  .max-h-dvh {
+    max-height: 100dvh;
+  }
+
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .pl-safe {
+    padding-left: env(safe-area-inset-left, 0px);
+  }
+
+  .pr-safe {
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+
+  .px-safe {
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+
+  .py-safe-4 {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 1rem);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem);
+  }
+
+  .px-safe-4 {
+    padding-left: calc(env(safe-area-inset-left, 0px) + 1rem);
+    padding-right: calc(env(safe-area-inset-right, 0px) + 1rem);
+  }
+
+  /* Шапка под «чёлкой»/статус-баром: safe-area + обычный отступ. */
+  .safe-header {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
+  }
+
+  /* Нижняя навигация над home-indicator. */
+  .safe-bottom-nav {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.35rem);
+  }
+
+  /* Контент не должен прятаться под нижним таб-баром. */
+  .pb-mobile-nav {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 5.25rem);
+  }
+
+  /* Модалка: не выше видимой области с учётом safe-area. */
+  .modal-safe {
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 1rem);
+  }
+
+  .scroll-touch {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Минимальная зона нажатия для иконочных кнопок. */
+  .touch-target {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Компактная верхняя панель под статус-баром. */
+  .safe-top-bar {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 0.5rem);
+  }
+}
+
+/* Горизонтальные отступы страницы: не меньше 1rem и не уже safe-area. */
+.px-page {
+  padding-left: max(1rem, env(safe-area-inset-left, 0px));
+  padding-right: max(1rem, env(safe-area-inset-right, 0px));
+}
+
+@media (min-width: 640px) {
+  .px-page {
+    padding-left: max(1.5rem, env(safe-area-inset-left, 0px));
+    padding-right: max(1.5rem, env(safe-area-inset-right, 0px));
+  }
+
+  .safe-header {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 1.5rem);
+  }
+}
+
+/* Компактный ландшафт iPhone: экономим вертикаль, но не прячем кнопки. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .landscape-compact-header {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 0.4rem);
+    padding-bottom: 0.6rem;
+  }
+
+  .landscape-compact-avatar {
+    width: 2.75rem;
+    height: 2.75rem;
+    font-size: 1.5rem;
+    border-radius: 0.9rem;
+  }
+
+  .landscape-hide {
+    display: none !important;
+  }
+
+  .landscape-compact-gap {
+    margin-top: 0.5rem;
+  }
+
+  .safe-bottom-nav {
+    padding-top: 0.2rem;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.2rem);
   }
 }
 

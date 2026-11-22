@@ -1135,7 +1135,78 @@ export default function ReadingTab({ selectedChildId }: Props) {
             hint={books.length === 0 ? 'Нажмите «+» справа внизу, чтобы добавить первую книгу' : 'Измените фильтры'}
           />
         ) : (
-          <div className="max-h-[480px] overflow-auto rounded-xl border border-slate-100">
+          <>
+            {/* Мобильные и планшетные карточки: таблица шириной 760px здесь не нужна */}
+            <div className="space-y-2 lg:hidden">
+              {archiveRows.map((r) => {
+                const meta = ARCHIVE_STATUS[r.status];
+                return (
+                  <div key={r.book.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="break-words font-semibold text-slate-800">
+                          {r.book.name}
+                          {!r.book.active && <span className="ml-2 text-xs font-normal text-slate-400">(скрыта)</span>}
+                        </div>
+                        <div className="mt-0.5 break-words text-xs text-slate-500">
+                          {[r.book.author, r.book.series].filter(Boolean).join(' · ') || '—'}
+                        </div>
+                      </div>
+                      <span className={`badge shrink-0 ${meta.cls}`}>{meta.label}</span>
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-slate-600">
+                      <div>
+                        Жанр: <span className="font-medium">{r.book.genre ?? '—'}</span>
+                      </div>
+                      <div>
+                        Страниц:{' '}
+                        <span className="font-medium">
+                          {r.book.pages}
+                          {r.status === 'reading' && ` (стр. ${r.book.currentPage ?? 0})`}
+                        </span>
+                      </div>
+                      <div>
+                        Баллы: <span className="font-medium">{r.points ? fmtAmount(r.points) : '—'}</span>
+                      </div>
+                      <div>
+                        Прочитана:{' '}
+                        <span className="font-medium">
+                          {r.readAt ? new Date(r.readAt).toLocaleDateString('ru-RU') : '—'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center justify-end gap-1">
+                      {r.status !== 'read' && r.status !== 'pending' && (
+                        <button
+                          className="btn-primary !px-2.5 !py-1.5 text-xs"
+                          disabled={busy}
+                          onClick={() => void markRead(r.book)}
+                          title="Засчитать как прочитанную"
+                        >
+                          Засчитать
+                        </button>
+                      )}
+                      <button
+                        className="touch-target flex items-center justify-center rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                        onClick={() => openEdit(r.book)}
+                        title="Редактировать"
+                      >
+                        <Pencil size={15} />
+                      </button>
+                      <button
+                        className="touch-target flex items-center justify-center rounded-lg p-2 text-slate-500 hover:bg-rose-50 hover:text-rose-600"
+                        onClick={() => void removeBook(r.book)}
+                        title="Удалить"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+          <div className="hidden max-h-[480px] overflow-auto rounded-xl border border-slate-100 lg:block">
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead className="sticky top-0 z-10 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
@@ -1210,12 +1281,13 @@ export default function ReadingTab({ selectedChildId }: Props) {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 
       {/* FAB: добавить книгу */}
       <button
-        className="fixed bottom-20 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-600 text-white shadow-xl shadow-indigo-600/40 transition hover:scale-105 hover:bg-indigo-700 active:scale-95 sm:bottom-8 sm:right-8"
+        className="fixed bottom-24 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-600 text-white shadow-xl shadow-indigo-600/40 transition hover:scale-105 hover:bg-indigo-700 active:scale-95 sm:bottom-8 sm:right-8"
         onClick={openCreate}
         title="Добавить книгу"
       >

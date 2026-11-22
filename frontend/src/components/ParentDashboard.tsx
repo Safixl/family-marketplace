@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Check, ChevronDown, Plus } from 'lucide-react';
+import { Check, ChevronDown, MoreHorizontal, Plus, X } from 'lucide-react';
 import {
   BookOpen,
   Calculator,
@@ -50,6 +50,9 @@ const TABS: Array<{ id: TabId; label: string; icon: typeof LayoutDashboard }> = 
   { id: 'quests', label: 'Квесты', icon: ScrollText },
 ];
 
+/** Основные вкладки в нижней панели; остальные доступны через «Ещё». */
+const PRIMARY_TAB_IDS: TabId[] = ['children', 'overview', 'quests'];
+
 /** Вкладка навыка → код навыка (вкладка видна только когда навык активирован ребёнку). */
 const TAB_SKILL: Partial<Record<TabId, string>> = {
   reading: 'READING',
@@ -93,6 +96,7 @@ export default function ParentDashboard() {
   const { session, logout } = useAuth();
   const [tab, setTab] = useState<TabId>('overview');
   const [notifOpen, setNotifOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   /** Скачивание CSV-отчёта (дети, достижения, покупки). */
   const exportReport = async () => {
@@ -204,6 +208,10 @@ export default function ParentDashboard() {
     return !skill || activeSkillCodes.includes(skill);
   });
 
+  const mobilePrimaryTabs = visibleTabs.filter((t) => PRIMARY_TAB_IDS.includes(t.id));
+  const mobileMoreTabs = visibleTabs.filter((t) => !PRIMARY_TAB_IDS.includes(t.id));
+  const mobileNavCount = mobilePrimaryTabs.length + (mobileMoreTabs.length > 0 ? 1 : 0);
+
   // Нет детей (или их ещё не загрузили) → открываем вкладку «Дети»
   useEffect(() => {
     if (children.length === 0) {
@@ -287,10 +295,10 @@ export default function ParentDashboard() {
       </aside>
 
       {/* Шапка (мобильный) */}
-      <header className="sticky top-0 z-30 flex items-center justify-between gap-2 bg-slate-900 px-4 py-3 lg:hidden">
-        <div className="flex items-center gap-2 text-white">
-          <Zap size={20} className="text-indigo-400" />
-          <span className="font-bold">Дейлики</span>
+      <header className="safe-top-bar sticky top-0 z-30 flex items-center justify-between gap-2 bg-slate-900 px-page pb-2.5 lg:hidden">
+        <div className="flex min-w-0 items-center gap-2 text-white">
+          <Zap size={20} className="shrink-0 text-indigo-400" />
+          <span className="hidden font-bold min-[400px]:inline">Дейлики</span>
         </div>
         <ChildPicker
           childrenList={children}
@@ -301,16 +309,20 @@ export default function ParentDashboard() {
           onSelect={(id) => setSelectedChildId(id)}
           onCreate={startChildCreate}
         />
-        <div className="flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1">
           <NotificationBell count={notifCount} onClick={requestNotificationPermission} />
-          <button onClick={logout} className="rounded-xl p-2 text-slate-300 hover:bg-slate-800" title="Выйти">
+          <button
+            onClick={logout}
+            className="touch-target flex items-center justify-center rounded-xl p-2 text-slate-300 hover:bg-slate-800"
+            title="Выйти"
+          >
             <LogOut size={20} />
           </button>
         </div>
       </header>
 
       {/* Контент */}
-      <main className="px-4 pb-24 pt-6 sm:px-6 lg:ml-64 lg:pb-10">
+      <main className="px-page pb-mobile-nav pt-6 lg:ml-64 lg:pb-10">
         <div className="mx-auto max-w-6xl">
           {tab === 'overview' && (
             <OverviewTab selectedChildId={selectedChildId} onCreateQuest={startQuestCreate} onSkillsChanged={handleSkillsChanged} />
@@ -345,23 +357,81 @@ export default function ParentDashboard() {
         onNavigate={(n) => setTab(tabForNotification(n))}
       />
 
-      {/* Нижняя навигация (мобильный) */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 flex justify-around border-t border-slate-200 bg-white px-2 py-2 lg:hidden">
-        {visibleTabs.map((t) => {
-          const Icon = t.icon;
-          return (
+      {/* Нижняя навигация (мобильный): 3 основные вкладки + «Ещё» */}
+      <nav className="safe-bottom-nav fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white px-1 pt-1 lg:hidden">
+        <div
+          className="mx-auto grid max-w-lg gap-0.5"
+          style={{ gridTemplateColumns: `repeat(${Math.max(1, mobileNavCount)}, minmax(0, 1fr))` }}
+        >
+          {mobilePrimaryTabs.map((t) => {
+            const Icon = t.icon;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`flex min-w-0 flex-col items-center gap-0.5 rounded-lg px-1 py-1.5 text-[10px] font-semibold leading-tight ${
+                  tab === t.id ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400'
+                }`}
+              >
+                <Icon size={20} />
+                <span className="w-full truncate text-center">{t.label}</span>
+              </button>
+            );
+          })}
+          {mobileMoreTabs.length > 0 && (
             <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`flex flex-col items-center gap-0.5 rounded-xl px-3 py-1.5 text-[11px] font-medium ${
-                tab === t.id ? 'text-indigo-600' : 'text-slate-400'
+              onClick={() => setMoreOpen(true)}
+              className={`flex min-w-0 flex-col items-center gap-0.5 rounded-lg px-1 py-1.5 text-[10px] font-semibold leading-tight ${
+                mobileMoreTabs.some((t) => t.id === tab) ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400'
               }`}
             >
-              <Icon size={20} /> {t.label}
+              <MoreHorizontal size={20} />
+              <span className="w-full truncate text-center">Ещё</span>
             </button>
-          );
-        })}
+          )}
+        </div>
       </nav>
+
+      {/* Лист «Ещё»: все разделы доступны без горизонтального скролла */}
+      {moreOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center lg:hidden">
+          <div className="absolute inset-0 bg-slate-900/50" onClick={() => setMoreOpen(false)} />
+          <div className="scroll-touch safe-bottom-nav relative max-h-[80dvh] w-full overflow-y-auto rounded-t-2xl bg-white px-4 pt-4 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-base font-bold text-slate-800">Все разделы</h3>
+              <button
+                onClick={() => setMoreOpen(false)}
+                className="touch-target flex items-center justify-center rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                aria-label="Закрыть"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-2 pb-2">
+              {visibleTabs.map((t) => {
+                const Icon = t.icon;
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => {
+                      setTab(t.id);
+                      setMoreOpen(false);
+                    }}
+                    className={`flex min-w-0 flex-col items-center gap-1 rounded-xl border px-2 py-3 text-xs font-semibold transition ${
+                      tab === t.id
+                        ? 'border-indigo-200 bg-indigo-50 text-indigo-700'
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Icon size={20} />
+                    <span className="w-full truncate text-center">{t.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -445,8 +515,8 @@ function ChildPicker({
         <>
           <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />
           <div
-            className={`absolute top-full z-30 mt-1 rounded-xl border border-slate-700 bg-slate-800 p-1.5 shadow-2xl ${
-              compact ? 'right-0 w-56' : 'left-0 right-0'
+            className={`scroll-touch absolute top-full z-30 mt-1 max-h-[60dvh] overflow-y-auto rounded-xl border border-slate-700 bg-slate-800 p-1.5 shadow-2xl ${
+              compact ? 'right-0 w-[min(14rem,calc(100vw-2rem))]' : 'left-0 right-0'
             }`}
           >
             {childrenList.map((c) => (

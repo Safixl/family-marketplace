@@ -100,7 +100,7 @@ export default function ChildShopsTab({ stores, products, profile, loading, onPu
     <div className="flex flex-col gap-4 lg:flex-row">
       {/* Вкладки-фильтры слева + корзина под ними */}
       <aside className="shrink-0 lg:w-64">
-        <div className="rpg-panel rpg-panel-gold flex gap-1.5 overflow-x-auto p-2 lg:flex-col">
+        <div className="rpg-panel rpg-panel-gold flex flex-wrap gap-1.5 p-2 lg:flex-col">
           <button
             onClick={() => setActiveStoreId(null)}
             className={`rpg-tab justify-start ${activeStoreId == null ? 'rpg-tab-active' : ''}`}

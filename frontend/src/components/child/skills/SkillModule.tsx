@@ -97,7 +97,7 @@ export default function SkillModule({ config, store, progress }: Props) {
   return (
     <div className="space-y-4">
       {/* Вкладки */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1">
+      <div className="flex flex-wrap gap-1.5 pb-1">
         {TABS.map((t) => {
           const Icon = t.icon;
           const label = t.id === 'requests' ? config.requestTitle : t.label;

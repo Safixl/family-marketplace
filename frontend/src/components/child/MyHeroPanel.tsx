@@ -28,7 +28,7 @@ export default function MyHeroPanel({ childName, avatarEmoji, onClose }: Props) 
   const [tab, setTab] = useState<HeroTab>('deposit');
 
   return (
-    <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-sm sm:items-center">
+    <div className="scroll-touch fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/60 px-safe-4 py-safe-4 backdrop-blur-sm sm:items-center">
       <div className="rpg-panel rpg-panel-gold w-full max-w-3xl p-4 sm:p-6">
         {/* Шапка героя */}
         <div className="mb-4 flex items-center justify-between gap-3">
@@ -43,7 +43,7 @@ export default function MyHeroPanel({ childName, avatarEmoji, onClose }: Props) 
           </div>
           <button
             onClick={onClose}
-            className="rounded-xl bg-white/10 p-2.5 text-white/80 transition hover:bg-white/20"
+            className="touch-target flex items-center justify-center rounded-xl bg-white/10 p-2.5 text-white/80 transition hover:bg-white/20"
             title="Закрыть"
             aria-label="Закрыть"
           >
@@ -51,8 +51,8 @@ export default function MyHeroPanel({ childName, avatarEmoji, onClose }: Props) 
           </button>
         </div>
 
-        {/* Вкладки героя */}
-        <div className="mb-4 flex gap-1.5 overflow-x-auto pb-1">
+        {/* Вкладки героя: на мобильных переносятся, а не уезжают вбок */}
+        <div className="no-scrollbar mb-4 flex flex-wrap gap-1.5 pb-1">
           {HERO_TABS.map((t) => {
             const Icon = t.icon;
             return (
@@ -67,7 +67,7 @@ export default function MyHeroPanel({ childName, avatarEmoji, onClose }: Props) 
           })}
         </div>
 
-        <div className="max-h-[60vh] overflow-y-auto pr-1">
+        <div className="min-w-0">
           {tab === 'deposit' && <ChildDepositsTab />}
           {tab === 'wardrobe' && <ChildWardrobeTab />}
           {tab === 'wishlist' && <ChildWishlistTab />}

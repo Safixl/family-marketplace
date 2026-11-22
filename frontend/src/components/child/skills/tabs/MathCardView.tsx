@@ -118,7 +118,7 @@ export default function MathCardView({ onDone }: { onDone?: () => void }) {
   return (
     <div className="space-y-3">
       {/* Вкладки: карточки / манускрипт */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1">
+      <div className="flex flex-wrap gap-1.5 pb-1">
         {([
           { id: 'cards', label: '🎴 Карточки' },
           { id: 'manuscript', label: '📖 Манускрипт' },
