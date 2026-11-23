@@ -3,6 +3,7 @@ import { Minus, Package, Send, ShoppingCart } from 'lucide-react';
 import { api } from '../../../../api/client';
 import { ChildProductDto, StoreDto } from '../../../../api/types';
 import { errMsg, fmtAmount } from '../../../../lib/format';
+import { LIMIT_PERIOD_SHORT, fmtLimitReset } from '../../../LimitPeriodSelect';
 import { EmptyState } from '../../../ui';
 
 interface Props {
@@ -119,8 +120,12 @@ export default function ShopTab({ store, products, balance, onPurchased }: Props
 
               {product.limitPerChild != null && (
                 <div className="text-xs text-stone-400">
-                  Куплено: {product.boughtCount} из {product.limitPerChild}
+                  Куплено: {product.boughtCount} из {product.limitPerChild}{' '}
+                  {LIMIT_PERIOD_SHORT[product.limitPeriod ?? 'NONE']}
                   {limitReached && <span className="ml-1 font-bold text-rose-400">· лимит</span>}
+                  {!limitReached && product.limitResetAt && (
+                    <span className="ml-1">· обновится {fmtLimitReset(product.limitResetAt)}</span>
+                  )}
                 </div>
               )}
 

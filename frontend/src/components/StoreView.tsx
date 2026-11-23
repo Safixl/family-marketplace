@@ -1,6 +1,18 @@
 import { Package, ShoppingCart } from 'lucide-react';
 import { ChildProductDto, StoreDto } from '../api/types';
 import { fmtAmount } from '../lib/format';
+import { LIMIT_PERIOD_SHORT } from './LimitPeriodSelect';
+
+/** Ближайший сброс лимита в читаемом виде (например, «24.11, 09:00»). */
+function fmtReset(iso: string | null): string | null {
+  if (!iso) return null;
+  return new Date(iso).toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
 
 interface StoreViewProps {
   store: StoreDto;
@@ -50,7 +62,8 @@ export default function StoreView({ store, products, balance, cartCount, onAddTo
                   <div>
                     <div className="theme-muted mb-1 flex justify-between text-xs">
                       <span>
-                        Куплено: {product.boughtCount} из {product.limitPerChild}
+                        Куплено: {product.boughtCount} из {product.limitPerChild}{' '}
+                        {LIMIT_PERIOD_SHORT[product.limitPeriod ?? 'NONE']}
                       </span>
                       {limitReached && <span className="font-semibold text-rose-600">лимит</span>}
                     </div>
@@ -60,6 +73,11 @@ export default function StoreView({ store, products, balance, cartCount, onAddTo
                         style={{ width: `${percent}%` }}
                       />
                     </div>
+                    {!limitReached && product.limitResetAt && (
+                      <div className="theme-muted mt-1 text-xs">
+                        Обновится: {fmtReset(product.limitResetAt)}
+                      </div>
+                    )}
                   </div>
                 )}
 

@@ -22,9 +22,11 @@ import {
   LogicCardApprovalDto,
   LogicTopicDto,
   ProductDto,
+  ProductLimitPeriod,
   StoreDto,
 } from '../../api/types';
 import { errMsg, fmtAmount } from '../../lib/format';
+import LimitPeriodSelect, { LIMIT_PERIOD_SHORT } from '../LimitPeriodSelect';
 import AchievementsTab from './AchievementsTab';
 import PendingPurchasesCard from '../PendingPurchasesCard';
 import Modal from '../Modal';
@@ -37,6 +39,7 @@ interface ProductForm {
   description: string;
   price: string;
   limitPerChild: string;
+  limitPeriod: ProductLimitPeriod;
   active: boolean;
   effectType: string;
   effectLimit: string;
@@ -56,6 +59,7 @@ const EMPTY_PRODUCT: ProductForm = {
   description: '',
   price: '',
   limitPerChild: '',
+  limitPeriod: 'NONE',
   active: true,
   effectType: 'NONE',
   effectLimit: '',
@@ -330,6 +334,7 @@ export default function LogicTab({ selectedChildId }: Props) {
       description: product.description ?? '',
       price: String(product.price),
       limitPerChild: product.limitPerChild != null ? String(product.limitPerChild) : '',
+      limitPeriod: product.limitPeriod ?? 'NONE',
       active: product.active,
       effectType: product.effectType || 'NONE',
       effectLimit: product.effectLimit ?? '',
@@ -364,6 +369,7 @@ export default function LogicTab({ selectedChildId }: Props) {
         description: productForm.description.trim() || null,
         price,
         limitPerChild: limit,
+        limitPeriod: limit != null ? productForm.limitPeriod : 'NONE',
         active: productForm.active,
         effectType: productForm.effectType || 'NONE',
         effectLimit: productForm.effectType !== 'NONE' ? productForm.effectLimit : null,
@@ -491,7 +497,9 @@ export default function LogicTab({ selectedChildId }: Props) {
                         {fmtAmount(product.price, store.currencyName)}
                       </div>
                       {product.limitPerChild != null && (
-                        <div className="text-xs text-slate-500">лимит: {product.limitPerChild} шт./ребенок</div>
+                        <div className="text-xs text-slate-500">
+                          лимит: {product.limitPerChild} {LIMIT_PERIOD_SHORT[product.limitPeriod ?? 'NONE']}
+                        </div>
                       )}
                     </div>
                     <div className="flex items-center gap-1">
@@ -622,6 +630,11 @@ export default function LogicTab({ selectedChildId }: Props) {
                   />
                 </div>
               </div>
+              <LimitPeriodSelect
+                value={productForm.limitPeriod}
+                disabled={!productForm.limitPerChild.trim()}
+                onChange={(limitPeriod) => setProductForm({ ...productForm, limitPeriod })}
+              />
               <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
                 <input
                   type="checkbox"

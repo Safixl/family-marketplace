@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { CheckCircle2, ChevronDown, ChevronUp, Package, Pencil, Plus, Trash2 } from 'lucide-react';
 import { api } from '../../api/client';
-import { ProductDto, SkillActivationDto, StoreDto } from '../../api/types';
+import { ProductDto, ProductLimitPeriod, SkillActivationDto, StoreDto } from '../../api/types';
 import { errMsg, fmtAmount } from '../../lib/format';
+import LimitPeriodSelect, { LIMIT_PERIOD_SHORT } from '../LimitPeriodSelect';
 import Modal from '../Modal';
 import { EmptyState, Spinner } from '../ui';
 
@@ -19,6 +20,7 @@ interface ProductForm {
   description: string;
   price: string;
   limitPerChild: string;
+  limitPeriod: ProductLimitPeriod;
   active: boolean;
   effectType: string;
   effectLimit: string;
@@ -31,6 +33,7 @@ const EMPTY_PRODUCT: ProductForm = {
   description: '',
   price: '',
   limitPerChild: '',
+  limitPeriod: 'NONE',
   active: true,
   effectType: 'NONE',
   effectLimit: '',
@@ -174,6 +177,7 @@ export default function StoresTab({ templateFilter, title }: StoresTabProps) {
       description: product.description ?? '',
       price: String(product.price),
       limitPerChild: product.limitPerChild != null ? String(product.limitPerChild) : '',
+      limitPeriod: product.limitPeriod ?? 'NONE',
       active: product.active,
       effectType: product.effectType || 'NONE',
       effectLimit: product.effectLimit ?? '',
@@ -208,6 +212,7 @@ export default function StoresTab({ templateFilter, title }: StoresTabProps) {
         description: productForm.description.trim() || null,
         price,
         limitPerChild: limit,
+        limitPeriod: limit != null ? productForm.limitPeriod : 'NONE',
         active: productForm.active,
         effectType: productForm.effectType || 'NONE',
         effectLimit: productForm.effectType !== 'NONE' ? productForm.effectLimit : null,
@@ -378,7 +383,7 @@ export default function StoresTab({ templateFilter, title }: StoresTabProps) {
                               </div>
                               {product.limitPerChild != null && (
                                 <div className="text-xs text-slate-500">
-                                  лимит: {product.limitPerChild} шт./ребенок
+                                  лимит: {product.limitPerChild} {LIMIT_PERIOD_SHORT[product.limitPeriod ?? 'NONE']}
                                 </div>
                               )}
                             </div>
@@ -526,6 +531,11 @@ export default function StoresTab({ templateFilter, title }: StoresTabProps) {
                 />
               </div>
             </div>
+            <LimitPeriodSelect
+              value={productForm.limitPeriod}
+              disabled={!productForm.limitPerChild.trim()}
+              onChange={(limitPeriod) => setProductForm({ ...productForm, limitPeriod })}
+            />
             <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
               <input
                 type="checkbox"
