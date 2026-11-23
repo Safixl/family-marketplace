@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -22,6 +23,10 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
 
     long countByProductIdAndChildIdAndStatusIn(Long productId, Long childId,
                                                Collection<PurchaseStatus> statuses);
+
+    /** Сколько раз товар куплен ребёнком начиная с указанного момента (для обновляемых лимитов). */
+    long countByProductIdAndChildIdAndStatusInAndConfirmedAtGreaterThanEqual(
+            Long productId, Long childId, Collection<PurchaseStatus> statuses, Instant since);
 
     boolean existsByProductIdAndChildIdAndStatus(Long productId, Long childId, PurchaseStatus status);
 

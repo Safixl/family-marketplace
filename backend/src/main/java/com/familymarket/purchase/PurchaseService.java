@@ -12,6 +12,7 @@ import com.familymarket.dto.PurchaseDto;
 import com.familymarket.inventory.InventoryService;
 import com.familymarket.limit.LimitService;
 import com.familymarket.product.Product;
+import com.familymarket.product.ProductLimits;
 import com.familymarket.product.ProductRepository;
 import com.familymarket.store.Store;
 import org.springframework.stereotype.Service;
@@ -77,10 +78,12 @@ public class PurchaseService {
             throw new BadRequestException("Товар неактивен");
         }
 
+        Instant now = Instant.now();
         Integer limit = product.getLimitPerChild();
-        if (limit != null) {
-            long used = purchaseRepository.countByProductIdAndChildIdAndStatusIn(
-                    product.getId(), childId, List.of(PurchaseStatus.PAID));
+        if (limit != null && limit > 0) {
+            long used = purchaseRepository.countByProductIdAndChildIdAndStatusInAndConfirmedAtGreaterThanEqual(
+                    product.getId(), childId, List.of(PurchaseStatus.PAID),
+                    ProductLimits.periodStart(product.getLimitPeriod(), now));
             if (used >= limit) {
                 throw new BadRequestException("Лимит покупок этого товара исчерпан");
             }
@@ -93,8 +96,6 @@ public class PurchaseService {
         }
         balance.setAmount(balance.getAmount().subtract(product.getPrice()));
         balance.setUpdatedAt(Instant.now());
-
-        Instant now = Instant.now();
         Purchase purchase = new Purchase();
         purchase.setChild(balance.getChild());
         purchase.setStore(store);
@@ -105,8 +106,9 @@ public class PurchaseService {
         purchase.setConfirmedAt(now);
         purchaseRepository.save(purchase);
 
-        // Одноразовая покупка: товар магазина «Дом» пропадает из магазина после покупки
-        if ("HOME".equals(store.getTemplateType())) {
+        // Одноразовая покупка: товар магазина «Дом» пропадает из магазина после покупки.
+        // Товары с обновляемым лимитом (день/неделя/месяц) остаются и вернутся после сброса.
+        if ("HOME".equals(store.getTemplateType()) && ProductLimits.isOneTime(product.getLimitPeriod())) {
             product.setActive(false);
             productRepository.save(product);
         }
@@ -131,6 +133,16 @@ public class PurchaseService {
         if (purchase.getStatus() != PurchaseStatus.PENDING) {
             throw new BadRequestException("Заказ уже обработан");
         }
+        Product product = purchase.getProduct();
+        Integer limit = product.getLimitPerChild();
+        if (limit != null && limit > 0) {
+            long used = purchaseRepository.countByProductIdAndChildIdAndStatusInAndConfirmedAtGreaterThanEqual(
+                    product.getId(), purchase.getChild().getId(), List.of(PurchaseStatus.PAID),
+                    ProductLimits.periodStart(product.getLimitPeriod(), Instant.now()));
+            if (used >= limit) {
+                throw new BadRequestException("Лимит покупок этого товара исчерпан");
+            }
+        }
         Balance balance = balanceRepository
                 .findByChildIdAndStoreIdForUpdate(purchase.getChild().getId(), purchase.getStore().getId())
                 .orElseThrow(() -> new BadRequestException("У ребенка нет баланса в этом магазине"));
@@ -143,9 +155,9 @@ public class PurchaseService {
         purchase.setConfirmedAt(Instant.now());
         purchaseRepository.save(purchase);
 
-        // Одноразовая покупка: товар магазина «Дом» пропадает из магазина после одобрения
-        if ("HOME".equals(purchase.getStore().getTemplateType())) {
-            Product product = purchase.getProduct();
+        // Одноразовая покупка: товар магазина «Дом» пропадает из магазина после одобрения.
+        // Товары с обновляемым лимитом остаются и вернутся после сброса.
+        if ("HOME".equals(purchase.getStore().getTemplateType()) && ProductLimits.isOneTime(product.getLimitPeriod())) {
             product.setActive(false);
             productRepository.save(product);
         }

@@ -45,6 +45,9 @@ export interface StoreTemplateDto {
   type: string;
 }
 
+/** Период обновления лимита покупок товара. */
+export type ProductLimitPeriod = 'NONE' | 'DAILY' | 'WEEKLY' | 'MONTHLY';
+
 export interface ProductDto {
   id: number;
   storeId: number;
@@ -52,6 +55,7 @@ export interface ProductDto {
   description: string | null;
   price: number;
   limitPerChild: number | null;
+  limitPeriod: ProductLimitPeriod;
   active: boolean;
   effectType: string;
   effectLimit: string | null;
@@ -66,6 +70,9 @@ export interface ChildProductDto {
   description: string | null;
   price: number;
   limitPerChild: number | null;
+  limitPeriod: ProductLimitPeriod;
+  /** Момент следующего сброса лимита; null для одноразового лимита. */
+  limitResetAt: string | null;
   currencyName: string;
   currencyIcon: string;
   boughtCount: number;
