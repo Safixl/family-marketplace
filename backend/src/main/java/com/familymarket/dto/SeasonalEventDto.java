@@ -7,6 +7,7 @@ import java.time.LocalDate;
 
 public record SeasonalEventDto(
         Long id,
+        Long storeId,
         String name,
         String description,
         String tokenName,
@@ -14,12 +15,14 @@ public record SeasonalEventDto(
         LocalDate startsAt,
         LocalDate endsAt,
         boolean active,
+        boolean keepAfterEnd,
         boolean openNow,
         Instant createdAt) {
 
-    public static SeasonalEventDto from(SeasonalEvent event) {
+    public static SeasonalEventDto from(SeasonalEvent event, Long storeId) {
         return new SeasonalEventDto(
                 event.getId(),
+                storeId,
                 event.getName(),
                 event.getDescription(),
                 event.getTokenName(),
@@ -27,6 +30,7 @@ public record SeasonalEventDto(
                 event.getStartsAt(),
                 event.getEndsAt(),
                 event.isActive(),
+                event.isKeepAfterEnd(),
                 event.isOpenNow(),
                 event.getCreatedAt());
     }

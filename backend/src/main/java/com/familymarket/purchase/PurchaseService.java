@@ -74,6 +74,9 @@ public class PurchaseService {
         if (!store.isActive()) {
             throw new BadRequestException("Магазин неактивен");
         }
+        if (!store.isAvailableNow()) {
+            throw new BadRequestException("Сезонный ивент завершён — магазин недоступен");
+        }
         if (!product.isActive()) {
             throw new BadRequestException("Товар неактивен");
         }

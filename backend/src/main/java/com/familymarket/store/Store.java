@@ -59,4 +59,9 @@ public class Store {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    /** Магазин доступен ребёнку: активен и, для сезонного, ивент сейчас открыт. */
+    public boolean isAvailableNow() {
+        return active && (seasonalEvent == null || seasonalEvent.isOpenNow());
+    }
 }

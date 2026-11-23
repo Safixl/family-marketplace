@@ -9,5 +9,6 @@ public record SeasonalEventUpsertRequest(
         String tokenIcon,
         LocalDate startsAt,
         LocalDate endsAt,
-        Boolean active) {
+        Boolean active,
+        Boolean keepAfterEnd) {
 }

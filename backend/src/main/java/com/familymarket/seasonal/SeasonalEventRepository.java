@@ -14,4 +14,8 @@ public interface SeasonalEventRepository extends JpaRepository<SeasonalEvent, Lo
     @Query("select e from SeasonalEvent e where e.parent.id = :parentId and e.active = true " +
             "and e.startsAt <= :today and e.endsAt >= :today")
     List<SeasonalEvent> findOpenForParent(@Param("parentId") Long parentId, @Param("today") LocalDate today);
+
+    /** Ивенты, у которых дата окончания уже прошла. */
+    @Query("select e from SeasonalEvent e where e.endsAt < :today")
+    List<SeasonalEvent> findEndedBefore(@Param("today") LocalDate today);
 }

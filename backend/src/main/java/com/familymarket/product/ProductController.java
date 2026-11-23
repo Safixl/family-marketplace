@@ -14,6 +14,7 @@ import com.familymarket.store.StoreRepository;
 import com.familymarket.store.StoreService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -83,6 +84,7 @@ public class ProductController {
     // ---------- Витрина (ребенок) ----------
 
     @GetMapping("/api/child/stores/{storeId}/products")
+    @Transactional(readOnly = true)
     public List<ChildProductDto> childProducts(@PathVariable Long storeId) {
         Long childId = CurrentUser.childId();
         Long parentId = childRepository.findParentIdById(childId)
@@ -96,6 +98,9 @@ public class ProductController {
                 .orElseThrow(() -> new NotFoundException("Магазин не найден"));
         if (!store.isActive()) {
             throw new BadRequestException("Магазин неактивен");
+        }
+        if (!store.isAvailableNow()) {
+            throw new BadRequestException("Сезонный ивент завершён — магазин недоступен");
         }
 
         Instant now = Instant.now();
