@@ -187,15 +187,42 @@ export default function ChildDashboard() {
   const localLevel = useMemo(() => levelFromXp(totalXp), [totalXp]);
 
   // Общий уровень с бэкенда: 50% опыта навыков + опыт ачивок и квестов
+  const loadLevel = useCallback(async () => {
+    try {
+      setServerLevel(await api.get<LevelDto>('/child/level'));
+    } catch {
+      // используем локальный расчёт
+    }
+  }, []);
+
   useEffect(() => {
-    (async () => {
-      try {
-        setServerLevel(await api.get<LevelDto>('/child/level'));
-      } catch {
-        // используем локальный расчёт
-      }
-    })();
-  }, [skills.length]);
+    void loadLevel();
+  }, [loadLevel, skills.length]);
+
+  // Родитель может одобрить квест, пока ребёнок на другой вкладке: без перезагрузки
+  // подтягиваем балансы, навыки, инвентарь, ачивки и уровень — по таймеру и при возврате на страницу.
+  useEffect(() => {
+    const refresh = () => {
+      if (document.hidden) return;
+      void loadProfile();
+      void loadSkills();
+      void loadInventory();
+      void loadAchievements();
+      void loadLevel();
+    };
+    const timer = window.setInterval(refresh, 20000);
+    const onFocus = () => refresh();
+    const onVisible = () => {
+      if (!document.hidden) refresh();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [loadProfile, loadSkills, loadInventory, loadAchievements, loadLevel]);
 
   const level: RpgLevel = serverLevel
     ? {

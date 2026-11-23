@@ -50,6 +50,10 @@ public class LangCardService {
     private static final int MAX_ACTIVE_WORDS = 50;
     private static final ZoneId ZONE = ZoneId.of("Europe/Moscow");
 
+    /** Статусы, в которых карточка считается «взятой»: одновременно может быть только одна. */
+    private static final List<String> TAKEN_STATUSES =
+            List.of("REQUESTED", "APPROVED", "IN_PROGRESS", "PAUSED");
+
     private final LangWordRepository wordRepository;
     private final LangWordProgressRepository progressRepository;
     private final LangCardSettingRepository settingRepository;
@@ -279,15 +283,38 @@ public class LangCardService {
         expireOverdue(childId);
 
         LocalDate today = todayDate();
-        // Лимит по ВСЕМ карточкам дня (включая незавершённые): нельзя перегенерировать
-        long doneToday = cardRepository.countByChildIdAndCardDate(childId, today);
-        if (doneToday >= DAILY_LIMIT) {
-            throw new BadRequestException("Лимит карточек на день исчерпан (3). Новые появятся завтра в 9:00");
+        List<LangCard> dayCards = cardRepository.findByChildIdAndCardDateOrderByCreatedAtDesc(childId, today);
+
+        // Пока есть взятая карточка (ждёт одобрения, одобрена или в работе) — вторую брать нельзя.
+        LangCard taken = dayCards.stream()
+                .filter(c -> TAKEN_STATUSES.contains(c.getStatus()))
+                .findFirst()
+                .orElse(null);
+        if (taken != null) {
+            if (taken.getTaskType() == type) {
+                // Повторный клик по тому же виду задания — возвращаем уже взятую карточку.
+                return LangCardDto.of(taken, taskRepository.findByCardIdOrderByIdAsc(taken.getId()),
+                        "IN_PROGRESS".equals(taken.getStatus()));
+            }
+            throw new BadRequestException("Сначала завершите текущую карточку");
         }
-        List<LangCard> active = cardRepository.findByChildIdAndCardDateAndStatus(childId, today, "IN_PROGRESS");
-        if (!active.isEmpty()) {
-            LangCard inProgress = active.get(0);
-            return LangCardDto.of(inProgress, taskRepository.findByCardIdOrderByIdAsc(inProgress.getId()), true);
+
+        // Этот вид задания уже встречался сегодня: завершённый повторять нельзя,
+        // а созданный (CREATED) возвращаем вместо создания дубля.
+        LangCard sameType = dayCards.stream()
+                .filter(c -> c.getTaskType() == type)
+                .findFirst()
+                .orElse(null);
+        if (sameType != null) {
+            if ("SUCCESS".equals(sameType.getStatus()) || "FAILED".equals(sameType.getStatus())) {
+                throw new BadRequestException("Этот вид задания уже выполнен сегодня — выберите другой");
+            }
+            return LangCardDto.of(sameType, taskRepository.findByCardIdOrderByIdAsc(sameType.getId()), false);
+        }
+
+        // Лимит по ВСЕМ карточкам дня (включая незавершённые): нельзя перегенерировать.
+        if (dayCards.size() >= DAILY_LIMIT) {
+            throw new BadRequestException("Лимит карточек на день исчерпан (3). Новые появятся завтра в 9:00");
         }
 
         LangCardSetting setting = settingRepository.findByParentIdAndTaskType(parentId, type)
@@ -329,6 +356,9 @@ public class LangCardService {
         if (!"CREATED".equals(card.getStatus())) {
             throw new BadRequestException("Карточка уже взята");
         }
+        if (hasOtherTakenCard(childId, card)) {
+            throw new BadRequestException("Сначала завершите текущую карточку");
+        }
         card.setStatus(card.getChild().isTrustLimit() ? "APPROVED" : "REQUESTED");
         cardRepository.save(card);
         return LangCardDto.of(card, taskRepository.findByCardIdOrderByIdAsc(cardId), false);
@@ -353,7 +383,7 @@ public class LangCardService {
         if (!"APPROVED".equals(card.getStatus())) {
             throw new BadRequestException("Карточка ещё не одобрена родителем");
         }
-        if (!cardRepository.findByChildIdAndCardDateAndStatus(childId, card.getCardDate(), "IN_PROGRESS").isEmpty()) {
+        if (hasOtherTakenCard(childId, card)) {
             throw new BadRequestException("Сначала завершите текущую карточку");
         }
         Instant now = Instant.now();
@@ -722,6 +752,12 @@ public class LangCardService {
             throw new NotFoundException("Карточка не найдена");
         }
         return card;
+    }
+
+    /** Есть ли у ребёнка за этот день другая взятая карточка (кроме переданной). */
+    private boolean hasOtherTakenCard(Long childId, LangCard card) {
+        return cardRepository.findByChildIdAndCardDateOrderByCreatedAtDesc(childId, card.getCardDate()).stream()
+                .anyMatch(c -> !c.getId().equals(card.getId()) && TAKEN_STATUSES.contains(c.getStatus()));
     }
 
     private LangCard ownedByParent(Long parentId, Long cardId) {

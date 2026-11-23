@@ -467,8 +467,12 @@ public class DailyService {
     }
 
     /**
-     * Начисление награды за дейлик дома (идемпотентно, 1 раз в день):
+     * Отметка дейлика «Хозяйственность» (идемпотентно, 1 раз в день):
      * вызывается из HouseService при подтверждении проверки комнаты или помощи.
+     * <p>
+     * Валюта здесь НЕ начисляется: «румы» за порядок и помощь копятся в календаре
+     * и начисляются раз в месяц (1-го числа) через {@code HouseService.settlePending}.
+     * Здесь фиксируется только прогресс дейлика (XP/галочка).
      */
     @Transactional
     public void recordHouse(Long childId) {
@@ -490,7 +494,6 @@ public class DailyService {
         if (log.getPoints() != null && log.getPoints().signum() > 0) {
             return;
         }
-        balanceService.credit(childId, store.getId(), BigDecimal.ONE);
         log.setPoints(BigDecimal.ONE);
         log.setXp(1);
         log.setFullClear(true);

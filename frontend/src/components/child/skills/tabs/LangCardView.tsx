@@ -13,6 +13,18 @@ import { useAntiCheatTest } from '../../../../hooks/useAntiCheatTest';
 import LangManuscript from './LangManuscript';
 import { Spinner } from '../../../ui';
 
+/** Статусы, в которых карточка считается «взятой»: одновременно может быть только одна. */
+const TAKEN_STATUSES = ['REQUESTED', 'APPROVED', 'IN_PROGRESS', 'PAUSED'];
+
+const LANG_TYPES: Array<[LangTaskType, string, string]> = [
+  ['WORD_WALL', '🧱', 'Перевод слов en → ru'],
+  ['SECRET_STORIES', '📜', 'Пропуски в историях'],
+  ['DECODE', '🔐', 'Перевод текста (родителю)'],
+  ['SPELLING', '✏️', 'Написание ru → en'],
+  ['SHARE_SECRET', '🤫', 'Вопрос ru → ответ en (родителю)'],
+  ['MASTERY', '🏆', 'Вопрос en → ответ en (родителю)'],
+];
+
 /**
  * Динамические карточки иностранного языка (ребёнок). До 3 карточек в день (сброс в 9:00).
  * 6 видов заданий вместо уровней сложности. Авто-задания проверяются автоматически,
@@ -139,6 +151,7 @@ export default function LangCardView({ onDone }: { onDone?: () => void }) {
       await api.post(`/child/lang-cards/${card.id}/${action}`);
       setResult(null);
       await load();
+      onDone?.();
     } catch (e) {
       alert(errMsg(e));
       await load();
@@ -156,6 +169,7 @@ export default function LangCardView({ onDone }: { onDone?: () => void }) {
       const res = await api.post<LangCardSubmitResult>(`/child/lang-cards/${card.id}/submit`, { answers: list });
       setResult(res);
       await load();
+      onDone?.();
     } catch (e) {
       alert(errMsg(e));
       await load();
@@ -179,6 +193,10 @@ export default function LangCardView({ onDone }: { onDone?: () => void }) {
 
   const limitReached = day.doneToday >= day.dailyLimit;
   const visible = active ? [active] : day.cards;
+  // Пока есть взятая карточка (ожидает одобрения / одобрена / в работе) — брать другую нельзя.
+  const takenCard = day.cards.find((c) => TAKEN_STATUSES.includes(c.status)) ?? null;
+  const dayTypes = new Set(day.cards.map((c) => c.taskType));
+  const canGenerate = !takenCard && !limitReached;
   const learning = vocab.filter((w) => w.status === 'ACTIVE');
   const learned = vocab.filter((w) => w.status === 'LEARNED');
 
@@ -252,19 +270,11 @@ export default function LangCardView({ onDone }: { onDone?: () => void }) {
             </div>
           )}
 
-          {/* Выбор вида задания — пока нет активной карточки и не исчерпан лимит */}
-          {!active && !limitReached && (
+          {/* Выбор вида задания — пока нет взятой карточки и не исчерпан лимит.
+              Виды, по которым карточка уже создана, показываются ниже со своей кнопкой «Взять». */}
+          {canGenerate && (
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {(
-                [
-                  ['WORD_WALL', '🧱', 'Перевод слов en → ru'],
-                  ['SECRET_STORIES', '📜', 'Пропуски в историях'],
-                  ['DECODE', '🔐', 'Перевод текста (родителю)'],
-                  ['SPELLING', '✏️', 'Написание ru → en'],
-                  ['SHARE_SECRET', '🤫', 'Вопрос ru → ответ en (родителю)'],
-                  ['MASTERY', '🏆', 'Вопрос en → ответ en (родителю)'],
-                ] as Array<[LangTaskType, string, string]>
-              ).map(([type, emoji, hint]) => (
+              {LANG_TYPES.filter(([type]) => !dayTypes.has(type)).map(([type, emoji, hint]) => (
                 <button
                   key={type}
                   disabled={busy}
@@ -275,6 +285,11 @@ export default function LangCardView({ onDone }: { onDone?: () => void }) {
                   <div className="mt-1 text-xs text-stone-400">{hint}</div>
                 </button>
               ))}
+            </div>
+          )}
+          {canGenerate && LANG_TYPES.every(([type]) => dayTypes.has(type)) && (
+            <div className="rpg-panel p-3 text-sm text-stone-400">
+              Все виды заданий на сегодня уже созданы — завершите их или дождитесь завтрашнего дня.
             </div>
           )}
 

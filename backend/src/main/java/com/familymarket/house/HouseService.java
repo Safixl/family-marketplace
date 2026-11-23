@@ -21,12 +21,16 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 @Service
 public class HouseService {
+
+    /** Граница месяца должна совпадать с локальным днём ребёнка/родителя. */
+    private static final ZoneId ZONE = ZoneId.of("Europe/Moscow");
 
     private final HouseDayRepository houseDayRepository;
     private final HouseCheckRequestRepository checkRequestRepository;
@@ -194,14 +198,18 @@ public class HouseService {
     }
 
     /**
-     * Начислить в баланс баллы за все отмеченные дни прошлых месяцев (лениво, при обращении).
+     * Начислить в баланс баллы за все отмеченные дни прошлых месяцев.
+     * <p>
+     * Вызывается планировщиком 1-го числа в 00:05 МСК (основной путь) и лениво —
+     * при открытии календаря, если приложение в момент начисления было недоступно.
+     * Дни текущего месяца не начисляются никогда: они остаются «ожидающими».
      */
     @Transactional
     public void settlePending(Long childId) {
-        LocalDate firstOfMonth = YearMonth.now().atDay(1);
+        LocalDate firstOfMonth = YearMonth.now(ZONE).atDay(1);
         List<HouseDay> pending = houseDayRepository.findByChildIdAndSettledFalseAndDayBefore(childId, firstOfMonth);
         for (HouseDay day : pending) {
-            if (day.getPoints().signum() != 0) {
+            if (day.getPoints() != null && day.getPoints().signum() != 0) {
                 balanceService.credit(childId, day.getStore().getId(), day.getPoints());
             }
             day.setSettled(true);
