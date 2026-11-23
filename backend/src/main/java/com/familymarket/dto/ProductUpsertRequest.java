@@ -13,6 +13,7 @@ public record ProductUpsertRequest(
         @Size(max = 2000, message = "Описание слишком длинное") String description,
         @NotNull(message = "Укажите цену") @DecimalMin(value = "0.01", message = "Цена должна быть больше нуля") BigDecimal price,
         @Min(value = 1, message = "Лимит должен быть положительным") Integer limitPerChild,
+        String limitPeriod,
         Boolean active,
         String effectType,
         String effectLimit,

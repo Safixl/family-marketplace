@@ -42,6 +42,13 @@ public class Product {
     @Column(name = "limit_per_child")
     private Integer limitPerChild;
 
+    /**
+     * Период действия лимита: NONE (всего, одноразовый), DAILY, WEEKLY, MONTHLY.
+     * Сброс лимита происходит в 09:00 по Москве.
+     */
+    @Column(name = "limit_period", nullable = false, length = 16)
+    private String limitPeriod = "NONE";
+
     @Column(nullable = false)
     private boolean active;
 

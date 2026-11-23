@@ -98,21 +98,36 @@ public class ProductController {
             throw new BadRequestException("Магазин неактивен");
         }
 
+        Instant now = Instant.now();
         return productRepository.findByStoreIdAndActiveTrueOrderByCreatedAtAsc(storeId).stream()
-                .map(p -> new ChildProductDto(
-                        p.getId(),
-                        storeId,
-                        store.getName(),
-                        p.getName(),
-                        p.getDescription(),
-                        p.getPrice(),
-                        p.getLimitPerChild(),
-                        store.getCurrencyName(),
-                        store.getCurrencyIcon(),
-                        purchaseRepository.countByProductIdAndChildIdAndStatusIn(
-                                p.getId(), childId, List.of(PurchaseStatus.PENDING, PurchaseStatus.PAID)),
-                        purchaseRepository.existsByProductIdAndChildIdAndStatus(
-                                p.getId(), childId, PurchaseStatus.PENDING)))
+                .map(p -> {
+                    String period = ProductLimits.normalize(p.getLimitPeriod());
+                    long bought = p.getLimitPerChild() == null
+                            ? purchaseRepository.countByProductIdAndChildIdAndStatusIn(
+                                    p.getId(), childId, List.of(PurchaseStatus.PENDING, PurchaseStatus.PAID))
+                            : purchaseRepository.countByProductIdAndChildIdAndStatusInAndConfirmedAtGreaterThanEqual(
+                                    p.getId(), childId, List.of(PurchaseStatus.PAID),
+                                    ProductLimits.periodStart(period, now));
+                    return new ChildProductDto(
+                            p.getId(),
+                            storeId,
+                            store.getName(),
+                            p.getName(),
+                            p.getDescription(),
+                            p.getPrice(),
+                            p.getLimitPerChild(),
+                            period,
+                            ProductLimits.nextReset(period, now),
+                            store.getCurrencyName(),
+                            store.getCurrencyIcon(),
+                            bought,
+                            purchaseRepository.existsByProductIdAndChildIdAndStatus(
+                                    p.getId(), childId, PurchaseStatus.PENDING));
+                })
+                // Товар с исчерпанным лимитом пропадает с витрины до следующего сброса.
+                .filter(dto -> dto.limitPerChild() == null
+                        || dto.limitPerChild() <= 0
+                        || dto.boughtCount() < dto.limitPerChild())
                 .toList();
     }
 
@@ -126,6 +141,7 @@ public class ProductController {
         product.setDescription(request.description());
         product.setPrice(request.price());
         product.setLimitPerChild(request.limitPerChild());
+        product.setLimitPeriod(ProductLimits.normalize(request.limitPeriod()));
         if (request.active() != null) {
             product.setActive(request.active());
         }

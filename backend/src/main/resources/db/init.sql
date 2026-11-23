@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS products (
     description     VARCHAR(2000),
     price           NUMERIC(12,2) NOT NULL,
     limit_per_child INT,
+    limit_period    VARCHAR(16)   NOT NULL DEFAULT 'NONE',
     active          BOOLEAN       NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMPTZ   NOT NULL DEFAULT now()
 );
@@ -511,6 +512,9 @@ CREATE INDEX IF NOT EXISTS idx_limit_events_child ON limit_events (child_id);
 ALTER TABLE products ADD COLUMN IF NOT EXISTS effect_type VARCHAR(20) NOT NULL DEFAULT 'NONE';
 ALTER TABLE products ADD COLUMN IF NOT EXISTS effect_limit VARCHAR(20);
 ALTER TABLE products ADD COLUMN IF NOT EXISTS effect_value INT NOT NULL DEFAULT 0;
+
+-- Период лимита покупок: NONE (одноразовый), DAILY, WEEKLY, MONTHLY (сброс в 09:00 МСК)
+ALTER TABLE products ADD COLUMN IF NOT EXISTS limit_period VARCHAR(16) NOT NULL DEFAULT 'NONE';
 
 -- Запросы ребёнка на выдачу карманных денег
 CREATE TABLE IF NOT EXISTS pocket_requests (
