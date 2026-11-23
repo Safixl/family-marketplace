@@ -34,7 +34,11 @@ public class StoreService {
     public List<Store> listActiveForChild(Long childId) {
         Long parentId = childRepository.findParentIdById(childId)
                 .orElseThrow(() -> new NotFoundException("Ребенок не найден"));
-        return storeRepository.findByParentIdAndActiveTrueOrderByCreatedAtAsc(parentId);
+        // Сезонный магазин скрыт от ребёнка, пока его ивент не открыт (даже если active=true).
+        return storeRepository.findByParentIdAndActiveTrueOrderByCreatedAtAsc(parentId)
+                .stream()
+                .filter(Store::isAvailableNow)
+                .toList();
     }
 
     @Transactional

@@ -608,6 +608,8 @@ export interface QuestSubmissionDto {
 
 export interface SeasonalEventDto {
   id: number;
+  /** Магазин ивента; null, если магазин ещё не создан. */
+  storeId: number | null;
   name: string;
   description: string | null;
   tokenName: string;
@@ -615,6 +617,8 @@ export interface SeasonalEventDto {
   startsAt: string;
   endsAt: string;
   active: boolean;
+  /** Не удалять ивент и магазин после окончания (видны только родителю). */
+  keepAfterEnd: boolean;
   openNow: boolean;
   createdAt: string;
 }

@@ -15,6 +15,7 @@ import lombok.Setter;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 
 /**
  * Сезонный ивент: магазин открыт ограниченное время, валюта — сезонные жетоны.
@@ -25,6 +26,8 @@ import java.time.LocalDate;
 @Getter
 @Setter
 public class SeasonalEvent {
+
+    private static final ZoneId ZONE = ZoneId.of("Europe/Moscow");
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -55,12 +58,22 @@ public class SeasonalEvent {
     @Column(nullable = false)
     private boolean active = true;
 
+    /**
+     * Не удалять ивент и магазин после окончания: они остаются у родителя,
+     * но скрыты от ребёнка до повторного запуска.
+     */
+    @Column(name = "keep_after_end", nullable = false)
+    private boolean keepAfterEnd = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
     /** Ивент сейчас активен (в пределах дат). */
     public boolean isOpenNow() {
-        LocalDate today = LocalDate.now();
+        return isOpenNow(LocalDate.now(ZONE));
+    }
+
+    public boolean isOpenNow(LocalDate today) {
         return active && !today.isBefore(startsAt) && !today.isAfter(endsAt);
     }
 }

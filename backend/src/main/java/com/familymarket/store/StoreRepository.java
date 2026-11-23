@@ -23,4 +23,6 @@ public interface StoreRepository extends JpaRepository<Store, Long> {
     Optional<Long> findParentIdById(@Param("id") Long id);
 
     List<Store> findByParentIdAndSeasonalEventIdOrderByCreatedAtAsc(Long parentId, Long seasonalEventId);
+
+    Optional<Store> findFirstBySeasonalEventId(Long seasonalEventId);
 }

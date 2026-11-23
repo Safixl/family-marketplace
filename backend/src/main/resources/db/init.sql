@@ -324,20 +324,24 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_achievements_parent_group_level
 
 -- Сезонные ивенты: ограниченное время, валюта-жетоны
 CREATE TABLE IF NOT EXISTS seasonal_events (
-    id          BIGSERIAL PRIMARY KEY,
-    parent_id   BIGINT       NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    name        VARCHAR(150) NOT NULL,
-    description VARCHAR(2000),
-    token_name  VARCHAR(50)  NOT NULL DEFAULT 'жетон',
-    token_icon  VARCHAR(16)  NOT NULL DEFAULT '🎟️',
-    starts_at   DATE         NOT NULL,
-    ends_at     DATE         NOT NULL,
-    active      BOOLEAN      NOT NULL DEFAULT TRUE,
-    created_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
+    id             BIGSERIAL PRIMARY KEY,
+    parent_id      BIGINT       NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    name           VARCHAR(150) NOT NULL,
+    description    VARCHAR(2000),
+    token_name     VARCHAR(50)  NOT NULL DEFAULT 'жетон',
+    token_icon     VARCHAR(16)  NOT NULL DEFAULT '🎟️',
+    starts_at      DATE         NOT NULL,
+    ends_at        DATE         NOT NULL,
+    active         BOOLEAN      NOT NULL DEFAULT TRUE,
+    keep_after_end BOOLEAN      NOT NULL DEFAULT FALSE,
+    created_at     TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 
 -- Сезонный магазин: обычный магазин, привязанный к ивенту
 ALTER TABLE stores ADD COLUMN IF NOT EXISTS seasonal_event_id BIGINT REFERENCES seasonal_events (id) ON DELETE SET NULL;
+
+-- Оставлять ивент и магазин после окончания (видны только родителю до повторного запуска)
+ALTER TABLE seasonal_events ADD COLUMN IF NOT EXISTS keep_after_end BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- Квесты ГМа: DAILY (дейлик) / STORY (сюжетный) / SEASONAL (сезонный)
 CREATE TABLE IF NOT EXISTS quests (

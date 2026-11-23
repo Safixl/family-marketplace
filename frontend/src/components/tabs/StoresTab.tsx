@@ -43,13 +43,15 @@ const EMPTY_PRODUCT: ProductForm = {
 interface StoresTabProps {
   /** Фильтр магазинов по типу шаблона: 'READING' | 'MATH' | ... | 'NONE' (без шаблона) */
   templateFilter?: string;
+  /** Показать только один магазин (например, магазин сезонного ивента). */
+  storeId?: number;
   /** Заголовок вкладки */
   title?: string;
   /** Ребёнок, выбранный в шапке: дефолт для подключения навыка и менеджеров */
   selectedChildId?: number | null;
 }
 
-export default function StoresTab({ templateFilter, title }: StoresTabProps) {
+export default function StoresTab({ templateFilter, storeId, title }: StoresTabProps) {
   const [stores, setStores] = useState<StoreDto[]>([]);
   const [productsByStore, setProductsByStore] = useState<Record<number, ProductDto[]>>({});
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
@@ -246,8 +248,12 @@ export default function StoresTab({ templateFilter, title }: StoresTabProps) {
 
   if (error) return <div className="card text-sm text-rose-600">{error}</div>;
 
-  // Фильтр по типу шаблона (вкладка навыка)
-  const visibleStores = templateFilter ? stores.filter((s) => s.templateType === templateFilter) : stores;
+  // Фильтр: конкретный магазин (сезонный ивент) или тип шаблона (вкладка навыка)
+  const visibleStores = storeId != null
+    ? stores.filter((s) => s.id === storeId)
+    : templateFilter
+      ? stores.filter((s) => s.templateType === templateFilter)
+      : stores;
 
   return (
     <div className="space-y-4">
