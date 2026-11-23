@@ -23,18 +23,47 @@ export default function ChildQuestsTab() {
   const [, setTick] = useState(0);
   const timerRef = useRef<number | null>(null);
 
+  /** Тихое обновление — для polling: без alert при временных сетевых ошибках. */
+  const refresh = useCallback(async () => {
+    try {
+      const [q, s] = await Promise.all([
+        api.get<QuestDto[]>('/child/quests'),
+        api.get<QuestSubmissionDto[]>('/child/quest-submissions'),
+      ]);
+      setQuests(q);
+      setSubmissions(s);
+    } catch {
+      // повторим на следующем тике
+    }
+  }, []);
+
   const load = useCallback(async () => {
     try {
-      setQuests(await api.get<QuestDto[]>('/child/quests'));
-      setSubmissions(await api.get<QuestSubmissionDto[]>('/child/quest-submissions'));
+      await refresh();
     } catch (e) {
       alert(errMsg(e));
     }
-  }, []);
+  }, [refresh]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Статус «Одобрено» и награда должны появляться без перезагрузки страницы:
+  // опрашиваем сервер и обновляемся при возврате на вкладку.
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (!document.hidden) void refresh();
+    }, 20000);
+    const onVisible = () => {
+      if (!document.hidden) void refresh();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [refresh]);
 
   // Тикер для обратных отсчётов (таймеры выполнения и спячки)
   useEffect(() => {

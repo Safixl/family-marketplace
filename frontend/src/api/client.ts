@@ -90,7 +90,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (response.status === 204) {
     return undefined as T;
   }
-  return (await response.json()) as T;
+  // Void-эндпоинты (identify/equip/accept/delete и т.п.) отвечают 200 с пустым телом —
+  // response.json() на нём бросает SyntaxError, из-за чего вызывающий код уходит в catch.
+  const text = await response.text();
+  if (!text) {
+    return undefined as T;
+  }
+  return JSON.parse(text) as T;
 }
 
 /** Скачивание файла с авторизацией (возвращает Blob). */
